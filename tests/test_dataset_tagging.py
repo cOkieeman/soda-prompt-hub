@@ -96,7 +96,10 @@ def test_store_and_review_wd14_result_without_overwriting_other_profile() -> Non
 
 
 def test_single_tag_and_review_api(settings, monkeypatch) -> None:
-    monkeypatch.setattr("prompt_hub.api.tag_image", lambda *_args, **_kwargs: _tag_result())
+    monkeypatch.setattr(
+        "prompt_hub.dataset_routes.tag_image",
+        lambda *_args, **_kwargs: _tag_result(),
+    )
     with TestClient(create_app(settings)) as client:
         project = _create_project(client)
         asset = _upload(client, project["project_id"], "single.png", "navy")
@@ -139,7 +142,7 @@ def test_selected_batch_returns_partial_failures(settings, monkeypatch) -> None:
             raise WD14Error(message)
         return _tag_result("1woman")
 
-    monkeypatch.setattr("prompt_hub.api.tag_image", fake_tag_image)
+    monkeypatch.setattr("prompt_hub.dataset_routes.tag_image", fake_tag_image)
     with TestClient(create_app(settings)) as client:
         project = _create_project(client)
         project_id = project["project_id"]

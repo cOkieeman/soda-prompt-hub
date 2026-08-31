@@ -61,7 +61,9 @@ def test_creative_store_project_recipe_and_export(settings) -> None:
     recipe = store.save_recipe(created["project_id"], "第一版", favorite=True)
     assert recipe["favorite"] is True
     assert recipe["snapshot"]["outputs"]["anima"]["positive"].startswith("masterpiece")
-    assert store.get_recipe(recipe["recipe_id"])["name"] == "第一版"
+    stored_recipe = store.get_recipe(recipe["recipe_id"])
+    assert stored_recipe is not None
+    assert stored_recipe["name"] == "第一版"
     assert store.list_recipes()[0]["project_id"] == created["project_id"]
 
     exported = export_project(updated)

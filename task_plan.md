@@ -139,10 +139,11 @@
 ### 阶段 16：工程安全门与可维护性整理
 - [x] 为当前未跟踪工作树建立可恢复的 Git 基线（仅本地 commit；未配置 remote、未 push）
 - [x] 备份正式 SQLite、个人媒体、模型配置与资料源版本信息
-- [ ] 将 `api.py`、`creative_web.py` 按数据集/创作/系统状态拆分边界
+- [x] 将 `api.py` 的数据集域拆到 `dataset_routes.py` / `result_assets.py`
+- [x] 将 `creative_web.py` 的创作台 HTML 布局拆到 `creative_web_layout.py`
 - [ ] 为长任务建立后台任务、进度、取消与失败重试基础
 - [ ] 保持 8765 正式服务、现有 API 和页面行为兼容
-- **状态：** in_progress
+- **状态：** partial / baseline and first refactor complete; background jobs pending
 
 ### 阶段 17：V1.7 数据集工作台
 - [ ] 以只读方式导入任意本地图片数据集目录，不移动或覆盖原文件
@@ -229,6 +230,15 @@
 | 阶段 16 首次敏感内容复合正则被 zsh 引号解析拒绝 | 1 | 不读取文件值，改用多条无嵌套引号的独立 `rg -l` 规则 |
 | 阶段 16 首次完整验证发现 5 个文件不符合 Ruff format | 1 | 使用项目锁定版本统一格式化，随后从头重跑全部检查 |
 | 阶段 16 首次 staged diff 检查发现文档末尾多余空行 | 1 | 修正 `BASELINE.md` 文件末尾并重新暂存、复检 |
+| 数据集路由拆分首轮 Ruff 报 7 条规范问题 | 1 | 调整 import 顺序与 TYPE_CHECKING；仅对 FastAPI 路由注册入口沿用精确复杂度例外 |
+| 数据集路由拆分后 2 项测试仍 patch 旧模块符号 | 1 | 将 monkeypatch 目标改为函数的新所有者 `prompt_hub.dataset_routes.tag_image` |
+| 首次基线/当前路由对照脚本因 Python 引号错误产生空输出假阳性 | 1 | 为两个子命令分别检查退出码，改用字符串拼接并重新比较 |
+| 第二次路由对照遇到 FastAPI `_IncludedRouter` 无 `methods` 属性 | 1 | 仅比较同时具有 `path` 与 `methods` 的真实 HTTP 路由 |
+| 直接遍历 `app.routes` 将嵌套 router 误判为少 6 条路由 | 1 | 根因是 FastAPI `_IncludedRouter` 不展平；改用 OpenAPI path/method 集合与带 lifespan 的 HTTP 探针 |
+| 前端 HTML 首次长删除补丁上下文不完全匹配 | 1 | 工具整体拒绝且无部分删除；从当前文件生成精确删除 patch 后再用 `apply_patch` 应用 |
+| 布局提取后 Ruff 报静态 HTML 长行/中文标点及 re-export | 1 | 新静态文件沿用旧文件精确例外；用同名 alias 明确公开 re-export |
+| Ruff 拒绝同名 alias re-export | 1 | 改用标准 `__all__` 声明公开的 HTML/CSS/JavaScript 常量 |
+| macOS BSD `xargs` 不支持 GNU `-a` 参数 | 1 | 改用 `while read` 逐个扫描变更文件，不沿用 GNU 专用参数 |
 | 浏览器按“KREA 2”模糊按钮名定位到 Profile 与导出按钮 | 1 | 改用 `data-profile="krea2"` 精确定位，不重复模糊点击 |
 | Gemma 4 12B Heretic 七槽位整理首次调用 120 秒超时 | 1 | 默认优先已加载文本模型，限制 500 tokens、关闭长推理倾向并设 90 秒上限 |
 | V1.1 首次批量更新规划文件时补丁段落归属错误 | 1 | 读取精确位置后按文件分别更新，不重复原批量补丁 |

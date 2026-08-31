@@ -22,6 +22,28 @@
 - 正式 8765 健康接口返回 `ok`；正式 SQLite `integrity_check=ok`，仍为 33,631 条资料和 1 个创作项目。
 - 已暂存 43 个工程文本文件；staged 敏感扫描无命中。首次 `git diff --cached --check` 只发现 `BASELINE.md` 末尾多余空行，修正后重新暂存复检。
 - 提交前完整验证再次通过后，已创建 `chore: establish Prompt Hub V1.6 baseline` 本地 root commit；未配置 remote、未 push、未创建 PR。
+- 基线最终 commit 为 `230185d`，提交后工作树干净；备份恢复说明已在 Git 仓库外记录该 commit。
+- 代码拆分阶段已启动。`gitnexus-refactoring` 技能要求的图索引工具在当前环境没有暴露，因此改用本地静态调用搜索、精确路由清单和全量测试作为替代，不执行猜测式批量改名。
+- 首轮拆分范围收束为：先把数据集 API 与请求模型从 `api.py` 提取为独立路由模块；前端静态资源和数据库继续分小步处理，避免一次跨越后端、页面、SQLite 三层。
+- 已新增 `dataset_routes.py` 与 `result_assets.py`，并从 `api.py` 移出数据集请求模型、ZIP/精选/WD14/审核端点及通用结果资产路径函数。
+- 首轮定向 Ruff 在测试前停止：1 条 import 顺序、4 条类型 import、2 条 FastAPI 注册函数复杂度。采用 TYPE_CHECKING 和文件级精确例外修正，不放宽全局规则。
+- 规范修正后 Ruff 与 ty 通过；定向测试 14 项中 12 项通过，2 项因 monkeypatch 仍指向旧模块失败。已改为 patch 新所有者 `dataset_routes.tag_image`，等待全量回归。
+- 修正测试 patch 后全量验证通过：43 项 pytest、覆盖率 85.96%、Ruff format/check、ty、diff check、正式健康接口和 SQLite 完整性均成功。
+- 首次额外路由对照脚本的 Python 引号错误导致基线与当前输出都为空，被 shell 误判为相同；该结果作废，改为对子命令退出码做显式检查后重跑。
+- 第二次对照已能正确传播错误，但 FastAPI 内部 `_IncludedRouter` 不具备 `methods`；调整为仅比较真实 HTTP 路由后再执行。
+- 继续调查确认 `include_router()` 在当前 FastAPI 中以 `_IncludedRouter` 嵌套保存，不会展平到顶层 `app.routes`；简单路由列表因此误报少 6 条。
+- 无 lifespan 的 TestClient 探针已进入 `dataset_routes.export_creative_dataset` 后才因临时库未初始化失败，证明数据集路由实际可达；最终改用 OpenAPI 集合和上下文 TestClient 验证。
+- OpenAPI 最终对照通过：基线与当前均为 31 条路径，HTTP 方法集合完全一致。
+- 已新增 `creative_web_layout.py` 作为创作台 HTML 布局的独立所有者；首次删除旧内嵌 HTML 的长补丁校验失败且未产生部分删除，改用当前文件生成精确 apply patch。
+- 精确补丁已移除旧内嵌 HTML，`creative_web.py` 改为导入独立布局；基线与当前的 `CREATIVE_HTML`、最终 `INDEX_HTML` SHA-256 分别完全一致。
+- `api.py` 从 816 行降为 577 行；数据集路由为 222 行、结果资产工具为 55 行。`creative_web.py` 从 764 行降为 651 行，布局模块为 116 行。
+- 本轮代码拆分仅改变模块所有权，没有更改 URL、请求/响应、SQLite schema、HTML、CSS 或 JavaScript；后台任务框架仍留在阶段 16 后续，不在本次基线重构中混入新功能。
+- 最终检查发现新布局文件需要继承旧静态 HTML 的 `E501`/`RUF001` 精确例外，且 import 需显式声明 re-export；已按原边界修正，不改变中文页面文本。
+- Ruff 不接受同名 alias 形式，已改为标准 `__all__` 声明三个公开静态常量，等待重新执行完整验证。
+- 完整验证通过后，OpenAPI 31 条路径和最终网页 bundle 再次与基线完全一致。
+- 最后的变更文件敏感扫描首次使用 GNU `xargs -a`，macOS BSD xargs 不支持该参数，扫描未执行；改用逐文件循环重跑。
+- macOS 兼容扫描重跑通过：本轮变更文件未命中私钥、常见 token 或 Bearer 凭据形态；仓库仍无 remote。
+- 阶段 16 本轮交付完成：V1.6 私有备份、本地 Git 基线、数据集 API 拆分、结果资产工具拆分和创作台 HTML 布局拆分均已验证；后台任务框架继续作为阶段 16 的后续前置，不与本次纯重构混合。
 
 ## 会话：2026-08-31（V1.6 后续路线规划）
 

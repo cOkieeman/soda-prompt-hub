@@ -12,6 +12,13 @@
 - LM Studio MCP 配置只复制到 Git 仓库外的私有备份目录，Git 中只保留“配置已备份”的记录，不记录配置内容。
 - 待提交候选全部为文本代码/文档/测试/锁文件；多规则敏感扫描无命中，且本地数据类型均由实际 `git check-ignore` 证明被排除。
 - 基线验证首次暴露 5 个历史格式偏差；使用项目锁定的 Ruff 统一格式化后，完整测试与静态检查均通过，说明可在干净格式状态建立首个 commit。
+- 当前环境没有 GitNexus MCP/索引工具；安全重构改用 `rg` 映射 `create_app`、`CreativeStore`、`PromptDatabase` 和路由调用者，并以 43 项回归测试约束行为。
+- `api.py` 的数据集路由形成清晰连续边界：数据集 ZIP、精选状态、单图/批量 WD14、审核确认和导出文件；适合作为首个独立 `APIRouter`，对外路径可完全不变。
+- 当前 FastAPI 的 `include_router()` 会在 `app.routes` 放置 `_IncludedRouter` 包装器；重构前后路由一致性不能只比较顶层 route 对象，应比较 `app.openapi()["paths"]` 的 path/method 集合并辅以 TestClient 请求。
+- 后端拆分后 `api.py` 减少 239 行，OpenAPI 31 条路径及方法集合与基线完全一致；数据集 API 已形成可供 V1.7 扩展的独立边界。
+- 前端布局提取后，创作台 HTML 片段和最终组装页面的 SHA-256 均与基线一致；静态拆分可以用最终 bundle hash 比仅检查 DOM 数量更严格地证明无视觉/脚本变化。
+- 代码拆分变更暂不自动创建第二个 commit：`230185d` 保持为可直接回退的 V1.6 基线，重构 diff 留给用户确认后再提交。
+- `creative_web.py` 已按 CSS、HTML、JavaScript 三个顶层字符串分段，后续可逐段提取；但与 API 同轮大搬移会放大问题定位范围，因此先完成后端路由拆分。
 
 ## V1.6 后续路线审计
 
