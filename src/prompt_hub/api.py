@@ -1,0 +1,816 @@
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Annotated, Any, Literal
+from urllib.parse import quote
+
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel, Field
+
+from prompt_hub.config import Settings
+from prompt_hub.creative import (
+    CreativeStore,
+    apply_iteration_suggestions,
+    apply_result_review,
+    compile_prompt,
+    export_project,
+    iteration_context,
+    next_iteration_values,
+)
+from prompt_hub.database import PromptDatabase
+from prompt_hub.dataset_export import (
+    DatasetExportError,
+    create_dataset_export,
+    resolve_dataset_export,
+    update_dataset_asset,
+)
+from prompt_hub.dataset_tagging import (
+    MAX_BATCH_TAG_ASSETS,
+    DatasetTaggingError,
+    review_wd14_draft,
+    store_wd14_result,
+)
+from prompt_hub.importers import import_all
+from prompt_hub.local_model import (
+    LocalModelError,
+    analyze_result_image,
+    expand_sourcing_queries,
+    list_local_models,
+    organize_slots,
+)
+from prompt_hub.media import resolve_media_path
+from prompt_hub.oc_manager import archive_import, parse_oc_manager_json
+from prompt_hub.result_media import ResultImageError, resolve_result_image, store_result_image
+from prompt_hub.sourcing import allowed_safety_levels, source_candidates
+from prompt_hub.wd14 import WD14Error, tag_image
+from prompt_hub.web import INDEX_HTML
+
+MAX_OC_IMPORT_BYTES = 25 * 1024 * 1024
+
+
+class MarkUpdate(BaseModel):
+    source_id: str = Field(min_length=1, max_length=120)
+    external_id: str = Field(min_length=1, max_length=600)
+    favorite: bool = False
+    rating: int | None = Field(default=None, ge=1, le=5)
+    note: str = Field(default="", max_length=1200)
+
+
+class CreativeProjectInput(BaseModel):
+    title: str = Field(default="未命名绘图项目", max_length=160)
+    brief_zh: str = Field(default="", max_length=6000)
+    safety_mode: Literal["sfw", "suggestive", "adult", "explicit-adult"] = "sfw"
+    target_profile: Literal["anima", "krea2"] = "anima"
+    character_id: str = Field(default="", max_length=300)
+    slots: dict[str, str] = Field(default_factory=dict)
+    slot_locks: dict[str, bool] = Field(default_factory=dict)
+    references: list[dict[str, Any]] = Field(default_factory=list, max_length=100)
+    generation: dict[str, Any] = Field(default_factory=dict)
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    test_notes: str = Field(default="", max_length=6000)
+
+
+class CreativeProjectUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=160)
+    brief_zh: str | None = Field(default=None, max_length=6000)
+    safety_mode: Literal["sfw", "suggestive", "adult", "explicit-adult"] | None = None
+    target_profile: Literal["anima", "krea2"] | None = None
+    character_id: str | None = Field(default=None, max_length=300)
+    slots: dict[str, str] | None = None
+    slot_locks: dict[str, bool] | None = None
+    references: list[dict[str, Any]] | None = Field(default=None, max_length=100)
+    generation: dict[str, Any] | None = None
+    lineage: dict[str, Any] | None = None
+    test_notes: str | None = Field(default=None, max_length=6000)
+
+
+class CreativeCompileInput(CreativeProjectInput):
+    profile_id: Literal["anima", "krea2"] | None = None
+
+
+class RecipeInput(BaseModel):
+    project_id: str = Field(min_length=1, max_length=160)
+    name: str = Field(default="", max_length=160)
+    favorite: bool = False
+
+
+class LocalAssistInput(BaseModel):
+    brief: str = Field(min_length=1, max_length=6000)
+    slots: dict[str, str] = Field(default_factory=dict)
+    slot_locks: dict[str, bool] = Field(default_factory=dict)
+    model: str = Field(min_length=1, max_length=300)
+    target_profile: Literal["anima", "krea2"] = "anima"
+
+
+class CreativeSourcingInput(BaseModel):
+    brief: str = Field(min_length=1, max_length=6000)
+    slots: dict[str, str] = Field(default_factory=dict)
+    slot_locks: dict[str, bool] = Field(default_factory=dict)
+    safety_mode: Literal["sfw", "suggestive", "adult", "explicit-adult"] = "sfw"
+    query_hints: dict[str, list[str]] = Field(default_factory=dict)
+    limit_per_slot: int = Field(default=6, ge=2, le=10)
+
+
+class CreativeSourcingExpandInput(BaseModel):
+    brief: str = Field(min_length=1, max_length=6000)
+    slots: dict[str, str] = Field(default_factory=dict)
+    slot_locks: dict[str, bool] = Field(default_factory=dict)
+    model: str = Field(min_length=1, max_length=300)
+
+
+class CreativeImageAnalysisInput(BaseModel):
+    model: str = Field(min_length=1, max_length=300)
+
+
+class CreativeReviewApplyInput(BaseModel):
+    analysis: dict[str, Any]
+    fill_empty_slots: bool = False
+
+
+class CreativeReviewBranchInput(BaseModel):
+    analysis: dict[str, Any]
+
+
+class DatasetAssetUpdate(BaseModel):
+    selected: bool | None = None
+    profile_id: Literal["anima", "krea2"] = "anima"
+    caption_override: str | None = Field(default=None, max_length=12000)
+
+
+class DatasetExportInput(BaseModel):
+    profile_id: Literal["anima", "krea2"] = "anima"
+
+
+class DatasetTagInput(BaseModel):
+    general_threshold: float = Field(default=0.35, ge=0, le=1)
+    character_threshold: float = Field(default=0.85, ge=0, le=1)
+    limit: int = Field(default=80, ge=1, le=200)
+
+
+class DatasetTagReviewInput(BaseModel):
+    draft_tags: str = Field(default="", max_length=12000)
+    confirm_anima: bool = False
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    active_settings = settings or Settings.from_environment()
+    database = PromptDatabase(active_settings.database_path)
+    creative_store = CreativeStore(active_settings.database_path)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        active_settings.ensure_directories()
+        database.initialize()
+        creative_store.initialize()
+        yield
+
+    application = FastAPI(
+        title="Soda Prompt Hub",
+        version="0.1.3",
+        description="Local-first prompt, style, tag, and workflow archive.",
+        lifespan=lifespan,
+    )
+
+    @application.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def index() -> str:
+        return INDEX_HTML
+
+    @application.get("/api/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "database": str(active_settings.database_path)}
+
+    @application.get("/api/stats")
+    def stats() -> dict[str, Any]:
+        return database.stats()
+
+    @application.get("/api/sources")
+    def sources() -> list[dict[str, Any]]:
+        return database.list_sources()
+
+    @application.get("/api/search")
+    def search(
+        query: str = "",
+        kind: str = "",
+        source_id: str = "",
+        model_family: str = "",
+        safety: str = "",
+        favorites_only: bool = False,
+        limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    ) -> dict[str, Any]:
+        results = database.search(
+            query,
+            kind=kind,
+            source_id=source_id,
+            model_family=model_family,
+            safety=safety,
+            favorites_only=favorites_only,
+            limit=limit,
+        )
+        _attach_visual_urls(results, safety)
+        return {"query": query, "count": len(results), "results": results}
+
+    @application.put("/api/marks")
+    def save_mark(update: MarkUpdate) -> dict[str, Any]:
+        return _save_mark(database, update)
+
+    @application.get("/api/creative/projects")
+    def list_creative_projects(
+        limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    ) -> list[dict[str, Any]]:
+        return creative_store.list_projects(limit=limit)
+
+    @application.post("/api/creative/projects", status_code=201)
+    def create_creative_project(payload: CreativeProjectInput) -> dict[str, Any]:
+        return creative_store.create_project(payload.model_dump())
+
+    @application.get("/api/creative/projects/{project_id}")
+    def get_creative_project(project_id: str) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        return project
+
+    @application.get("/api/creative/projects/{project_id}/iteration")
+    def get_creative_iteration(project_id: str) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        parent_id = str(project.get("lineage", {}).get("parent_project_id", "")).strip()
+        parent = creative_store.get_project(parent_id) if parent_id else None
+        return iteration_context(project, parent)
+
+    @application.post("/api/creative/projects/{project_id}/iteration/apply")
+    def apply_creative_iteration(project_id: str) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        proposal = apply_iteration_suggestions(project)
+        applied_slots = proposal.pop("applied_slots")
+        if applied_slots:
+            project = creative_store.update_project(project_id, proposal)
+        parent_id = str(project.get("lineage", {}).get("parent_project_id", "")).strip()
+        parent = creative_store.get_project(parent_id) if parent_id else None
+        return {
+            "project": project,
+            "applied_slots": applied_slots,
+            "iteration": iteration_context(project, parent),
+        }
+
+    @application.put("/api/creative/projects/{project_id}")
+    def update_creative_project(
+        project_id: str,
+        payload: CreativeProjectUpdate,
+    ) -> dict[str, Any]:
+        values = {
+            key: value
+            for key, value in payload.model_dump(exclude_unset=True).items()
+            if value is not None
+        }
+        try:
+            return creative_store.update_project(project_id, values)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Creative project not found") from error
+
+    @application.post("/api/creative/compile")
+    def compile_creative_prompt(payload: CreativeCompileInput) -> dict[str, Any]:
+        values = payload.model_dump(exclude={"profile_id"})
+        return compile_prompt(values, payload.profile_id)
+
+    @application.get("/api/creative/projects/{project_id}/export")
+    def export_creative_project(project_id: str) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        return export_project(project)
+
+    @application.post("/api/creative/projects/{project_id}/dataset-export")
+    def export_creative_dataset(
+        project_id: str,
+        payload: DatasetExportInput,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        try:
+            export = create_dataset_export(
+                active_settings,
+                project=project,
+                profile_id=payload.profile_id,
+            )
+        except DatasetExportError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        export.pop("path", None)
+        export["download_url"] = f"/dataset-exports/{quote(str(export['filename']))}"
+        return export
+
+    @application.post("/api/creative/projects/{project_id}/results", status_code=201)
+    async def upload_creative_result(
+        project_id: str,
+        request: Request,
+        filename: Annotated[str, Query(min_length=1, max_length=180)] = "result.png",
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        try:
+            asset = store_result_image(
+                active_settings,
+                project_id=project_id,
+                filename=filename,
+                raw=await request.body(),
+                safety_mode=str(project["safety_mode"]),
+            )
+        except ResultImageError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        generation = dict(project.get("generation", {}))
+        current_assets = generation.get("result_assets", [])
+        assets = list(current_assets) if isinstance(current_assets, list) else []
+        assets.append(asset)
+        generation["result_assets"] = assets
+        updated = creative_store.update_project(project_id, {"generation": generation})
+        return {"asset": asset, "project": updated}
+
+    @application.put("/api/creative/projects/{project_id}/results/{asset_id}/dataset")
+    def update_creative_dataset_asset(
+        project_id: str,
+        asset_id: str,
+        payload: DatasetAssetUpdate,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        try:
+            generation, asset = update_dataset_asset(
+                project,
+                asset_id=asset_id,
+                selected=payload.selected,
+                profile_id=payload.profile_id,
+                caption_override=payload.caption_override,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Result image not found") from error
+        updated = creative_store.update_project(project_id, {"generation": generation})
+        return {"asset": asset, "project": updated}
+
+    @application.post("/api/creative/projects/{project_id}/results/{asset_id}/tag")
+    def tag_creative_dataset_asset(
+        project_id: str,
+        asset_id: str,
+        payload: DatasetTagInput,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        asset = _find_result_asset(project, asset_id)
+        if asset is None:
+            raise HTTPException(status_code=404, detail="Result image not found")
+        path = _result_asset_path(active_settings, project_id, asset)
+        try:
+            result = tag_image(
+                path,
+                model_root=active_settings.wd14_model_root,
+                general_threshold=payload.general_threshold,
+                character_threshold=payload.character_threshold,
+                limit=payload.limit,
+                provider="auto",
+            )
+            generation, tagged_asset = store_wd14_result(
+                project,
+                asset_id=asset_id,
+                result=result,
+            )
+        except WD14Error as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        updated = creative_store.update_project(project_id, {"generation": generation})
+        return {"asset": tagged_asset, "project": updated}
+
+    @application.post("/api/creative/projects/{project_id}/dataset-tag")
+    def tag_selected_creative_dataset(
+        project_id: str,
+        payload: DatasetTagInput,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        assets = _selected_result_assets(project)
+        if not assets:
+            raise HTTPException(status_code=422, detail="请先至少精选一张结果图")
+        if len(assets) > MAX_BATCH_TAG_ASSETS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"同步批量打标一次最多处理 {MAX_BATCH_TAG_ASSETS} 张图片",
+            )
+
+        working = project
+        results: list[dict[str, Any]] = []
+        for asset in assets:
+            asset_id = str(asset.get("asset_id", ""))
+            try:
+                path = _result_asset_path(active_settings, project_id, asset)
+                result = tag_image(
+                    path,
+                    model_root=active_settings.wd14_model_root,
+                    general_threshold=payload.general_threshold,
+                    character_threshold=payload.character_threshold,
+                    limit=payload.limit,
+                    provider="auto",
+                )
+                generation, _tagged_asset = store_wd14_result(
+                    working,
+                    asset_id=asset_id,
+                    result=result,
+                )
+                working = {**working, "generation": generation}
+                results.append({"asset_id": asset_id, "status": "tagged"})
+            except (HTTPException, WD14Error) as error:
+                detail = error.detail if isinstance(error, HTTPException) else str(error)
+                results.append({"asset_id": asset_id, "status": "failed", "detail": detail})
+
+        tagged_count = sum(item["status"] == "tagged" for item in results)
+        updated = (
+            creative_store.update_project(project_id, {"generation": working["generation"]})
+            if tagged_count
+            else project
+        )
+        return {
+            "project": updated,
+            "selected_count": len(assets),
+            "tagged_count": tagged_count,
+            "failed_count": len(assets) - tagged_count,
+            "results": results,
+        }
+
+    @application.put("/api/creative/projects/{project_id}/results/{asset_id}/tag-review")
+    def review_creative_dataset_tags(
+        project_id: str,
+        asset_id: str,
+        payload: DatasetTagReviewInput,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        try:
+            generation, asset = review_wd14_draft(
+                project,
+                asset_id=asset_id,
+                draft_tags=payload.draft_tags,
+                confirm_anima=payload.confirm_anima,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Result image not found") from error
+        except DatasetTaggingError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        updated = creative_store.update_project(project_id, {"generation": generation})
+        return {"asset": asset, "project": updated}
+
+    @application.post("/api/creative/projects/{project_id}/results/{asset_id}/analyze")
+    def analyze_creative_result(
+        project_id: str,
+        asset_id: str,
+        payload: CreativeImageAnalysisInput,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        asset = _find_result_asset(project, asset_id)
+        if asset is None:
+            raise HTTPException(status_code=404, detail="Result image not found")
+        path = resolve_result_image(
+            active_settings,
+            project_id=project_id,
+            variant="original",
+            stored_name=str(asset.get("original_name", "")),
+        )
+        if path is None:
+            raise HTTPException(status_code=404, detail="Result image file not found")
+        try:
+            return analyze_result_image(image_path=path, project=project, model=payload.model)
+        except LocalModelError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @application.post("/api/creative/projects/{project_id}/results/{asset_id}/apply")
+    def apply_creative_result_review(
+        project_id: str,
+        asset_id: str,
+        payload: CreativeReviewApplyInput,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        if _find_result_asset(project, asset_id) is None:
+            raise HTTPException(status_code=404, detail="Result image not found")
+        values = apply_result_review(
+            project,
+            payload.analysis,
+            fill_empty_slots=payload.fill_empty_slots,
+        )
+        return creative_store.update_project(project_id, values)
+
+    @application.post(
+        "/api/creative/projects/{project_id}/results/{asset_id}/branch",
+        status_code=201,
+    )
+    def branch_creative_result_review(
+        project_id: str,
+        asset_id: str,
+        payload: CreativeReviewBranchInput,
+    ) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        asset = _find_result_asset(project, asset_id)
+        if asset is None:
+            raise HTTPException(status_code=404, detail="Result image not found")
+        values = next_iteration_values(project, asset, payload.analysis)
+        return creative_store.create_project(values)
+
+    @application.get("/api/creative/recipes")
+    def list_creative_recipes(
+        limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    ) -> list[dict[str, Any]]:
+        return creative_store.list_recipes(limit=limit)
+
+    @application.post("/api/creative/recipes", status_code=201)
+    def save_creative_recipe(payload: RecipeInput) -> dict[str, Any]:
+        try:
+            return creative_store.save_recipe(
+                payload.project_id,
+                payload.name,
+                favorite=payload.favorite,
+            )
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Creative project not found") from error
+
+    @application.get("/api/local-models")
+    def local_models() -> dict[str, Any]:
+        try:
+            return {"available": True, "models": list_local_models()}
+        except LocalModelError as error:
+            return {"available": False, "models": [], "message": str(error)}
+
+    @application.post("/api/creative/assist")
+    def assist_creative_project(payload: LocalAssistInput) -> dict[str, Any]:
+        try:
+            return organize_slots(
+                brief=payload.brief,
+                slots=payload.slots,
+                locks=payload.slot_locks,
+                model=payload.model,
+                target_profile=payload.target_profile,
+            )
+        except LocalModelError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @application.post("/api/creative/source")
+    def source_creative_materials(payload: CreativeSourcingInput) -> dict[str, Any]:
+        result = source_candidates(
+            database,
+            brief=payload.brief,
+            safety_mode=payload.safety_mode,
+            slots=payload.slots,
+            locks=payload.slot_locks,
+            query_hints=payload.query_hints,
+            limit_per_slot=payload.limit_per_slot,
+        )
+        _attach_sourcing_visuals(result, payload.safety_mode)
+        return result
+
+    @application.post("/api/creative/source/expand")
+    def expand_creative_sourcing(payload: CreativeSourcingExpandInput) -> dict[str, Any]:
+        try:
+            return expand_sourcing_queries(
+                brief=payload.brief,
+                slots=payload.slots,
+                locks=payload.slot_locks,
+                model=payload.model,
+            )
+        except LocalModelError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @application.post("/api/oc-manager/import")
+    async def import_oc_manager_json(
+        request: Request,
+        filename: Annotated[str, Query(min_length=1, max_length=180)] = "oc-manager-export.json",
+    ) -> dict[str, Any]:
+        raw = await request.body()
+        return _import_oc_manager(active_settings, database, filename, raw)
+
+    @application.get("/api/oc-manager/characters")
+    def search_oc_characters(
+        query: str = "",
+        world: str = "",
+        limit: Annotated[int, Query(ge=1, le=50)] = 30,
+    ) -> dict[str, Any]:
+        results = database.search_oc_characters(query, world=world, limit=limit)
+        return {"query": query, "count": len(results), "results": results}
+
+    @application.get("/api/oc-manager/characters/{character_id}")
+    def get_oc_character(character_id: str) -> dict[str, Any]:
+        result = database.get_oc_character(character_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Character not found")
+        return result
+
+    @application.get("/api/oc-manager/worlds")
+    def list_oc_worlds() -> list[dict[str, Any]]:
+        return database.list_oc_worlds()
+
+    @application.get("/api/oc-manager/lore")
+    def search_oc_lore(
+        query: str = "",
+        world: str = "",
+        limit: Annotated[int, Query(ge=1, le=20)] = 10,
+    ) -> dict[str, Any]:
+        results = database.search_oc_lore(query, world=world, limit=limit)
+        return {"query": query, "count": len(results), "results": results}
+
+    @application.get(
+        "/media/{source_id}/{variant}/{relative_path:path}",
+        response_class=FileResponse,
+        include_in_schema=False,
+    )
+    def media(source_id: str, variant: str, relative_path: str) -> FileResponse:
+        return _media_response(active_settings, source_id, variant, relative_path)
+
+    @application.get(
+        "/result-media/{project_id}/{variant}/{asset_id}",
+        response_class=FileResponse,
+        include_in_schema=False,
+    )
+    def result_media(project_id: str, variant: str, asset_id: str) -> FileResponse:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Result image not found")
+        asset = _find_result_asset(project, asset_id)
+        if asset is None:
+            raise HTTPException(status_code=404, detail="Result image not found")
+        stored_key = "original_name" if variant == "original" else "thumbnail_name"
+        path = resolve_result_image(
+            active_settings,
+            project_id=project_id,
+            variant=variant,
+            stored_name=str(asset.get(stored_key, "")),
+        )
+        if path is None:
+            raise HTTPException(status_code=404, detail="Result image not found")
+        return FileResponse(path)
+
+    @application.get(
+        "/dataset-exports/{filename}",
+        response_class=FileResponse,
+        include_in_schema=False,
+    )
+    def dataset_export_file(filename: str) -> FileResponse:
+        path = resolve_dataset_export(active_settings, filename)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Dataset export not found")
+        return FileResponse(path, media_type="application/zip", filename=filename)
+
+    @application.post("/api/import")
+    def rebuild_index() -> dict[str, Any]:
+        results = import_all(active_settings, database)
+        return {"status": "imported", "sources": results, "stats": database.stats()}
+
+    return application
+
+
+def _visual_urls(result: dict[str, Any], safety_filter: str = "") -> list[dict[str, str]]:
+    metadata = result.get("metadata", {})
+    refs = metadata.get("image_refs", [])
+    if not isinstance(refs, list):
+        return []
+    source_id = str(result.get("source_id", ""))
+    visuals = []
+    for ref in refs[:3]:
+        if not isinstance(ref, dict):
+            continue
+        path = ref.get("path")
+        safety = str(ref.get("safety", result.get("safety", "sfw")))
+        if not isinstance(path, str) or (safety_filter and safety != safety_filter):
+            continue
+        visuals.append(
+            {
+                "thumbnail_url": f"/media/{source_id}/thumbnail/{quote(path, safe='/')}",
+                "original_url": f"/media/{source_id}/original/{quote(path, safe='/')}",
+                "safety": safety,
+            }
+        )
+    return visuals
+
+
+def _save_mark(database: PromptDatabase, update: MarkUpdate) -> dict[str, Any]:
+    try:
+        return database.save_mark(
+            source_id=update.source_id,
+            external_id=update.external_id,
+            favorite=update.favorite,
+            rating=update.rating,
+            note=update.note,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Entry not found") from error
+
+
+def _import_oc_manager(
+    settings: Settings,
+    database: PromptDatabase,
+    filename: str,
+    raw: bytes,
+) -> dict[str, Any]:
+    if len(raw) > MAX_OC_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="OC Manager JSON exceeds 25 MiB")
+    try:
+        bundle = parse_oc_manager_json(raw)
+        archived_path, digest = archive_import(settings.library_root, filename, raw)
+        result = database.import_oc_manager(
+            bundle,
+            source_file=str(archived_path),
+            import_hash=digest,
+        )
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {"status": "imported", **result}
+
+
+def _media_response(
+    settings: Settings,
+    source_id: str,
+    variant: str,
+    relative_path: str,
+) -> FileResponse:
+    path = resolve_media_path(settings, source_id, variant, relative_path)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Media not found")
+    return FileResponse(path)
+
+
+def _attach_visual_urls(results: list[dict[str, Any]], safety_filter: str = "") -> None:
+    for result in results:
+        result["visuals"] = _visual_urls(result, safety_filter)
+
+
+def _attach_sourcing_visuals(result: dict[str, Any], safety_mode: str) -> None:
+    allowed = allowed_safety_levels(safety_mode)
+    groups = result.get("slots", {})
+    if not isinstance(groups, dict):
+        return
+    for group in groups.values():
+        if not isinstance(group, dict):
+            continue
+        candidates = group.get("candidates", [])
+        if not isinstance(candidates, list):
+            continue
+        for candidate in candidates:
+            if isinstance(candidate, dict):
+                candidate["visuals"] = [
+                    visual for visual in _visual_urls(candidate) if visual["safety"] in allowed
+                ]
+
+
+def _find_result_asset(project: dict[str, Any], asset_id: str) -> dict[str, Any] | None:
+    generation = project.get("generation", {})
+    if not isinstance(generation, dict):
+        return None
+    assets = generation.get("result_assets", [])
+    if not isinstance(assets, list):
+        return None
+    return next(
+        (
+            asset
+            for asset in assets
+            if isinstance(asset, dict) and str(asset.get("asset_id", "")) == asset_id
+        ),
+        None,
+    )
+
+
+def _selected_result_assets(project: dict[str, Any]) -> list[dict[str, Any]]:
+    generation = project.get("generation", {})
+    assets = generation.get("result_assets", []) if isinstance(generation, dict) else []
+    return [
+        asset
+        for asset in assets
+        if isinstance(asset, dict) and asset.get("dataset_selected") is True
+    ]
+
+
+def _result_asset_path(
+    settings: Settings,
+    project_id: str,
+    asset: dict[str, Any],
+) -> Path:
+    path = resolve_result_image(
+        settings,
+        project_id=project_id,
+        variant="original",
+        stored_name=str(asset.get("original_name", "")),
+    )
+    if path is None:
+        raise HTTPException(status_code=404, detail="Result image file not found")
+    return path
+
+
+app = create_app()

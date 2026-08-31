@@ -1,0 +1,98 @@
+[project]
+name = "prompt-hub"
+version = "0.1.3"
+description = "Local-first prompt, style, tag, LoRA, and workflow knowledge hub"
+readme = "README.md"
+authors = [
+    { name = "cOkieeman", email = "95237994+cOkieeman@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "mcp>=2.1.1",
+    "onnxruntime>=1.17.0",
+    "pillow>=12.1.1",
+    "uvicorn>=0.52.4",
+]
+
+[project.scripts]
+prompt-hub = "prompt_hub.cli:main"
+prompt-hub-mcp = "prompt_hub.mcp_server:main"
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.5",
+    "ty>=0.0.75",
+]
+test = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.uv]
+default-groups = ["dev", "test"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "CPY001", "D", "ISC001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ANN", "PLR2004", "S101"]
+"src/prompt_hub/api.py" = ["C901", "FBT001", "FBT002", "PLR0913", "PLR0915", "PLR0917", "TC003"]
+"src/prompt_hub/cli.py" = ["T201", "TC003"]
+"src/prompt_hub/creative.py" = ["ANN401", "EM101", "EM102", "PLR2004", "RUF001", "TRY003"]
+"src/prompt_hub/dataset_export.py" = ["EM101", "EM102", "TRY003"]
+"src/prompt_hub/dataset_tagging.py" = ["EM101", "TRY003"]
+"src/prompt_hub/creative_web.py" = ["E501", "RUF001"]
+"src/prompt_hub/database.py" = ["FLY002", "PLR0913", "S608", "TC003"]
+"src/prompt_hub/importers.py" = ["TC001", "TC003"]
+"src/prompt_hub/local_model.py" = ["ANN401", "EM101", "EM102", "PLR0913", "RUF001", "S310", "TRY003"]
+"src/prompt_hub/result_media.py" = ["EM101", "TRY003", "TRY301"]
+"src/prompt_hub/sourcing.py" = ["ANN401", "PLR0913", "RUF001"]
+"src/prompt_hub/wd14.py" = ["EM101", "EM102", "PLR0913", "TRY003"]
+"src/prompt_hub/mcp_server.py" = ["FBT001", "FBT002", "PLR0913", "PLR0917"]
+"src/prompt_hub/web.py" = ["E501", "RUF001"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=prompt_hub",
+    "--cov-report=term-missing",
+    "--cov-fail-under=80",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/prompt_hub"]
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+[tool.ty.environment]
+python-version = "3.12"

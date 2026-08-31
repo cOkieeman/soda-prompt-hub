@@ -1,0 +1,54 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.coverage
+coverage.xml
+htmlcov/
+
+# Virtual environments
+.venv/
+
+# Test, lint, browser, and editor state
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ty_cache/
+.playwright-cli/
+.DS_Store
+*.log
+*.tmp
+
+# Local environments, credentials, and private keys
+.env
+.env.*
+*.env
+!.env.example
+!.env.schema
+!*.env.example
+.secrets/
+secrets/
+credentials*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Runtime databases and generated archives
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.zip
+
+# Local Prompt Hub data and model assets
+prompt-library/
+models/
+backups/
+exports/
+test-results/
+thumbnails/
+sources/
