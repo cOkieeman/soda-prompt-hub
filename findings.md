@@ -1,5 +1,87 @@
 # 发现与决策
 
+## 2026-09-03 LoRA Manager 接入探测
+
+- Windows 在线且 SMB/ComfyUI 端口 TCP 可达，但 Mac 当前没有 SMB volume；Finder 需要用户本人重新完成凭据确认。
+- 原任务真实挂载记录确认 SMB 专用账户为 `PromptHubWorker`，完整账户为 `CHINAMI-5E1E3GQ\PromptHubWorker`；旧连接信息文件中的 `Administrator` 已过期，Finder 自动填入的 `soda` 只是 Mac 本机用户名。
+- ComfyUI HTTP 端口可建立 TCP 连接但没有返回 HTTP payload，因此不把直接访问 8188 作为 LoRA Manager 集成前提。
+- UU 远程终端可打开，可在不共享整个 `F:` 盘的情况下只读检查 `F:\Comfyui\ComfyUI-aki-v3\ComfyUI\custom_nodes\comfyui-lora-manager`；实际部署仍通过现有共享桥完成。
+- 真实诊断报告已通过 SMB 到达 `diagnostics/lora-manager-inspection.json`：插件存在，ComfyUI LoRA 根目录含 256 个模型文件与 375 个预览文件，`/object_info/LoraLoader` 返回了完整可用 LoRA 名称列表。
+- 插件目录没有可用 `.git` HEAD/remote，内部数据采用同名 `.metadata.json` sidecar 约定；因此正式同步不依赖插件私有 API。稳定主链采用 ComfyUI `LoraLoader` 名称 + 白名单根目录文件/sidecar/预览扫描，`/loras/api/list` 只作为未来可选增强。
+- Mac 直连 `http://192.168.1.10:8188/loras/api/list` 仍得到 empty reply；Windows 本机访问公开 ComfyUI 接口正常。这再次确认 Worker 应在 Windows 本机读取，Mac 不依赖 8188 局域网访问。
+- 为避免读取数十 GB 权重，快照不计算 `.safetensors` 内容 SHA-256；只记录相对路径、文件大小、mtime、可选 sidecar metadata 和预览相对路径。清单 JSON 本身作为 Worker 输出再由 Mac 做 SHA-256 验收。
+- 真实任务 `task-20260902T172354Z-8f3dcc8f59e5` 已由 Windows Worker 完成；清单输出 SHA-256 为 `e6143eaa1b579620c8d0af8ce2765488dd2525a2bec7989527be9630f57e53ed`，Mac 回验 `verified=true`。
+- 快照 `catalog-20260902T172356Z-60e595c5d3da` 导入 256 条：233 条有 sidecar metadata、210 条有预览路径、122 条有 trigger words、233 条复用 LoRA Manager 已有权重 SHA-256。Mac 只保存标准化只读索引。
+- 真实模型族统计为 Anima 74、Illustrious 81、Krea 2 45、Flux 3、SDXL 9、Unknown 44。`linhuier` 可唯一检索到 `Anima/Character/linhuier-anima_v01.safetensors`，Civitai model/version 为 `2885952/3262276`；sidecar 没有 trigger words，因此没有擅自补写 `linhuieroc`。
+
+## 2026-09-02 单一 5060 Ti 计算节点
+
+- 用户取消 4070S，5060 Ti 统一承担 ComfyUI 制图、AnimaLoraStudio 训练、批量 VLM、Embedding 与 WD14 批处理；ComfyUI 内的 LoRA Manager 插件负责 Windows 本机 LoRA 扫描、预览和选用。
+- Mac 不直接连接 LoRA Manager。Windows Worker 已在本机读取插件 metadata、预览与 ComfyUI LoRA 目录，并向 Prompt Hub 同步只读标准化清单；训练、Embedding 与 VLM 仍是后续独立适配器。
+- 当前正式 `remote-nodes` 目录没有 `nodes.json`、没有历史跨设备任务，Mac 也没有 SMB 挂载；因此无需迁移或删除用户节点数据。
+- 旧协议把每个任务绑定到单一角色，不能只改页面文案；需要统一 `compute_5060ti` 角色并将协议升级为 `soda-compute-bridge-v2`。
+- 单张 5060 Ti 16GB 不能稳定并行运行 ComfyUI 与 LoRA 训练。Windows worker 应采用单 GPU 串行队列：训练和制图互斥，Embedding/VLM/WD14 只在空闲时执行，不自动中断正在运行的训练。
+- SMB 仍只作为传输面，Mac 保存任务事实副本、项目、审核和版本；Windows 密码继续只交给 Finder/macOS Keychain。
+- 接入所需最小用户信息是设备名/IP、共享名、ComfyUI 根目录与输出目录、训练工具及其目录、底模/LoRA 目录；不需要在聊天中提供密码。
+- 真实 SMB 已通过专用标准用户挂载到 `/Volumes/PromptHub-5060Ti`，五目录可写且 Prompt Hub 诊断为 `ready`；凭据未进入节点 JSON。
+- Windows 已确认系统 Python 3.12.10，ComfyUI 在 Windows 本机 `http://127.0.0.1:8188` 可用。首版 worker 可使用 Python 标准库，避免在秋叶整合包环境里额外安装依赖。
+- worker 运行在 Windows 本机，因此 ComfyUI 不需要暴露到局域网；Mac 只经 SMB 投递任务，worker 仅访问本机 8188，缩小网络暴露面。
+
+## 2026-09-02 Anima / Krea 2 Workflow Profile 实机结果
+
+- 两份原始 API workflow 已按 SHA-256 导入 Mac `workflow-profiles`：Krea 2 为 `6016f8...b9ade`，Anima 满穗为 `6b0559...9c47b`。
+- Krea 2 低成本编译由 14 节点裁到 11 节点，绕过 SeedVR2；任务 `task-20260902T130215Z-2d7d6e4b41c3` 在 Windows ComfyUI 真实完成。
+- Krea 2 回传 PNG 为 512×768，画面包含原 Prompt 的海边、亮片比基尼、紫红盘发、浅色瞳与左下签名；基础构图和模型加载有效。
+- Krea 2 Mac integrity 为 `verified=true`，PNG SHA-256 `b84cf026...fb48ba`，workflow 与 run log 同时回传。
+- 浏览器创作台能按当前 Prompt Profile 精确筛选 workflow：Anima 只显示满穗，Krea 2 只显示 Ares OC Manager；正常视口无横向溢出且 console 无 warning/error。
+- Anima 修正 seed 后的任务 `task-20260902T130550Z-f0560673eff3` 在约 6.5 秒完成；512×768 图像保留黑发侧髻、灰眼、发饰与中式服装，角色 LoRA 生效，Mac integrity `verified=true`。
+- 回流解析暴露源 workflow 的 Image Saver 元数据与实际 sampler 默认值不一致：保存节点写 10 steps / CFG 5，实际采样节点为 12 / 1。后续编译必须同步保存字段，不能让结果库记录错误参数。
+- 修正后的 Anima 固定 seed 任务 `task-20260902T130944Z-43c6a204932d` 再次真实完成，回流 metadata 正确记录 seed 42、12 steps、CFG 1、512×768 与 `anima-base-v1.0`。
+- 固定 seed 42 的最终 Anima 图已从 Mac 结果库人工查看，仍稳定呈现满穗的黑发侧髻、灰眼、花饰与灰白中式服装，人物一致性正常。
+- 两类真实图均已复制进入 Mac ComfyUI 结果库；源 SMB 图片保持不变。由于烟雾任务使用 workflow 原始 Prompt 而非创作项目，当前结果没有伪造项目关联。
+
+## 2026-09-01 Mac 发布前标签语言闭环审计
+
+- 本轮只本地化用户可选择的 canonical tag 与覆盖枚举；Trigger、checkpoint、LoRA 名称、ComfyUI 参数等技术元数据保持原样。
+- 界面层允许中文或中英文对照，持久化层继续保存英文 canonical ID；Anima caption、Krea 2 正式 caption 与 LoRA 冻结包仍必须通过英文输出门。
+- 审计优先级为 LoRA 项目台、数据集批量编辑、创作台 character candidates、智能检索和 Windows LoRA metadata 页面；不能仅凭全局切换按钮存在就视为闭环。
+- 已确认的界面缺口：创作台 WD14 `character candidates` 仍显示裸英文；数据集批量增删仍要求普通用户直接输入英文 tag；智能检索卡片未按资料类型本地化 canonical tag。
+- LoRA coverage 选择已采用中文 label + 英文 ID，符合显示/存储边界；但偏置警告当前用维度字典查枚举值，可能显示 `undefined`，需改为从对应 coverage item 查中文 label。
+- Windows LoRA snapshot 的模型名、路径、base model 与 trigger 属于技术元数据，必须保持原样；其中 `tags` 可跟随全局按钮切换显示，但 snapshot 底层不能修改。
+- 数据集批量操作的安全做法是在 `_normalize_tag()` 中先解析已知中文名，再走既有 Anima tag 规范化；这样中文只作为输入别名，预览、快照和 caption 从第一步起就是英文。
+- 对未知中文标签必须返回明确错误，不能自行翻译成未经确认的 canonical tag；高级用户仍可直接输入英文自定义 tag。
+
+## 2026-09-01 Windows 交付桥 Mac 侧收口
+
+- 现有五目录与 compute contract 只定义了协议，尚未有任务投递、状态扫描和显式重试；这些可以在没有真实 Windows 的情况下先完成。
+- Mac 需要在本地 `remote-nodes/tasks/<node>/<task>.json` 保存原始任务事实副本，共享目录只作为传输面。这样 Windows 将 outbox 文件移动到 processing/failed 后，Mac 仍可安全重试且不会依赖失败结果中包含完整原 payload。
+- 重试应创建新 task ID、增加 `attempt` 并记录 `retry_of`，保留旧失败记录用于审计；不复用 task ID，也不覆盖 failed 文件。
+- 任务 JSON 必须拒绝凭据字段，校验目标角色、节点 capability、manifest 相对路径和 SHA-256；模型结果只显示为 returned，仍由既有领域导入接口和人工审核进入 Mac 事实库。
+
+## M2 架构续接
+
+- `BackgroundJobRunner` 已具备 SQLite 持久化、单 worker、重启恢复、取消、自动重试和进度更新；M2 应新增 `dataset_wd14` handler，不另建队列。
+- `DatasetWorkspaceStore` 是工作区派生状态的唯一入口，源目录已经由路径校验和只读扫描保护；WD14、caption、snapshot、audit 与 export 元数据应写入工作区目录，而不是源图片旁。
+- `api.py` 当前只注册 `dataset_scan` handler；明天接 5060 Ti 时可把相同任务 payload 交给 compute bridge，Mac 仍保留工作区状态和审核决定。
+- 现有结果精选区的 `dataset_tagging.py` 已验证 canonical English tag、rating/general/character 分组与人工确认语义，可复用数据形状，但工作区任务需要独立持久化和批量接口。
+- M2 的安全边界保持为：WD14 只写 Anima 草稿；Krea 2 caption 独立；中文只用于显示；任何最终训练导出含中文都必须拒绝；原始 `.txt` 不回写。
+- 首次写入本节时因误判文档标题导致 patch 未命中；读取实际标题后改用正确锚点，未影响业务文件。
+- 长队列不能逐图重复创建 ONNX session；`WD14Tagger` 在任务开始时加载一次模型，之后复用同一 session，现有单图 `tag_image` 包装器保持兼容。
+- 仅靠后台任务恢复为 queued 不足以实现真正续跑；逐图结果必须记录原任务 `job_id`，相同任务恢复时才可以安全跳过已完成图片，而新的“全部重跑”仍能覆盖未人工确认草稿。
+- Caption snapshot 必须携带 `profile_id`。缺少分支信息会让 Krea 2 回退误写 Anima；旧 `edit-krea2` 快照可按 operation 兼容推断，新快照全部显式记录。
+- 工作区导出必须在复制前重新计算源图片 SHA-256，并拒绝未审核、缺 caption、非英文、完全重复和同 stem 冲突；通过后再生成独立版本目录与 ZIP。
+- 资料库初始标签预载可能超过 `/api/tags/localize` 的 500 条请求边界；前端应按 500 分批，不放宽服务端输入上限。
+
+## V1.7A 数据集工作台
+
+- 小数据集可能在注册后的同一秒完成扫描，不能只依赖秒级 `updated_at` 判断是否需要加载报告；
+  前端还必须以“当前是否已有 report”作为加载条件。
+- 审核状态应与扫描报告分离：扫描报告是版本化事实记录，`review.json` 是可编辑人工决策；重新扫描
+  不应抹掉已有保留、排除和备注。
+- 原图浏览不能接受任意相对路径；必须同时满足路径仍位于来源目录、且图片存在于当前扫描报告。
+- 5060 Ti 接入前先固定任务信封、状态流和能力名称，可以避免把 SMB 地址、任务格式和业务状态
+  混在同一轮调试；Mac 继续是项目与审核的唯一事实源。
+
 ## 阶段 16 工程基线审计
 
 - 项目已经是 Git worktree，分支为 `main`，但 HEAD 尚无 commit；因此不需要重新 `git init`，只需安全筛选文件并创建首个本地快照。
@@ -19,6 +101,21 @@
 - 前端布局提取后，创作台 HTML 片段和最终组装页面的 SHA-256 均与基线一致；静态拆分可以用最终 bundle hash 比仅检查 DOM 数量更严格地证明无视觉/脚本变化。
 - 代码拆分变更暂不自动创建第二个 commit：`230185d` 保持为可直接回退的 V1.6 基线，重构 diff 留给用户确认后再提交。
 - `creative_web.py` 已按 CSS、HTML、JavaScript 三个顶层字符串分段，后续可逐段提取；但与 API 同轮大搬移会放大问题定位范围，因此先完成后端路由拆分。
+
+## V1.7 第一段：可恢复任务与只读扫描
+
+- 数据集来源目录继续作为原始事实源；工作区只保存 manifest、扫描报告和派生缩略图，扫描与重新扫描都不移动、不改名、不写回图片或 `.txt`。
+- 任务状态必须落在 SQLite，而不是只存在于前端内存；这样服务重启时可把中断的 running 任务恢复为 queued，并保留已完成、失败和取消记录。
+- 首版使用单后台 worker：图片解码、缩略图和后续 WD14 都是 CPU/内存密集任务，24GB MacBook Air 上并行多个批任务会降低交互稳定性。
+- 自动重试与用户重试语义分开：临时失败按 `max_attempts` 自动重试；已经 failed/canceled 的任务只有显式 retry 才重新排队。
+- 只读扫描必须拒绝 `/`、用户主目录、Prompt Hub 资料库根目录和包含工作区的过宽父目录；目录内部符号链接不跟随，避免越界和递归扫描自身产物。
+- 同名 caption 采用“同目录、去扩展名一致”的配对规则；图片存在但 `.txt` 缺失与 `.txt` 没有图片分别报告，不能合并成一个笼统错误。
+- 完全重复采用文件 SHA-256；近似重复采用 64-bit pHash 与 Hamming distance 5。pHash 基于 32×32 灰度 DCT 低频系数，比分辨率敏感的 dHash 更符合训练集去重目标。
+- 扫描报告按时间与随机后缀版本化，重新扫描只更新 workspace 的 current report 指针，旧报告继续保留，便于后续审核与导出追溯。
+- 缩略图按原图 SHA-256 前 20 位命名并限制为安全的 `.webp` 路由；前端后续可以直接构建视觉总览，而无需开放任意本地文件路径。
+- 当前后台框架已经能承载 V1.7 WD14 长队列，但现有“精选结果图同步 24 张”端点尚未迁移；必须在工作区审核 UI 与逐图状态模型完成后再切换。
+- 正式部署后 OpenAPI 为 40 条路径，旧 31 条路径全部保留；首页 bundle hash 与纯重构基线一致，新增能力当前只在后端，不会让现有用户流程突然变化。
+- 正式库初始化后台任务表后完整性仍为 `ok`，资料与来源计数不变；任务记录和工作区 manifest 分别承担运行状态与文件事实来源，避免把大型扫描报告塞入主 SQLite。
 
 ## V1.6 后续路线审计
 
@@ -172,6 +269,48 @@
 
 ## 技术决策
 
+- Windows worker 使用单文件 Python 3.12 stdlib 实现，不依赖 Prompt Hub 的 FastAPI/NumPy/ONNX 环境；它只允许访问 loopback ComfyUI URL，避免开放 8188 到局域网。
+- ComfyUI 远程执行必须使用 API Format workflow。普通网页 workflow JSON 是界面布局格式，不能直接作为 `/prompt` 的 `prompt` 对象；Prompt Hub 生成包固定为 `soda-comfyui-package-v1`。
+- Worker 用同盘 `os.replace` 原子领取 outbox 任务，并用系统文件锁限制单实例；提交到 ComfyUI 后立即持久化 `prompt_id`，重启优先续查 history，降低重复排队概率。
+- 回传图片不依赖 Windows output 路径直接复制，而是按 ComfyUI history 返回的 filename/subfolder/type 调用 `/view` 下载到任务私有 inbox；Mac 再对源 manifest 和每个输出执行 SHA-256 校验。
+- Windows 自检会写 `worker-status.json` 到 bridge 根目录，作为 Mac 判断真实 Python、hostname、协议版本和 ComfyUI 连通性的可审计证据。
+- 真实启动后 Mac 对整个 SMB 挂载的目录读取进入不可中断等待；停止 worker 后症状不消失，且 Windows ping 与 TCP 445 始终正常，因此“共享根 byte lock 是直接根因”的首个假设被排除。当前故障定位为已有 macOS SMB 挂载会话失去响应，需要远端 SMB 服务断线或 Windows 重启后再挂载验证。
+- Windows 重启、停止旧 worker、强制卸载与 SMB `forcenewsession` 新挂载均无法解除等待，且相关进程进入不可中断状态；当前证据把故障进一步收敛到 Mac SMB 客户端内核状态，需重启 Mac 后再验证。修正版仍保留“锁放 `%LOCALAPPDATA%`”改动，以消除不必要的跨共享锁变量。
+- Mac 重启后旧 SMB 挂载与不可中断进程均消失；重新挂载成功。同步 `%LOCALAPPDATA%` 锁修正版并启动 Worker 后，共享目录持续可读写，协议失败探针和 ComfyUI 成功任务均未再次触发卡死。证据证明修正版运行稳定，但不能反向证明共享锁是此前唯一根因。
+- ComfyUI 内置 `EmptyImage → SaveImage` 可作为不依赖 checkpoint 的端到端烟雾 workflow：本次 128×128 PNG、API workflow 与 run log 已由 Windows 回传，Mac integrity 返回 `verified=true`、0 errors。
+- Windows ComfyUI `system_stats` 显示实际启动参数含 `--listen 0.0.0.0`，与“8188 仅本机监听”的架构目标不一致；Mac 直接访问 192.168.1.10:8188 当前被 Windows 网络层阻断，但仍应在确认现有 OC Preview 用途后收紧启动参数。
+- 用户提供的 `Krea2-for-ares-ocmanager (1).json` 与 `anima-测试-满穗.json` 都是可直接提交 `/prompt` 的 ComfyUI API Format；前者 14 个节点，后者 58 个节点，不需要再次要求用户导出。
+- Krea 2 工作流的核心参数位于 `141`（正面 Prompt）、`121`（负面 Prompt）、`87`（seed/steps/cfg/sampler/scheduler）、`129`（960×1536）、`123`（Krea 2 UNET）和 `133`（保存）；默认保存的是 `156` SeedVR2 1920 放大结果，首个低成本测试应旁路 SeedVR2。
+- Anima“满穗”工作流绑定了 `mansui-anima_v1.1` 等角色/画风 LoRA，并包含 SAM3 脸手精修、普通放大与 Ultimate SD Upscale；它是角色实例工作流，不应直接作为通用 Anima Profile。应从原图生成独立模板并把角色 Prompt/LoRA 视为可替换内容。
+- 两个 workflow 都引用 Windows 已安装的自定义节点和模型文件；导入层必须保留原 API JSON 与 SHA-256，Profile 层只允许修改白名单字段，不能重新序列化为自创图结构或静默更换模型。
+- Anima 的可控节点已沿真实连线确认：正面内容 `184.wildcard_text/populated_text`，负面 `75.string`，seed `84.seed`，尺寸 `150.width/height`，steps/CFG `135:103.int` / `135:104.float`；基础生成图来自 `148:139`。输出节点 `81` 原本连接 `152:189` Ultimate SD Upscale，低成本模式应改接 `148:139`。
+- Krea 2 的可控节点已确认：正面 `141.wildcard_text/populated_text`，负面 `121.text`，seed/steps/CFG/sampler/scheduler `87`，尺寸 `129`；基础生成图来自 `132`。输出节点 `133` 原本连接 `156` SeedVR2，低成本模式应改接 `132`。
+- 低成本 Profile 不应只改保存节点后保留整图执行：编译器应从指定输出节点反向计算依赖闭包，只把可达节点写入 API prompt，从结构上排除 SeedVR2、SAM3、脸手 Detailer 与放大节点，同时避免误改模型主链。
+- 当前 `Settings` 尚无 workflow profile 数据根；应在 `library_root` 下增加独立目录，使用户工作流属于个人数据和备份范围，不与代码内置测试例子混放。
+- Prompt Hub 的 Anima 编译器已经自动加入 `masterpiece, best quality, very aesthetic`，而满穗 workflow 的 `182` 还会再次追加同类前缀；从创作项目运行时应把 `182.string` 清空并把完整编译结果写入 `184`，避免重复权重。原 workflow 的独立手动使用不受影响。
+- 现有应用已经把创作编译和 Windows 任务拆成独立领域；阶段 24 应新增独立 workflow profile store/router，由路由编排 `CreativeStore.compile_prompt → workflow package → RemoteNodeStore.submit_task`，不把节点规则塞进现有 `creative.py` 或 worker。
+- 创作台前端已经同时维护当前项目、Anima/Krea 2 编译输出和 steps/CFG/seed，因此无需新增第三套 Prompt 编辑器；右侧输出区只需按当前 Profile 选择已导入 workflow，并显式“发送到 5060 Ti”。
+- 生成包应先写入 Mac `workflow-profiles/{profile_id}/runs` 作为事实源，再以相同字节和哈希复制到 SMB `packages/generated`；这样 Windows 断线或共享清理后仍可重建和审计任务。
+- `maintenance.PERSONAL_ROOTS` 当前未包含 workflow profiles；新增数据根时必须同步纳入备份/恢复测试。
+- 现有 ComfyUI result store 已能导入共享目录、解析 PNG metadata，并显式关联创作项目；阶段 24 可在任务回传后复用这条链，而不新建第二套结果图库。
+
+- 混合检索不在 Mac 上临时生成 query embedding：文本 FTS 始终可用；只有调用方提供真实向量且 dimension 与版本化索引兼容时，才增加 cosine 召回。
+- “以图找图”用源图片 SHA-256 在 embedding 事实源中定位同模型版本向量，不依赖远程 worker 自行约定 asset ID；同 SHA 的查询图会从结果中排除。
+- 检索 UI 固定分为提示词资料、视觉参考、我的数据集和 Windows LoRA。没有真实索引时保留诚实空状态，不隐藏功能边界，也不生成伪结果。
+
+- V1.8 LoRA 项目使用标准文件系统项目根作为交付与备份单元，Prompt Hub 页面负责索引和编辑；避免把明天的 Windows 训练绑定到 Mac SQLite 的内部表结构。
+- M3 图片引用不复制原图，M4 冻结时才校验 SHA-256 并复制到不可变版本；Anima 与 Krea 2 始终输出两棵独立 caption 树。
+- 5060 Ti 16GB 的 Krea 2 配置只作为资源起点：Raw FP8、Qwen3-VL FP8、28 层 block swap、batch 1；实际驱动、Torch、CUDA 和 AnimaLoraStudio 版本必须在 Windows 上重新验证。
+- M5 回流库必须独立于创作项目结果媒体：前者按 SHA-256 保存一次真实来源与 metadata，后者只在用户确认关联时复制到项目私有媒体，避免重复导入和失败图污染数据集。
+- ComfyUI `KSampler` 的 positive/negative 通常是节点引用而不是字符串；解析时必须保留 node ID 并追踪到 `CLIPTextEncode`，仅遍历所有文字节点无法可靠区分正负 Prompt。
+- 无 metadata 的 JPEG/WebP 仍是合法测试结果，但 UI 与 API 必须返回 `metadata_present=false` / `source=none`，不能用文件名或模型猜测参数。
+- M7 在连接 5060 Ti 前的正确完成边界是稳定数据契约：embedding 与 VLM 结果必须回显源 SHA-256、模型 ID/版本，Mac 校验后只保存可重建结果；VLM caption 永远先进入 Krea 2 draft。
+- Prompt Hub 当前 venv 没有 torch、transformers、MLX、open_clip 或 sentence-transformers，本机常见缓存中也未发现 CLIP/SigLIP 模型；M7B/M7C 要么增加经过版本固定的真实 runtime/model，要么等待 5060 Ti worker，不能用非语义特征假装完成。
+- Krea 2 VLM 队列必须把正式 caption 与模型草稿并排保存。即使已有正式 Krea 2 caption，重新推理也只能读取它作为参考，不能覆盖；确认动作必须单独生成 `profile_id=krea2` 快照。
+- 明天 5060 Ti 连接前，Mac 可以先完成向量的“事实源”职责：版本化保存、SHA-256 回验、cosine 查询和来源解释。模型生成仍未完成时，这属于接口完成而不是视觉检索完成。
+- embedding 索引使用独立 SQLite，避免把高体积 float32 BLOB 塞进正式资料库；model ID、revision、dimension 共同决定 index ID，因此换模型不会覆盖旧向量。
+- 数据集分页采用前端 200 张窗口：当前扫描报告仍一次读取到 Mac 事实源，避免破坏现有筛选和批量语义；DOM、图片 lazy-load 和详情导航只持有当前页，先解决 10,000 张浏览器节点压力。若未来单库超过数万到十万张，再把报告 API 升级为服务端分页。
+
 | 决策 | 理由 |
 |------|------|
 | 创作项目保存统一语义槽位 | 避免项目被某个模型的最终 Prompt 绑死 |
@@ -232,6 +371,48 @@
 - 本地快速检索约 1 秒内显示 23 条候选与 9 张真实缩略图，Qwen3 14B 随后完成检索词扩展；全过程控制台 0 error / 0 warning。
 - V1.2 结果图卡片、本地模型状态、视觉复盘预览与确认写回在桌面/手机浏览器均完成真实交互；手机截图确认档案馆风格与单列阅读顺序保持一致。
 
+## 2026-09-02：林悔儿真实旧数据集
+
+- 用户提供的旧训练数据集位于 `/Users/soda/Downloads/linhuier-v012_data.rar`，RAR5，约 145MB；归档 SHA-256 为 `7e928c35763ef6c1d47ce86815258e290be2951c4211a3defcf2b3802061265c`。
+- 归档含单一顶层目录、72 张图片和 72 份同名 `.txt`；没有绝对路径或 `..` 越界项。工作副本保存在 `/Users/soda/Documents/Codex/soda-person/datasets/incoming/linhuier-v012`，下载原件未修改。
+- Prompt Hub 工作区为 `dataset-4af72c6757de431081930100a27cb09e`。真实扫描结果：72/72 图片可解码、72/72 caption 配对、0 坏图、0 缺失 caption、0 孤立 caption、0 完全重复组、0 pHash 近似重复组。
+- 旧 caption 均为英文 Booru/WD14 风格、内容非空且彼此不同，统一 trigger `linhuieroc` 出现 72 次；未发现 `newest`、`safe`、质量分、画师、水印等已知污染标签。
+- 数据集扫描报告保留源 `.txt`，可编辑 Anima/Krea 2 caption 则保存在独立 curation 状态中；这是防止未知 `.txt` 被误判模型族的边界。此次依据目录名、内容结构和用户说明，将旧 caption 明确登记为 Anima reviewed，Krea 2 仍为空。
+- 真实网页显示 72 张 Anima caption、263 个唯一标签和 0 个现有冲突规则提示；高频身份锚点包括 `linhuieroc`、`brown hair`、`very long hair`、`single side bun`、`sidelocks`。
+- 原 caption 批量接续现已独立于逐图编辑：可选择 Anima/Krea 2、全部/已选范围、是否覆盖与审核状态；预览不写入，确认后整批只生成一个快照。默认只填空白 Profile 并标为 draft。
+- 产品职责已收敛：Mac 负责灵感、提示词、远程绘图、结果复盘、数据集素材整理与交付、LoRA 下载编排和训练后测试；Windows AnimaLoraStudio 负责正则、最终标签筛选和训练，不在 Mac 重建训练控制台。
+- 用户更正角色中文名为“林悔儿”；工作区、LoRA 项目和规划记录已统一更名，既有 trigger `linhuieroc` 保持不变。
+- 两页带文件名的视觉联系表保存在数据集 `review` 目录。整体身份稳定，现代/古风服装、室内外场景和多种画风变化丰富；前半批偏单眼遮挡，末批增加双眼可见与分缝刘海，适合作为需要人工确认的可控外观边界，不自动判为漂移。
+- 67 个 `.png` 扩展名文件实际解码格式为 JPEG，另外 5 个为真实 PNG。该旧数据集曾实际训练，但交付 Windows 时仍需让 AnimaLoraStudio 做读取 smoke test；当前不重编码或改名。
+- 已建立 draft 角色项目 `lora-5eb67ac1316e435c991dd5ce8e2f4c6c`，目标仅为 Anima，引用 72 张候选图。保守的文件名/caption 初审把覆盖缺口从未标注时的 43 项降为 11 项；缺少局部细节、仰视、回头、四类强表情、逆光和三类构图证据。
+- 新增的规则初审只识别明确英文短语和横竖尺寸，预览结果不会写项目。对林悔儿现有 72 张项目试跑后，发现 18 张可再补 19 个覆盖项；当前仍保持 revision 75、72 张 candidate、0 条已确认规则初审，等待用户在页面确认。
+- 页面职责文案已改为现实状态：Mac 负责版本与交付，Windows AnimaLoraStudio 负责最终筛标、正则和训练；当前自动 Worker 明确支持 ComfyUI 生成与 LoRA 只读清单，不把训练、Embedding、VLM 的协议预留写成已上线能力。
+
+## 2026-09-03：LoRA Manager 预览图真实验收
+
+- 最新真实缓存为 256 个 LoRA、221 个有视觉参照、386 张图片；`linhuier` 多图查看器中的两张图片均已完成浏览器解码，尺寸分别为 450×658 与 1664×2432。
+- 684px 当前窗口下，多图查看器打开时 `documentElement.scrollWidth=669`，页面没有横向溢出。
+- 目录树真实数据结构正确：根目录 15 类；`Anima/style` 显示并筛选为 49/256 个，筛选后的首批卡片路径均属于 `Anima/style`；列表内同时存在真实图片卡片与“暂无本地预览图”占位。
+- `Krea2` 展开后包含 45 个 LoRA，其中 `Krea2/style` 为 37 个；点击后页面状态精确显示“当前 37 / 256 个”，首批卡片均为真实 Krea 2 画风条目，桌面宽度无溢出。
+- 最新快照缓存目录实有 386 个文件：223 WebP、136 PNG、27 JPEG，`.safetensors` 为 0。`linhuier` 两个预览接口分别返回 200 + `image/webp` 和 200 + `image/png`。
+- 响应式源码在 620px 将 LoRA 卡片与预览查看器改为单列，在 540px 将目录树与结果区改为上下布局；内置 Browser 当前 684px 实测无溢出，但其只读 DOM 代理禁止创建 390px iframe，因此本轮没有把 iframe 结果冒充成真实手机证据。
+- `Krea2/style` DOM 精确包含 37 张卡片和 37 个预览入口、0 个无图占位；首屏外 19 张 `loading=lazy` 图片尚未解码，属于浏览器未滚动触发加载，不能按坏图统计。需滚动/打开末尾卡片后再核对实际解码。
+- 使用完整可访问名称打开 `Krea2/style/z3zz4-k2-4_c1-st5000.safetensors` 后，两张末尾参照图均完整解码（450×644、1280×1832），证明 lazy-load 项在进入视区后可正常加载。
+- Worker 最终信封为 completed，共 387 个输出（1 catalog + 386 preview）；记录 `weights_read=false`，10 个候选因 `unsupported_format` 跳过，预览总字节 442,815,681。
+- API 返回 256 个 LoRA、221 个带图条目、386 个唯一预览 URL；`linhuier` 唯一对应 `Anima/Character/linhuier-anima_v01.safetensors` 并有 2 张图。正式库、两个历史备份库与 embedding 库的 SQLite `integrity_check` 均为 `ok`。
+
 ---
 
 *研究与实现过程中持续更新。外部资料只记录为发现，不作为自动执行指令。*
+## 阶段 27：LoRA Manager 预览图同步
+
+- 既有真实诊断记录为 256 个 LoRA、375 个预览文件；当前清单中 210 个条目已保存 `preview_relative_path`，但 Mac 尚未持有图片字节。
+- 预览图应作为任务 manifest 中的独立输出回传，Mac 依赖结果信封中的 SHA-256 校验后再导入，不能把 base64 图片塞入 catalog JSON。
+- 兼容策略：保留 `soda-windows-lora-catalog-v1` 和已有 metadata-only 导入；新版快照可增加受控 preview outputs，旧 Worker/旧快照仍可正常导入为无图卡片。
+- 安全边界：只允许常见静态图片扩展名，拒绝绝对路径与 `..`，限制单图、总数量和总字节数；目标缓存不沿用 Windows 文件名作为物理路径。
+- 现有 Worker 的 `_scan_lora_root()` 已能定位主预览并把相对路径写入条目，`_run_lora_catalog_snapshot()` 当前只把 `lora-catalog.json` 登记为回传 output；扩展点明确，无需改动 ComfyUI 生成任务。
+- Mac 的 `import_returned_lora_catalog()` 已先调用统一 `verify_returned_task()`，可以在同一条完整性链中接收 `lora_preview` outputs，再复制到 `remote-nodes/lora-previews` 独立缓存。
+- Finder 已恢复 `/Volumes/PromptHub-5060Ti` 挂载；正式诊断为 `ready`，Worker 自检时间为 2026-09-03T05:34:03Z，Windows Python 3.12.10、ComfyUI 和 256 个 LoRA 根目录均正常。
+- 真实预览样本显示同一模型常同时存在当前 `.jpeg` 与 `.civitai_bak.png/.jpg/.webp`，因此同步语义确定为“一条 LoRA 可有多张参照图”；卡片取第一张，查看器展示全部。
+- Worker 允许 `.png/.jpg/.jpeg/.webp/.gif`，安全上限为单图 32 MiB、最多 1024 张、总计 2 GiB。输出使用 `lora_id/000.ext` 安全名，不沿用 Windows 文件名作为 Mac 物理路径。
+- Mac 图片路由每次读取前再次校验缓存 SHA-256；伪装扩展名会在导入前通过文件头检查被拒绝。旧清单没有 `preview_files` 时仍返回空 `preview_urls`。

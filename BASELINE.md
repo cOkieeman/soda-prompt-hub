@@ -8,7 +8,7 @@
 
 - 服务地址：`http://127.0.0.1:8765`
 - 服务状态：`ok`
-- 数据库：`/Users/soda/Documents/Codex/soda-person/prompt-library/database/prompt-library.sqlite`
+- 数据库：`$HOME/Documents/Codex/soda-person/prompt-library/database/prompt-library.sqlite`
 - Python：3.12
 - Web：FastAPI 返回内嵌 HTML/CSS/JavaScript
 - 数据：SQLite + FTS5

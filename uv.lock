@@ -703,6 +703,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "mcp" },
+    { name = "numpy" },
     { name = "onnxruntime" },
     { name = "pillow" },
     { name = "uvicorn" },
@@ -723,6 +724,7 @@ test = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "mcp", specifier = ">=2.1.1" },
+    { name = "numpy", specifier = ">=2.0.0" },
     { name = "onnxruntime", specifier = ">=1.17.0" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "uvicorn", specifier = ">=0.52.4" },

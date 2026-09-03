@@ -8,7 +8,7 @@ from PIL import Image
 
 from prompt_hub.api import create_app
 from prompt_hub.creative import apply_result_review
-from prompt_hub.local_model import analyze_result_image
+from prompt_hub.local_model import analyze_result_image, draft_krea2_caption
 from prompt_hub.result_media import resolve_result_image
 
 
@@ -224,3 +224,38 @@ def test_local_vision_analysis_normalizes_response(tmp_path, monkeypatch) -> Non
     assert captured["payload"]["store"] is False
     assert result["observed_slots"]["outfit"] == "dark military coat"
     assert result["reconstructed_prompts"]["anima_negative"] == "bad hands"
+
+
+def test_local_vision_krea2_caption_uses_native_chat_and_english(tmp_path, monkeypatch) -> None:
+    image_path = tmp_path / "dataset.png"
+    Image.new("RGB", (80, 120), "teal").save(image_path)
+    captured = {}
+
+    def fake_request(_url, **kwargs):
+        captured.update(kwargs)
+        return {
+            "output": [
+                {
+                    "type": "message",
+                    "content": json.dumps(
+                        {
+                            "caption": "An adult character stands in soft teal studio light.",
+                            "observations": {"lighting": "soft teal studio light"},
+                            "safety_warning": "",
+                        }
+                    ),
+                }
+            ]
+        }
+
+    monkeypatch.setattr("prompt_hub.local_model._request_json", fake_request)
+    result = draft_krea2_caption(
+        image_path=image_path,
+        model="vision-model",
+        existing_caption="A previous reviewed caption.",
+    )
+    assert captured["payload"]["reasoning"] == "off"
+    assert captured["payload"]["input"][0]["type"] == "image"
+    assert "previous reviewed caption" in captured["payload"]["input"][1]["content"]
+    assert result["draft"] == "An adult character stands in soft teal studio light."
+    assert result["observations"]["lighting"] == "soft teal studio light"

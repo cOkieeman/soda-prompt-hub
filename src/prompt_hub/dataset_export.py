@@ -79,6 +79,11 @@ def create_dataset_export(
         profile_id=profile_id,
         default_caption=default_caption,
     )
+    invalid_caption = next((caption for *_rest, caption in prepared if not caption.isascii()), "")
+    if invalid_caption:
+        raise DatasetExportError(
+            "最终 caption 必须是英文; 请先把中文标签或描述转换为 Anima/Krea 2 对应英文"
+        )
 
     exported_at = datetime.now(UTC)
     manifest = {

@@ -6,9 +6,11 @@
 
 ## 当前阶段
 
-阶段 15：V1.6 数据集自动打标与人工审核（已完成）
+阶段 28 / GitHub 私有发布基线：整理当前代码与文档，排除个人数据、模型、缓存和凭据，完成新鲜工程门后创建私有 GitHub 仓库并推送 `main`。
 
-当前执行阶段：阶段 16 工程安全门；完成后进入阶段 17 / V1.7 数据集工作台
+本轮完成边界：Mac 必须能独立管理事实数据、审核草稿、检索资料、备份恢复并诊断；没有真实 CLIP/SigLIP embedding 时不得生成伪视觉结果。阶段 17/18 的用户真实数据集与 Windows smoke test 验收门继续保留。
+
+本轮状态：**Mac 本机开发与接口预留 complete**；完整跨设备系统保持 in progress，等待真实 Windows 环境验收。
 
 ## 各阶段
 
@@ -73,7 +75,7 @@
 ### 阶段 8：Windows 与 ComfyUI 交付
 - [x] 导出标准生成包 JSON
 - [x] 写明并验证字段级手动导入顺序
-- [ ] 局域网发送和结果回传（待两台 Windows 的固定地址与传输方式）
+- [ ] 局域网发送和结果回传（待 5060 Ti 的固定地址与传输方式）
 - **状态：** partial / external details needed
 
 ### 阶段 9：V1.1 本地智能取材
@@ -141,57 +143,426 @@
 - [x] 备份正式 SQLite、个人媒体、模型配置与资料源版本信息
 - [x] 将 `api.py` 的数据集域拆到 `dataset_routes.py` / `result_assets.py`
 - [x] 将 `creative_web.py` 的创作台 HTML 布局拆到 `creative_web_layout.py`
-- [ ] 为长任务建立后台任务、进度、取消与失败重试基础
-- [ ] 保持 8765 正式服务、现有 API 和页面行为兼容
-- **状态：** partial / baseline and first refactor complete; background jobs pending
+- [x] 为长任务建立后台任务、进度、取消与失败重试基础
+- [x] 保持 8765 正式服务、现有 API 和页面行为兼容
+- **状态：** complete
 
 ### 阶段 17：V1.7 数据集工作台
-- [ ] 以只读方式导入任意本地图片数据集目录，不移动或覆盖原文件
-- [ ] 检查图片解码、尺寸、同名 caption、孤立图片与孤立 `.txt`
-- [ ] 增加缩略图总览、筛选、多选和数据集级审核状态
-- [ ] 将 WD14 扩展为可恢复批量队列，不再受当前 24 张同步上限约束
-- [ ] 增加标签频率、批量增删、冲突标签提示和 caption 版本快照
-- [ ] 首版以 SHA-256 + pHash 完成完全重复与近似重复检测
-- [ ] 导出前生成数据集清单、审计报告和不覆盖原始文件的版本包
-- **状态：** pending / next product milestone
+- [x] 以只读方式导入任意本地图片数据集目录，不移动或覆盖原文件
+- [x] 检查图片解码、尺寸、同名 caption、孤立图片与孤立 `.txt`
+- [x] 增加缩略图总览、筛选、多选和数据集级审核状态
+- [x] 将 WD14 扩展为可恢复批量队列，不再受当前 24 张同步上限约束
+- [x] 增加标签频率、批量增删、冲突标签提示和 caption 版本快照
+- [x] 首版以 SHA-256 + pHash 完成完全重复与近似重复检测
+- [x] 导出前生成数据集清单、审计报告和不覆盖原始文件的版本包
+- **状态：** in_progress / M1 + M2 feature complete; user dataset scale gate pending
 
 ### 阶段 18：V1.8 角色 / 服装 / 风格 LoRA 项目管理
-- [ ] 支持 character、outfit、character_outfit、style 四类项目
-- [ ] 定义 trigger word、固定特征、可控变化、允许变化与禁止漂移
-- [ ] 从 OC Manager 角色创建 LoRA 项目，但不回写 OC Manager
-- [ ] 增加景别、角度、姿态、服装、表情和背景覆盖矩阵
-- [ ] 为 Anima tags 与 Krea 2 自然语言维护独立 caption 树
-- [ ] 冻结数据集版本、文件哈希与 manifest，并导出给 Windows 训练机
-- **状态：** pending
+- [x] 支持 character、outfit、character_outfit、style 四类项目
+- [x] 定义 trigger word、固定特征、可控变化、允许变化与禁止漂移
+- [x] 从 OC Manager 角色创建 LoRA 项目，但不回写 OC Manager
+- [x] 增加景别、角度、姿态、服装、表情和背景覆盖矩阵
+- [x] 为 Anima tags 与 Krea 2 自然语言维护独立 caption 树
+- [x] 冻结数据集版本、文件哈希与 manifest，并导出给 Windows 训练机
+- **状态：** in_progress / M3 + M4 feature complete; real dataset and Windows smoke test pending
 
 ### 阶段 19：V1.9 ComfyUI 结果元数据回流
-- [ ] 读取 ComfyUI PNG 内嵌 workflow、prompt、seed、sampler、steps、CFG、模型与 LoRA 信息
-- [ ] 将结果图关联回创作项目、配方和数据集候选
-- [ ] 支持从回流结果创建下一版本，并保留完整来源链
-- [ ] 首先支持本地文件/共享目录导入，再考虑直接队列接口
-- **状态：** pending
+- [x] 读取 ComfyUI PNG 内嵌 workflow、prompt、seed、sampler、steps、CFG、模型与 LoRA 信息
+- [x] 将结果图人工关联回创作项目和数据集候选
+- [x] 支持从回流结果创建下一版本，并保留完整来源链
+- [x] 首先支持本地文件/共享目录导入，再考虑直接队列接口
+- **状态：** feature complete / 等明天用真实 Windows ComfyUI PNG 交叉核对
 
 ### 阶段 20：V2.0 Windows 交付桥
-- [ ] 优先采用 SMB/共享目录交付生成包与训练包
-- [ ] 将 4070S 主机定位为 ComfyUI 生成与测试节点
-- [ ] 将 5060 Ti 16GB 主机定位为 LoRA 训练与批量测试节点
-- [ ] 增加任务状态、结果回传、失败重试和连接诊断
-- [ ] 凭据只进入安全存储，不写入项目、日志或生成包
-- **状态：** pending / Windows details deferred
+- [x] 优先采用 SMB/共享目录交付生成包与训练包，并建立五目录协议与 Mac 节点登记页
+- [x] 根据最新设备方案，将制图与训练能力合并为单一 `compute_5060ti` 节点
+- [x] Mac 增加任务投递、五目录状态扫描、returned 待审核状态、失败重试和连接诊断
+- [ ] 用真实 Windows worker 验证领取、回传、结果导入、断线恢复与幂等
+- [x] Mac 接口不接受或保存 Windows 凭据；真实登录凭据明天只交给 Finder / macOS Keychain
+- **状态：** in_progress / Mac 登记、诊断、目录、任务 ledger 与重试完成；真实 SMB 与 worker 明天验收
 
 ### 阶段 21：V2.1 视觉检索与 Krea 2 批量 caption
-- [ ] 在 pHash 去重稳定后增加 CLIP embedding 相似图检索与视觉聚类
+- [ ] 在 pHash 去重稳定后增加真实 CLIP/SigLIP embedding 相似图检索与视觉聚类
 - [ ] 增加 Git/网站提示词资料的本地缓存、来源、许可和更新时间
-- [ ] 建立 FTS + 语义检索的混合召回，检索结果必须保留真实来源
-- [ ] 为 Krea 2 增加异步 VLM 自然语言 caption 队列与人工审核
-- [ ] 允许将慢速视觉任务按需交给 Windows，Mac 继续负责审核与管理
-- **状态：** pending
+- [x] 建立 FTS + 可选真实向量的混合召回，按四类分组并保留真实来源；无索引时明确空状态
+- [x] 为 Krea 2 增加异步 VLM 自然语言 caption 队列与人工审核
+- [x] 建立慢速视觉任务下放契约与哈希回验，Mac 继续负责审核与管理；真实 Windows worker 待接入
+- [x] 建立版本化 embedding Mac 事实源、SHA-256 回验与远程导入契约
+- **状态：** in_progress / Mac 检索产品层、M7D 与索引事实源完成；真实向量与网站缓存待后续
+
+### 阶段 22：V2.2 单一 5060 Ti 生成 / 训练节点
+- [x] 取消 4070S 节点与双角色方案
+- [x] 将 compute contract 升级为 v2，并让所有 Windows 任务指向 `compute_5060ti`
+- [x] 设备页收敛为一张 5060 Ti 卡片，统一生成、训练、VLM、Embedding 与 LoRA 清单 capability
+- [x] 获取 5060 Ti 的设备名/IP、SMB 共享名、ComfyUI 与训练工具路径
+- [x] 挂载共享目录并建立五目录交付桥
+- [ ] 部署单卡串行 worker：训练与 ComfyUI 互斥，Embedding/VLM 仅在空闲时执行
+- [ ] 完成 ComfyUI 最小任务、Windows LoRA 清单适配、LoRA smoke test 与断线恢复验收
+- **状态：** in_progress / Mac 单节点协议、页面与真实 SMB 交付桥已完成，等待 Windows worker 和真实 GPU 任务验收
+
+### 阶段 23：V2.3 Windows worker 与 ComfyUI 最小闭环
+- [x] 新增可在 Windows Python 3.12 独立运行的 stdlib-only worker 包
+- [x] 实现 outbox 原子领取、单 GPU 串行锁、processing 恢复与重复任务幂等
+- [x] 实现 ComfyUI `/prompt`、`/history`、`/view` 调用和超时/取消/失败回传
+- [x] 回传图片、workflow、运行日志、源哈希和输出 SHA-256 结果信封
+- [x] 提供不含凭据的 Windows 配置模板、启动脚本、诊断命令和使用说明
+- [x] 在 Mac 自动测试后打包到 SMB，共享目录内完成 worker 自检
+- [x] 投递一个低成本 ComfyUI 真实任务并由 Mac 回验结果
+- **状态：** complete / 真实 Windows、SMB、ComfyUI 与 SHA-256 回验全部通过
+
+### 阶段 24：V2.4 Anima / Krea 2 模型级生成接入
+- [x] 从 Windows ComfyUI 分别导出 Anima 与 Krea 2 的 API Format workflow
+- [x] 将 Prompt、seed、尺寸、steps、CFG 映射为白名单参数，并将模型/LoRA 固定为 Profile 依赖
+- [x] 在 Mac 端建立可选择的 workflow Profile，不让用户直接编辑节点 JSON
+- [x] 各投递一个低成本模型生成任务，回传图片、PNG metadata、workflow 与日志
+- [x] 将回传结果验收进 Mac 结果库，并在任务带 project_id 时关联到创作项目和既有下一版本入口
+- [ ] 将 ComfyUI 监听地址从局域网收紧为本机，并复验 Worker 不受影响
+- **状态：** in_progress / 两类 Profile、真实出图与一键回流完成；仅剩 Windows 监听收紧
+
+### 阶段 25：V2.5 用户真实数据集验收与职责收敛
+- [x] 原样保存 `linhuier-v012_data.rar`，校验归档路径与 SHA-256，并建立不覆盖原件的工作副本
+- [x] 将 72 张图片与 72 份同名 caption 注册为只读数据集工作区
+- [x] 完成坏图、缺失 caption、孤立文件、SHA-256 重复与 pHash 近似重复扫描
+- [x] 将 72 份旧人工 WD14/Booru caption 明确接续为 Anima reviewed caption，不运行 WD14 覆盖旧标签
+- [x] 建立带文件名的视觉联系表，完成人工抽查与覆盖矩阵初审
+- [x] 增加“从原 caption 批量接续到 Anima/Krea 2 Profile”的可预览、单快照入口
+- [x] 增加基于文件名、原 caption 与横竖尺寸的保守覆盖初审；仅在用户确认后合并，不改变图片状态
+- [x] 清理数据集、LoRA、设备与检索页面的过期阶段文案，明确当前 Worker 只承诺 ComfyUI 自动闭环
+- [ ] 验证审核选择、冻结版本与向 5060 Ti 数据集交付包；训练、正则和最终标签筛选继续由 Windows AnimaLoraStudio 负责
+- **状态：** in_progress / 真实导入、扫描、批量 caption 接续入口和覆盖初审完成；等待用户确认保留项后再做冻结与交付验收
+
+### 阶段 26：V2.6 Windows LoRA Manager 只读清单闭环
+- [x] 只读诊断真实 LoRA Manager、ComfyUI `LoraLoader`、LoRA 目录与预览文件
+- [x] Worker 以配置白名单根目录执行 `lora_catalog_snapshot`，不读取或复制权重内容
+- [x] 回传标准 `soda-windows-lora-catalog-v1`，Mac 完整性验收后导入只读索引
+- [x] 设备页增加同步、任务状态、验收导入和 LoRA 检索闭环
+- [x] 部署新版 Worker，在 256 个真实 LoRA 上完成快照与 Mac 检索验收
+- **状态：** complete / 真实 Windows、SMB、Worker、LoRA Manager sidecar、ComfyUI `LoraLoader`、SHA-256 验收与 Mac 检索全部通过
+
+### 阶段 27：V2.7 Windows LoRA Manager 预览图同步
+- [x] Worker 从配置白名单 LoRA 根读取允许格式的预览图，不读取或复制权重
+- [x] 预览资产进入任务 manifest，并限制单图大小、总文件数与总字节数
+- [x] Mac 在完整性验收后保存到独立预览缓存，路径与 `lora_id` 安全关联
+- [x] 增加预览图片路由、卡片缩略图、无图占位与大图查看
+- [x] 完成自动测试、真实 Windows 同步、浏览器交互与服务重启验收
+- **状态：** complete / 256 个 LoRA、221 个带视觉参照、386 张图片已缓存到 Mac；权重未读取或复制
+
+阶段 27 错误记录：
+
+| 错误 | 尝试次数 | 解决方案 |
+|------|---------:|----------|
+| Finder URL 调用后 8 秒内未出现 `/Volumes/PromptHub-5060Ti` | 1 | 不重复盲目调用；检查 Finder 是否正在等待登录/确认，并从 UI 完成已有钥匙串会话 |
+| 首轮 Worker 定向测试把文本字节伪装成 JPEG，新的文件头校验正确拒绝 | 1 | 将测试夹具改成带合法 JPEG/PNG 文件头的双预览样本，保留内容伪装拒绝逻辑 |
+| 新增断言使 Worker 集成测试超过 statement 门槛 | 1 | 将回传与导入断言拆到专用 helper，不放宽 Ruff 规则 |
+
+### 阶段 28：GitHub 私有发布基线
+- [x] 审计 tracked/untracked 文件、体积、个人路径与敏感信息
+- [x] 整理 `.gitignore`、README 与仓库交付文档，只保留可复现代码和安全模板
+- [x] 对待提交集合执行密钥形状、个人数据和大文件安全门
+- [x] 重新执行 pytest、coverage、Ruff、ty 与 diff 检查
+- [ ] 创建本地发布 commit
+- [ ] 在已连接 GitHub 账号创建 private 仓库并推送 `main`
+- [ ] 从远端复核默认分支、可见性与 commit SHA
+- **状态：** in_progress
 
 ### 延后阶段：MiniMax H3 视频
 - [ ] 绘图 V1 完成后重新确认范围
 - [ ] 设计视频项目、时间线、镜头和声音结构
 - [ ] 实现 H3 文生视频、图生视频、首尾帧和全参考 Profile
 - **状态：** pending / deferred
+
+## 完整交付路线：从当前状态到绘图系统完全可用
+
+### 完成定义
+
+绘图主线在 V2.1 完成时，应形成下面这条闭环：
+
+`提示词/OC → 创作项目 → Anima/Krea 2 Prompt → ComfyUI 出图 → 结果回流 → 数据集审核 → LoRA 项目 → Windows 训练/测试 → 版本复盘`
+
+全局完成标准：
+
+- 原始图片、原始 caption、OC Manager 数据和公共提示词源始终不被静默覆盖。
+- 所有模型结果先作为建议或草稿，只有用户确认后才进入正式 caption、项目或导出包。
+- Anima Booru tags 与 Krea 2 自然语言保持独立版本树，不能相互覆盖。
+- MacBook Air 负责检索、编排、审核、版本和交付；5060 Ti 16GB 统一负责 ComfyUI 生成、LoRA 训练、批量 VLM 与 Embedding。
+- 任何长任务都有持久化状态、进度、取消、失败详情、重试和重启恢复。
+- 所有导出都带 manifest、文件哈希、来源和版本；任何 Windows 回传都能关联到原项目/配方/数据集。
+- 正式版本必须通过自动测试、真实数据集、桌面/手机、服务重启、数据库完整性和备份恢复验收。
+
+### 总体顺序
+
+| 里程碑 | 版本 | 核心结果 | 是否依赖 Windows |
+|--------|------|----------|------------------|
+| M1 | V1.7A | 数据集工作台前端与只读审核 | 否 |
+| M2 | V1.7B | WD14 长队列、批量编辑与版本化导出 | 否 |
+| M3 | V1.8A | LoRA 项目定义与覆盖矩阵 | 否 |
+| M4 | V1.8B | Anima/Krea 2 双 caption 树与训练包冻结 | 否 |
+| M5 | V1.9 | ComfyUI 结果元数据回流 | 可先本地完成 |
+| M6 | V2.0 | 5060 Ti 共享目录交付桥 | 是 |
+| M7 | V2.1 | 视觉检索、提示词资料更新、Krea 2 VLM 队列 | 可选下放 Windows |
+| M8 | Release | 性能、恢复、文档与最终发布验收 | 是 |
+| M9 | 视频阶段 | MiniMax H3 独立工作台 | 延后 |
+
+### 设备归属原则
+
+“功能在 Mac”表示项目状态、索引、审核界面和最终决定保存在 Mac；耗时计算可以交给 Windows，但 Windows 不成为唯一事实源。
+
+| 里程碑 | MacBook Air | 5060 Ti 16GB 主机 |
+|--------|-------------|--------------------|
+| M1 | 完整实现与运行数据集工作台 | 不需要 |
+| M2 | WD14 队列、审核、caption 版本与导出；本机 CPU 默认执行 | 可选批量 worker |
+| M3 | 完整实现 LoRA 项目、选图和覆盖矩阵 | 不需要 |
+| M4 | 双 caption、数据冻结、训练包与配置草案 | 执行 smoke test、正式训练和 checkpoint 测试 |
+| M5 | 解析、关联、展示和保存 ComfyUI 元数据 | 提供真实生成图片/workflow 与 LoRA 测试结果 |
+| M6 | 任务中枢、SMB 状态、回传索引与审核 | 统一生成、训练和批量测试节点 |
+| M7 | 资料缓存、向量索引、混合检索、UI、任务编排与人工审核 | 大批量 embedding/VLM worker，训练时暂停 |
+| M8 | 正式状态、备份恢复、文档与最终验收 | 参与生成、训练与断线验收 |
+| M9 | 视频项目、Prompt、素材、版本和结果管理 | 可选视频计算节点 |
+
+### M1 / V1.7A：数据集工作台前端
+
+实施内容：
+
+- [x] 在主导航增加“数据集工作台”，沿用现有纸张/档案馆视觉语言。
+- [x] 提供目录路径导入、最近工作区、重新扫描和移除工作区记录；移除记录不删除原目录。
+- [x] 展示后台任务状态、逐步进度、取消、失败详情和重试。
+- [x] 建立缩略图网格与大图审核抽屉，支持键盘上一张/下一张。
+- [x] 支持按有效/坏图、有无 caption、已审核、重复组、扩展名和尺寸筛选。
+- [x] 支持单选、多选、全选当前筛选结果，并保存工作区级审核状态。
+- [x] 显示图片尺寸、文件大小、SHA-256、pHash、caption 路径和来源相对路径。
+- [x] 增加安全缩略图与原图查看；不允许通过 URL 越出已注册数据集目录。
+- [x] 为手机端提供单列审核布局，但批量操作优先保证桌面体验。
+
+实施状态：功能完成。4 图混合目录、1,000 / 10,000 张隔离规模、桌面与 390px 手机端已通过；
+用户真实数据集与长任务取消/重启恢复仍保留为跨设备发布验收门。
+
+验收门：
+
+- 使用至少一个包含正常图、坏图、缺失 caption、孤立 `.txt`、完全重复和近似重复的真实目录验收。
+- 扫描前后对原目录所有文件做哈希对照，必须完全一致。
+- 关闭并重启 8765 后，工作区、任务、审核状态和当前报告仍可恢复。
+- 1,000 张图片的目录可以后台扫描，前端不冻结、可以取消并重新开始。
+
+### M2 / V1.7B：WD14 长队列、caption 审核与版本化导出
+
+实施内容：
+
+- [x] 将工作区图片的 WD14 处理接入现有后台任务，不再限制为 24 张同步批次。
+- [x] 保存每张图的 rating、general、character、置信度、阈值、模型版本和运行时间。
+- [x] 支持只处理未打标、失败、当前筛选、多选或整个工作区。
+- [x] 增加标签频率、低频标签、疑似拼写问题和冲突标签面板。
+- [x] 建立可配置冲突规则，例如 `grey_hair/white_hair`；只提示，不静默删除。
+- [x] 支持批量增加、删除、替换、排序和标准化标签，并提供变更预览。
+- [x] 每次批量修改生成 caption snapshot，支持查看差异和回退，不覆盖旧版本。
+- [x] 每张图片维护 `anima` 与 `krea2` 两条 caption 记录；WD14 只进入 Anima 草稿。
+- [x] 导出前生成数据集审计：坏图、缺 caption、重复、未审核、分辨率异常、标签频率。
+- [x] 导出版本目录/ZIP：原图副本、caption、manifest、audit、hashes；永不写回源目录。
+
+验收门：
+
+- [x] 30 张真实图片文件集通过第 10 张中断与同任务续跑；任务层取消、重启恢复和失败重试已有独立回归覆盖。
+- [x] 人工修改 Anima caption 后重新运行 WD14，不覆盖已确认内容。
+- [x] Krea 2 caption 在 WD14、批量标签编辑和 Anima 导出过程中保持不变。
+- [x] 导出包同名图片/`.txt` 配对完整，manifest 哈希可复核，源目录字节不变。
+- [ ] 使用用户提供的超过 24 张真实 LoRA 数据集做发布级耗时、取消与恢复验收。
+
+### M3 / V1.8A：LoRA 项目定义与数据覆盖矩阵
+
+实施内容：
+
+- [x] 支持 `character`、`outfit`、`character_outfit`、`style` 四种项目类型。
+- [x] 每个项目保存 trigger word、固定特征、可控变化、允许变化和禁止漂移。
+- [x] 可从 OC Manager 角色建立项目，只读取角色资料与图库，不回写 OC Manager。
+- [x] 可从现有数据集工作区选择图片建立 LoRA 数据集版本，不复制或修改源数据。
+- [x] 建立景别、视角、姿态、表情、服装、背景、光线和构图覆盖矩阵。
+- [x] 标记重复过多、覆盖缺口、角色特征不一致、服装污染和背景偏置。
+- [x] 支持候选、保留、排除、待补图、正则图五种图片状态。
+- [x] 保存项目级数据集说明、目标模型、训练尺寸、训练机与测试计划。
+
+验收门：
+
+- 选择一个真实项目类型完成端到端验收，优先建议先做 `character`。
+- 覆盖矩阵能明确指出缺失角度/景别/表情，而不是只显示图片数量。
+- 从 OC Manager 创建项目后，原角色 JSON、图库和数据库无变化。
+- 每个纳入版本的图片都可追溯到来源工作区、源相对路径和文件哈希。
+
+### M4 / V1.8B：双 caption 树、数据冻结与训练包
+
+实施内容：
+
+- [x] 复用数据集工作区的 Anima canonical Booru tag 树，并在冻结时强制 trigger 与人工审核状态。
+- [x] 复用独立 Krea 2 英文自然语言 caption 树，不复制 WD14 标签串。
+- [x] 支持逐图 caption 差异、批量编辑快照、受保护 trigger word 和人工确认状态。
+- [x] 增加训练/正则物理分组、独立测试目录与同名 caption 校验。
+- [x] 冻结数据集版本后生成 immutable manifest；后续修改必须创建新版本。
+- [x] 生成适配 5060 Ti 16GB 的训练配置草案，记录 batch、resolution、rank、学习率与显存交换起点。
+- [x] 导出训练包、配置、触发词说明和固定测试 prompt 集。
+- [x] 保存训练 run 占位 ID，为 Windows 回传日志、模型和样图预留关联。
+
+验收门：
+
+- 同一冻结版本能够分别导出 Anima 和 Krea 2 caption，不混用内容。
+- 训练包内图片-caption 同 stem，文件哈希与冻结 manifest 一致。
+- 修改任何 caption 后旧训练包版本保持不变，新导出获得新版本号。
+- 训练配置通过本地结构校验，且明确标注目标为 5060 Ti 16GB，不假设更大显存。
+
+### M5 / V1.9：ComfyUI 结果元数据回流
+
+实施内容：
+
+- [x] 解析 ComfyUI PNG 内嵌 prompt/workflow，以及 seed、steps、CFG、sampler、scheduler、checkpoint、LoRA 和尺寸。
+- [x] 对缺少元数据的 JPEG/WebP 保留普通图片导入，不伪造生成参数。
+- [x] 首版通过人工选择关联创作项目；manifest、文件名自动关联和 LoRA run 关联留到 M6 真实回传。
+- [x] 在结果图库显示真实工作流参数、模型和 LoRA 组合，并支持一键建立下一版本。
+- [x] 支持将满意结果加入数据集候选，将失败结果记录为测试样例而不污染训练集。
+- [x] 对重复回流文件按 SHA-256 去重，不重复建立结果记录。
+- [x] 首版支持本地文件和共享目录导入；直接连接 ComfyUI API 延后到共享目录闭环稳定后。
+
+验收门：
+
+- 使用真实 ComfyUI PNG 复原主要生成参数，并和 ComfyUI 中的原工作流人工对照。
+- 同一文件重复导入不会重复记录；不同 seed 的图片保持独立。
+- 回流结果能追踪到创作项目、配方、生成包和数据集候选。
+- 旧版无 lineage/无元数据图片仍能安全显示和手动关联。
+
+当前证据：3 项 M5 专项测试覆盖真实 PNG 文本块、去重、无 metadata JPEG、只读目录、关联、候选、
+失败和分支；隔离服务完成 1280px 与 390×844 浏览器验收。真实 Windows ComfyUI 产物与原 workflow
+人工对照作为明天 M6 接入的第一项 smoke test。
+
+### M6 / V2.0：Windows 共享目录交付桥
+
+实施内容：
+
+- [x] 确认 5060 Ti Windows 的设备名/IP、SMB 共享目录和双向读写权限；固定地址保留后续在路由器确认。
+- [x] Mac 建立 `outbox/inbox/processing/completed/failed` 任务目录协议。
+- [ ] 5060 Ti 节点接收 ComfyUI 生成/批量测试任务，回传图片、workflow 和运行状态。
+- [ ] 同一 5060 Ti 节点接收 LoRA 训练包，回传 checkpoint、日志、配置快照和测试图。
+- [ ] Windows worker 串行占用 GPU：训练与制图互斥，Embedding/VLM 只在空闲时运行。
+- [x] Mac 投递信封带唯一 ID、manifest、目标节点、attempt 与 `retry_of`；本地保留事实副本，失败重试不覆盖旧记录。
+- [ ] Windows worker 证明领取、结果幂等与重复投递不会重复执行。
+- [ ] Mac 端显示节点在线状态、共享目录可写性、磁盘空间和最后成功同步时间。
+- [ ] 凭据只保存在 macOS Keychain/系统挂载配置，不写入 Git、SQLite 明文、日志或任务包。
+- [ ] 断网、Windows 重启或共享目录临时不可用时任务保留并可恢复，不丢包、不重复训练。
+- [ ] SMB 稳定后再评估是否增加 Windows 常驻小代理；不把 SSH 作为首版前置条件。
+
+验收门：
+
+- 分别向 5060 Ti 投递一个 ComfyUI 任务和一个 LoRA smoke test，并收到完整结果。
+- 中途断开共享目录后恢复，任务状态能够继续，不生成重复结果或覆盖旧结果。
+- Mac 上能从任务记录直接打开回传结果，并关联原创作项目/LoRA run。
+- 安全扫描确认仓库、日志和导出包不含凭据。
+
+### M7 / V2.1：视觉检索、提示词资料维护与 Krea 2 VLM 队列
+
+M7 仍然是 Mac 上的产品功能，只有可重建、计算密集的 embedding/VLM 推理可以下放 Windows。最终索引、来源、caption 草稿、审核结果和版本记录仍以 Mac 为准。
+
+#### M7A：提示词与模型资料同步（Mac）
+
+- [x] 增量更新 Git 提示词库；只对干净且有 upstream 的仓库执行 fast-forward-only 更新，随后重建索引。
+- [ ] 为允许抓取的网站保存本地缓存、来源 URL、许可和更新时间。
+- [x] 只把真实来源内容写入资料库；模型生成内容只能作为检索词或草稿，不能伪装成资料卡。
+- [x] 建立 Windows LoRA metadata snapshot API、只读清单页和混合检索入口；后续由 Windows Worker 读取 LoRA Manager 插件 metadata、预览与 ComfyUI LoRA 目录。
+- [x] LoRA/Checkpoint 权重继续留在 Windows；Mac snapshot 只保存 SHA-256、相对路径、底模、trigger、标签和预览引用。
+
+#### M7B：关键词 + 向量混合检索（Mac）
+
+- [x] 建立独立版本化 embedding 索引与 5060 Ti 批量结果导入接口，保存模型版本、维度、生成设备与源 SHA-256。
+- [ ] 为提示词文本、视觉参考、数据集图片和远程 LoRA 预览建立分类型 embedding 索引。
+- [x] 查询先执行 SQLite FTS 精确召回；只有提供真实 query vector 且索引兼容时才增加 cosine 召回。
+- [x] 结果按“提示词资料 / 视觉参考 / 我的数据集 / Windows LoRA”分组，不把不同资产混成无来源列表。
+- [x] 每条已有结果显示关键词或视觉相似依据，并保留真实来源链接/路径；语义依据等待真实向量填充。
+- [x] embedding 保存模型 ID、版本、维度和生成设备；换模型建立并存索引，不覆盖旧版本。
+
+#### M7C：相似图与视觉聚类（Mac 管理，Windows 可加速）
+
+- [x] 建立 cosine 相似查询 API，返回 asset 类型、真实来源、worker 与匹配分数；等待真实 CLIP/SigLIP 向量后接 UI。
+- [ ] pHash 继续负责完全重复和近似重复；CLIP/SigLIP 类 embedding 负责语义相似，不混用职责。
+- [x] 支持按源图 SHA-256 的“以图找图”入口和真实索引可用性检查；相似分类浏览与视觉聚类等待真实向量。
+- [ ] 少量图片或单图查询可在 Mac 计算；数千张以上批量 embedding 默认交给空闲的 5060 Ti。
+- [ ] 5060 Ti 在 ComfyUI/训练都空闲时执行 embedding，不让检索任务阻塞制图或炼丹。
+- [ ] Windows 只回传 `文件哈希 + embedding + 模型版本`；Mac 校验哈希后写入版本化索引。
+
+#### M7D：Krea 2 VLM caption 队列（Mac 审核，Windows 默认批量推理）
+
+- [x] Mac 可调用本地 Qwen3.5 9B Vision，适合即时反推与少量审核。
+- [ ] 大批量 Krea 2 caption 默认派发到空闲的 5060 Ti 16GB；训练任务优先，caption 队列可暂停恢复。
+- [x] 视觉模型只输出英文自然语言草稿和结构化观察，不直接覆盖已确认 caption。
+- [x] Mac 显示原 caption、VLM 草稿和图片，用户确认后才生成 Krea 2 caption snapshot。
+- [x] 成人向合法素材继续只走本地/LAN 模型，不默认上传云端；分级与来源随任务保留。
+- [x] Anima WD14 tags 与 Krea 2 VLM captions 使用独立队列、独立状态和独立版本。
+- [x] 5060 Ti `vlm_caption_batch` 回传接口已完成，Mac 按扫描报告回验源 SHA-256 后只写草稿。
+
+接口准备：`/api/compute/contract` 已定义 `embedding_batch` 与 `vlm_caption_batch` 的 payload、结果、
+模型版本、源 SHA-256 回验和“只返回 draft”边界；Mac 已实现共享目录投递、状态扫描和失败重试，
+5060 Ti worker 的真实领取、执行和回传仍需在 M6 接通设备后实测，不能仅凭 Mac 模拟标记 M7 完成。
+
+实施内容：
+
+- [ ] 为资料卡、参考图和数据集图片生成 CLIP embedding，保留模型版本与重建能力。
+- [ ] 建立 FTS 关键词 + embedding 的混合检索，结果始终显示真实来源，不用模型记忆冒充资料。
+- [ ] 增加相似图搜索、视觉聚类和重复簇浏览；pHash 继续负责基础去重。
+- [ ] 为 Git 提示词库和允许抓取的网站建立本地缓存、来源 URL、许可、更新时间和更新记录。
+- [ ] 资料更新采用增量导入，不覆盖个人收藏、评分、备注或项目引用。
+- [x] 增加 Krea 2 异步 VLM caption 队列，本机执行接口已完成，Windows worker 契约继续保留。
+- [x] VLM 输出先进入 Krea 2 草稿，提供逐图对照、人工确认与版本快照。
+- [ ] 建立检索与 caption 质量样例集，避免模型/embedding 更新后质量静默下降。
+
+验收门：
+
+- 真实查询同时返回关键词匹配与视觉相似结果，并能解释来源与匹配原因。
+- 资料源更新后，个人收藏和项目引用保持有效。
+- Krea 2 批量 caption 可取消、重启恢复、人工确认，且不改动 Anima caption。
+- embedding/VLM 模型升级可以并存版本或重建，不使旧数据不可读。
+- 断开 Windows 时，Mac 的已建索引、搜索、审核和已完成 caption 仍可正常使用；只有新的大批量计算等待节点恢复。
+
+### M8：最终发布、恢复与日常使用验收
+
+实施内容：
+
+- [x] 为数据库、embedding、工作区、个人媒体、导出版本、LoRA 项目、设备登记和任务状态建立统一备份清单。
+- [x] 实测从备份恢复到新目录，并验证 manifest、SHA-256 与两个 SQLite 完整性。
+- [x] 对 1,000 / 10,000 张隔离目录测试扫描、SHA/pHash、分页、全量筛选选择和 DOM 上限。
+- [x] 完成桌面和 390px 手机分页回归；数据集批量操作允许标注为桌面优先。
+- [ ] 完成服务异常退出、Mac 重启、网络中断、Windows 离线和磁盘不足场景测试。
+- [x] 整理“一次创作”“一次数据集审核”“一次 LoRA 训练”“一次 Windows 回传”的操作手册。
+- [x] 提供一键启动、更新、备份、诊断和安全停止入口。
+- [x] 全量执行 Ruff、ty、pytest、覆盖率、SQLite integrity、路径越界、敏感信息和浏览器检查。
+- [ ] 用户确认后创建本地 release commit/tag；是否配置 GitHub remote、push 或发布继续单独确认。
+
+最终验收门：
+
+- 不看代码，用户可以仅按界面和操作手册完成四条核心流程。
+- 任意失败任务都有可理解的原因和恢复入口，不需要手工修改 SQLite。
+- 备份恢复、原文件不变、双 Profile 隔离、Windows 断线恢复均有真实证据。
+- 正式服务连续使用后无已知数据丢失、静默覆盖或不可恢复迁移问题。
+
+### M9：MiniMax H3 视频阶段（不阻塞绘图主线）
+
+实施内容：
+
+- [ ] 复用角色、场景、画风、参考图和版本链，但建立独立视频项目，不污染静态绘图槽位。
+- [ ] 支持文生视频、图生视频、首尾帧和全参考四类 H3 任务。
+- [ ] 增加镜头、动作时间线、时长、运镜、节奏、环境声音和对白/音效字段。
+- [ ] 保存 H3 参数、参考素材、生成版本和结果视频，支持结果复盘与下一版。
+- [ ] 接入 5060 Ti 或云端 H3 实际执行方式，继续沿用任务包与回传协议。
+
+验收门：
+
+- 至少完成一次文生视频、一次图生视频和一次首尾帧任务的端到端回流。
+- 视频项目与绘图项目可以引用同一 OC/视觉资料，但参数和版本记录互不混淆。
+
+## 用户协作输入与最晚需要时间
+
+| 需要用户提供 | 最晚阶段 | 用途 |
+|--------------|----------|------|
+| 一个真实图片数据集目录，最好同时含部分 `.txt` 与故意保留的问题样本 | M1 开始 | 工作台真实验收 |
+| 首个 LoRA 项目类型、角色/风格目标、trigger word 偏好 | M3 开始 | 建立项目定义与覆盖矩阵 |
+| 5060 Ti 的设备名/IP、共享目录和权限方式 | M6 开始 | SMB 交付桥 |
+| 一张真实 ComfyUI PNG 及对应 workflow | M5 开始 | 元数据回流对照 |
+| 常用提示词网站或希望长期缓存的资料源 | M7 开始 | 本地资料更新与来源管理 |
+| MiniMax H3 常用工作流和样例任务 | M9 开始 | 视频阶段 |
+
+除当前阶段所需输入外，其余信息不需要一次性准备；在对应里程碑开始前提供即可。
 
 ## 关键问题
 
@@ -218,7 +589,7 @@
 | 去重先做 SHA-256 + pHash | 成本低、结果可解释；CLIP embedding 放到视觉检索阶段 |
 | ComfyUI 回流先读文件元数据 | 不依赖 Windows 在线，能先闭合结果与配方来源链 |
 | Windows 首选共享目录 | 比直接上 SSH/API 更容易部署、排错和恢复，之后再升级传输协议 |
-| Mac 负责规划审核，Windows 负责生成训练 | 符合 24GB Air、4070S 主机与 5060 Ti 训练机的设备分工 |
+| Mac 负责规划审核，5060 Ti 负责生成训练 | 单一 16GB GPU 节点更易维护，但必须串行调度重任务 |
 
 ## 遇到的错误
 
@@ -265,6 +636,7 @@
 | V1.4 后端整块补丁上下文不匹配 | 1 | 不重复大补丁，读取精确区段后分段应用 |
 | V1.4 复盘测试函数 statements 超限 | 1 | 拆出版本建议 API 独立测试，不修改 lint 阈值 |
 | 定向 pytest 触发全局覆盖率门槛 | 1 | 保留门槛，最终以全量 pytest 验收 |
+| 新增智能检索内嵌模板未加入页面模块的 Ruff 精确例外 | 1 | 只为 `search_web.py` 增加 E501/RUF001 per-file ignore，不放宽全项目规则；全量 Ruff 复验通过 |
 | V1.4 浏览器 reload 后丢失当前视图 | 1 | 按默认首页→创作台的真实路径重新进入，不重复直接等待 |
 | V1.4 应用建议后提示被异步刷新覆盖 | 1 | 检查实际写入后，将成功提示保存在 state 并由渲染函数读取 |
 
@@ -310,4 +682,4 @@
 - V1.3 回归边界见 `BASELINE.md`。
 - 不自动 commit、push 或创建 PR。
 - 每完成一个阶段，更新本文件与 `progress.md`。
-- 绘图 V1.5 已部署到 `127.0.0.1:8765`；两台 Windows 的自动传输继续延后。
+- 绘图 V1.5 已部署到 `127.0.0.1:8765`；5060 Ti 的自动传输等待真实接入。

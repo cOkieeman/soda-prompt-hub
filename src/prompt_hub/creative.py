@@ -29,6 +29,16 @@ SLOT_LABELS = {
     "style": "画风",
 }
 
+KREA2_SLOT_LABELS = {
+    "character": "Character",
+    "outfit": "Outfit",
+    "action": "Action",
+    "composition": "Composition",
+    "scene": "Scene",
+    "lighting": "Lighting",
+    "style": "Style",
+}
+
 SAFETY_MODES = ("sfw", "suggestive", "adult", "explicit-adult")
 PROFILE_IDS = ("anima", "krea2")
 
@@ -523,7 +533,8 @@ def _compile_anima(project: Mapping[str, Any]) -> dict[str, Any]:
     elif safety_mode == "suggestive":
         negatives.extend(("explicit sexual content", "genital focus"))
     warnings = _common_warnings(project)
-    if any(_contains_cjk(str(value)) for value in project["slots"].values() if value):
+    contains_cjk = any(_contains_cjk(str(value)) for value in project["slots"].values() if value)
+    if contains_cjk:
         warnings.append("Anima 更适合英文 Booru 标签；当前中文内容可先用本地模型转换，再确认写回。")
     return {
         "profile_id": "anima",
@@ -532,6 +543,8 @@ def _compile_anima(project: Mapping[str, Any]) -> dict[str, Any]:
         "negative": ", ".join(_dedupe(negatives)),
         "warnings": warnings,
         "safety_mode": safety_mode,
+        "output_language": "mixed" if contains_cjk else "en",
+        "ready": bool(positive) and not contains_cjk,
     }
 
 
@@ -540,21 +553,27 @@ def _compile_krea2(project: Mapping[str, Any]) -> dict[str, Any]:
     for slot in SLOT_ORDER:
         value = str(project["slots"].get(slot, "")).strip().rstrip(".。")
         if value:
-            clauses.append(f"{SLOT_LABELS[slot]}：{value}")
-    positive = "。".join(clauses)
-    if project["brief_zh"]:
-        positive = (
-            f"创作意图：{project['brief_zh']}。{positive}" if positive else str(project["brief_zh"])
-        )
-    if positive and not positive.endswith(("。", ".", "!", "！")):
-        positive += "。"
-    negative = "避免低清晰度、模糊、错误解剖、畸形手部、文字与水印。"
+            clauses.append(f"{KREA2_SLOT_LABELS[slot]}: {value}")
+    brief = str(project["brief_zh"]).strip()
+    if brief and not _contains_cjk(brief):
+        clauses.insert(0, f"Creative intent: {brief.rstrip('.')}")
+    positive = ". ".join(clauses)
+    if positive and not positive.endswith((".", "!")):
+        positive += "."
+    negative = "Avoid low resolution, blur, bad anatomy, malformed hands, text, and watermarks."
     safety_mode = str(project["safety_mode"])
     if safety_mode == "sfw":
-        negative += "保持非成人向，不出现裸体或明确性内容。"
+        negative += " Keep the image non-explicit; avoid nudity and explicit sexual content."
     elif safety_mode == "suggestive":
-        negative += "避免明确性行为和生殖器特写。"
+        negative += " Avoid explicit sexual acts and genital close-ups."
     warnings = _common_warnings(project)
+    contains_cjk = _contains_cjk(positive)
+    if brief and _contains_cjk(brief):
+        warnings.append(
+            "Krea 2 最终输出只使用英文；中文创作想法未自动拼入 Prompt，请先完成英文转换。"
+        )
+    if contains_cjk:
+        warnings.append("Krea 2 槽位仍含中文，当前输出未就绪；请先转换为英文自然语言。")
     if any(len(_split_tags(str(value))) >= 10 for value in project["slots"].values() if value):
         warnings.append("Krea 2 更适合连贯描述；当前槽位偏标签堆叠，可用本地模型润色为自然语言。")
     return {
@@ -564,6 +583,8 @@ def _compile_krea2(project: Mapping[str, Any]) -> dict[str, Any]:
         "negative": negative,
         "warnings": warnings,
         "safety_mode": safety_mode,
+        "output_language": "mixed" if contains_cjk else "en",
+        "ready": bool(positive) and not contains_cjk,
     }
 
 

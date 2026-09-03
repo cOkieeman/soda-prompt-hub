@@ -107,6 +107,15 @@ CREATIVE_HTML = r"""
       <div class="output-block"><header><h3>Positive prompt</h3><button class="output-copy" data-copy-output="positive">COPY</button></header><pre class="output-text" id="creativePositive">先填写一个槽位。</pre></div>
       <div class="output-block"><header><h3>Negative / Avoid</h3><button class="output-copy" data-copy-output="negative">COPY</button></header><pre class="output-text output-negative" id="creativeNegative"></pre></div>
       <ul class="warning-list" id="creativeWarnings"></ul>
+      <section class="workflow-dispatch">
+        <div class="workflow-dispatch-head"><strong>5060 Ti / 生成工作流</strong><span>ComfyUI</span></div>
+        <label for="workflowProfile">当前 Profile 对应工作流</label>
+        <select id="workflowProfile"></select>
+        <label class="workflow-cost"><input id="workflowLowCost" type="checkbox" checked><span><strong>先做低成本测试</strong><small>跳过脸手精修与放大；确认构图后可关闭</small></span></label>
+        <button class="creative-action primary" id="sendWorkflow" disabled>发送到 5060 Ti</button>
+        <p id="workflowRunStatus">正在读取本机 Workflow Profile…</p>
+        <button class="workflow-task-link" data-view="remote">查看任务队列与回传</button>
+      </section>
       <input class="recipe-name" id="recipeName" maxlength="160" placeholder="配方名称（可选）">
       <div class="output-actions"><button class="creative-action primary" id="saveRecipe">保存为配方</button><button class="creative-action" id="exportCreative">导出 Anima + Krea 2 JSON</button><button class="creative-action" data-view="prompts">继续找参考资料</button></div>
       <p class="save-state" id="creativeSaveState">尚未建立项目</p>

@@ -1,5 +1,253 @@
 # 进度日志
 
+## 2026-09-03：ComfyUI LoRA Manager 真实适配
+
+- 用户已打开 5060 Ti；只读网络探测确认 `192.168.1.10:445` 与 `:8188` TCP 可达。
+- Mac 重启后 `/Volumes/PromptHub-5060Ti` 尚未恢复，设备诊断为 `mount_missing`；Finder 已打开 SMB 重新连接窗口，等待用户本人输入 Windows 密码并选择是否存入 macOS Keychain。
+- 直接 HTTP 读取 ComfyUI `/system_stats`、`/object_info/LoraLoader` 和 `/extensions` 均超时；不要求为此扩大局域网暴露，后续仍优先走 SMB + Windows 本机 Worker。
+- UU 远程显示 `CHINAMI-5E1E3GQ` 在线，并可打开远程 PowerShell；待 SMB 恢复后继续只读确认插件 API、metadata、预览和 LoRA 目录来源。
+- 会话恢复脚本首次误用不存在的 `/opt/homebrew/bin/python3`；已改用系统 Python，恢复检查正常完成。
+- 首次看到 Finder 自动填入 Mac 用户名 `soda` 后误称其为 Windows SMB 用户，随后又错误采用了配置前旧表中的 `Administrator`。回查原任务的真实挂载记录，最终专用账户是 `PromptHubWorker`，历史挂载源为 `//PromptHubWorker@192.168.1.10/PromptHub-5060Ti`；后续以该真实证据为准。
+- 用户重新挂载后设备诊断恢复为 `ready`：SMB 可写、Worker ready、ComfyUI reachable、RTX 5060 Ti 16GB 状态正常。
+- 新增只读诊断脚本 `deploy/windows-worker/3-检查LoRAManager.ps1`，已按相同 SHA-256 同步到 Windows 共享 worker 目录；脚本只生成插件/LoRA 目录与本机 ComfyUI 接口报告。
+- 远程终端执行前 Mac 被系统锁定，且因检测到用户物理输入暂停自动解锁；等待用户手动解锁后继续，不重复运行未知状态的命令。
+
+## 2026-09-02：纠正 ComfyUI LoRA Manager 边界
+
+- 用户确认 `comfyui-lora-manager` 是安装在 Windows ComfyUI 内的 LoRA 管理插件，不是独立训练器或直接面向 Mac 的同步服务。
+- 设备页、智能检索空状态、README、Mac/Windows 操作说明、连接清单、完成度审计与开发计划已统一为：Windows Worker 适配器读取 LoRA Manager metadata、预览和 ComfyUI LoRA 目录，再向 Mac 提交只读标准化清单。
+- AnimaLoraStudio 继续独立负责训练；训练产物进入 ComfyUI LoRA 目录后由 LoRA Manager 扫描管理。Mac 不复制权重，也不直接连接插件。
+- 当前只完成 Mac 侧清单接收和检索接口；Windows 读取适配与远程下载仍保持未实现状态。
+- 新鲜验证通过：94/94 pytest、81.15% coverage、89 文件 Ruff format、Ruff lint、ty、整页 JavaScript、98 条 OpenAPI 路径与 `git diff --check`。
+- 正式服务已重启；浏览器实测设备页显示“ComfyUI LoRA 远程清单”和 Windows Worker 适配器边界，控制台 0 warning/error。
+
+## 2026-09-02：单一 5060 Ti 制图 / 炼丹节点
+
+- 用户取消 4070S，确认所有 Windows 侧制图、训练、VLM、Embedding 与 LoRA 管理都由 5060 Ti 承担。
+- 只读审计确认当前没有持久化 `nodes.json`、历史远程任务或 SMB 挂载，因此改为单节点不需要迁移用户数据。
+- 将 compute contract 升级为 `soda-compute-bridge-v2`，统一角色 `compute_5060ti`；`comfyui_generate`、`lora_train`、`embedding_batch`、`vlm_caption_batch` 和 `lora_catalog_snapshot` 均指向同一节点。
+- 设备页由两张卡收敛为一张“5060 Ti · 制图与炼丹节点”，保留完整 capability，并明确只保存位置、不保存密码。
+- 首轮代码静态检查、类型检查与 6 项 API/远程节点定向测试通过；测试证明同一节点可以接收 ComfyUI 与训练类任务。
+- 当前文档整块补丁因 README 实际换行与预期不同被整体拒绝，确认没有部分应用后改为逐文件精确更新。
+- README、Mac 操作手册、完成度审计和任务计划已改为单节点方案；单 GPU 默认采用串行调度，训练与制图互斥，Embedding/VLM 在空闲时执行。
+- 完整工程门通过：81 个文件 format check、Ruff lint、ty、77/77 pytest、81.98% coverage、整页 JavaScript、OpenAPI 87 条路径与 `git diff --check` 均通过。
+- 正式服务会话 `36737`（PID `77523`）已运行新版本；浏览器强制刷新后确认设备页仅有 1 张“5060 Ti · 制图与炼丹节点”卡片，不再出现 4070S。
+- 正式 `/api/compute/contract` 返回 `soda-compute-bridge-v2`，并确认 `compute_5060ti` 同时具备 ComfyUI、LoRA、WD14、Embedding、VLM 与 LoRA 清单能力。
+- 已取得 5060 Ti 的设备名、局域网地址、ComfyUI、AnimaLoraStudio、底模、LoRA 与 LoRA Manager 路径；凭据未写入连接资料。
+- 已通过 Finder 以专用标准用户挂载 `smb://192.168.1.10/PromptHub-5060Ti`，Mac 实际路径为 `/Volumes/PromptHub-5060Ti`；临时探针的创建、读写与清理通过。
+- 已登记唯一 `compute-5060ti` 节点并建立 `prompt-hub/outbox`、`inbox`、`processing`、`completed`、`failed`；五目录均可写，正式诊断状态为 `ready`，`credentials_stored=false`。
+- 用户确认 Windows 系统 Python 为 3.12.10，ComfyUI 本机地址为 `http://127.0.0.1:8188`；阶段 23 Windows worker 与 ComfyUI 最小闭环开始。
+- **状态：** Mac 单节点改造与真实 SMB 交付桥完成；等待 Windows worker 部署与 ComfyUI/LoRA 真实任务验收。
+
+## 2026-09-01：Mac 发布前标签语言与 Windows 接口收口
+
+- 已恢复阶段 21 规划、既有测试证据和 dirty worktree 边界。
+- 已确认本轮目标：逐页面核对所有 tag/标签交互，中文仅用于显示和选择，英文 canonical 继续用于保存与 Anima/Krea 2/LoRA 导出。
+- 已建立五步执行计划；下一步完整检查 LoRA、数据集、创作、检索和远程设备页面及其测试。
+- 首次跨 8 个文件的整块补丁因 `dataset_curation.py` import 形状与预期不同而整体未应用；已确认无部分修改，改为按领域拆分小补丁。
+- 已实现常用标签 catalog、中文批量标签解析、数据集统计标签点击添加、创作台 character tag 本地化、检索与 Windows LoRA tag 切换，以及 LoRA coverage 中英对照与偏置提示修复。
+- 首轮定向格式检查发现 `tests/test_tag_locale.py` 一处仅格式差异；按项目 formatter 修正后，Ruff、ty 与 18 项相关测试通过。
+- 已补齐 Mac 侧 Windows 共享任务桥：原子写入 outbox、本地任务事实副本、五目录状态扫描、returned 待审核状态、失败任务新 ID 重试和任务详情 API。
+- 任务投递会校验节点角色/capability、必需 payload、manifest 相对路径与 SHA-256，并递归拒绝密码、token、API key、credential 和 private key 字段。
+- 设备页新增“跨设备任务状态”，显示等待领取、执行中、结果待审核、完成、失败与取消；失败任务可显式重新投递，旧记录保留。
+- 首轮远程桥静态检查发现 2 处 formatter 差异、1 个参数数量 lint、1 个性能 lint 和 1 个 ty 联合类型问题；已通过改为 values 对象、字典更新和显式类型收窄解决。
+- 修正后 Ruff、ty、整页 JavaScript 与 22 项相关测试通过；真实 SMB/worker 仍留到明天，不宣称远程计算已发生。
+- 正式服务已安全停止旧进程并以新代码重启，当前服务会话为 `97689`。
+- 首轮正式组合检查因未给带 `?` 的 URL 加引号触发 zsh glob，同时 Python 单行 f-string 中错误使用转义；请求未执行到后续检查，改用引号 URL 与 `%` 格式后从头重跑。
+- 浏览器设备页桌面验收显示两节点、任务 ledger 和 LoRA snapshot 诚实空状态，1280px 无横向溢出、控制台无 warning/error。
+- 标签检索首轮定位使用了不存在的中文 placeholder，读取实时 DOM 后改用 `searchbox`；`silver_hair` 与 `silver hair` 在当前 FTS 无命中，未重复猜测更多变体，改用页面已有的 `yellow jacket` 资料验证切换分支。
+- 中文模式对未收录长尾 tag 会诚实保留英文，因此按钮从“标签：中文”改为“标签：中英”，并补充常见服装词根；英文模式仍为 `TAGS: EN`，canonical 数据不变。
+- 正式标签切换复验通过：`黄色夹克 (yellow jacket)` → `yellow jacket`，中英模式显示标准英文输出前缀，英文模式不显示。
+- 数据集页已加载 86 项中文候选，其中“银发”对应 `silver_hair`；正式数据集为空，因此未污染正式工作区。
+- 390×844 设备页节点与任务列表均为单列，`innerWidth=390`、`scrollWidth=390`、任务列表宽 370px；控制台 0 warning/error。
+- 浏览器视口已恢复默认，正式标签页保留在“设备连接”，服务会话更新为 `13226`。
+- 首次核对测试报告旧数字时，shell 检索命令的双引号未闭合，zsh 在执行任何文档检查前返回 `unmatched \"`；已改为不含嵌套引号的安全检索并重新核对，确认没有旧测试数字残留。
+- 最终新鲜门首次整页 JavaScript 提取误用系统 Python，因找不到项目包而失败；管道未启用 `pipefail` 又让外层返回 0，该次 JavaScript 结果作废。改用 `uv run python` 与严格管道重新执行，其他已显示通过的 Ruff、ty、77 项 pytest 和 diff 检查证据保留。
+- 正式诊断断言首次将每项真实的 `ok` 布尔字段误读为 `status`，因此脚本在健康、86 项标签目录与 87 条 OpenAPI 已通过后中止；返回内容显示 7 项均为 `ok: true`，但该次 doctor 判定仍作废，按真实结构重新执行。
+- 修正后的 doctor 7 项通过；后续独立 SQLite 脚本误猜 `Settings.embedding_database_path` 属性名而中止，未执行敏感扫描。正式诊断中的两库完整性结果有效，独立 SQLite 与敏感扫描改按 `config.py` 的真实字段重跑。
+- 文档更新后的最终新鲜工程门通过：81 个文件 format check、Ruff lint、ty、77/77 pytest、82.01% coverage、整页 JavaScript 严格管道检查和 `git diff --check` 均通过。
+- 正式运行态复核通过：`/api/health=ok`、Tag catalog 86 项、OpenAPI 87 条路径、doctor 7/7、主库与 embedding 库 `integrity_check=ok`；私钥、GitHub/OpenAI/Google key 形状与非示例 `.env` 扫描均为 0。
+- **状态：** Mac 本机开发收口完成；真实 SMB、Windows worker、LoRA Manager snapshot、训练/回传和断线恢复留到明天跨设备验收。
+
+## 会话：2026-09-01（Mac 收口与 5060 Ti 接口预留）
+
+- **状态：** in progress
+- 用户要求继续完成 Mac 本机能力，并把明天连接 5060 Ti 所需接口留好；今天不配置 Windows SSH/SMB。
+- 已恢复规划、发现、进度与 dirty worktree；确认现有改动均需保护，不 commit、push 或创建 PR。
+- 本轮顺序：混合检索 API → 检索/相似图 UI → worker/LoRA Manager 契约 → Mac 备份恢复与诊断 → 全量验收。
+- 安全边界：当前无真实 CLIP/SigLIP runtime 与 embedding，空状态必须明确，不得用随机或非语义特征冒充视觉检索。
+- 新增混合检索后端第一版：关键词始终返回；只有收到真实 query vector 且存在兼容索引时才合入 cosine 结果；支持按源 SHA-256 以图查图。
+- 首轮 5 项定向测试通过。Ruff 发现动态 SQL 形式、import 顺序和全角标点规范问题；已改为两条固定参数化 SQL 并整理类型导入，等待复测。
+- 混合检索与 source-status API 已接入正式应用；9 项相关/API 测试通过，ty 通过。Ruff 第二轮只发现 FastAPI `Annotated` 和多余 `noqa`，已修正。
+- 新增“智能检索”主页面和数据集详情“以此图查相似”入口。浏览器桌面实测：四分组可见、空索引明确显示等待真实视觉索引，`gothic` 返回 24 条提示词和 5 条视觉参考，控制台 0 warning/error，1280px 无横向溢出。
+- 390×844 实测单列、`innerWidth=390`、`scrollWidth=390`、四分组均保留，控制台 0 warning/error。浏览器首轮误用文档示例中的 `tab.playwright.screenshot`，已按实际 API 改为 `tab.screenshot`，未影响页面。
+- 正式库当前没有已注册数据集工作区，因此数据集详情按钮的真实页面点击需使用隔离夹具或后续用户数据集；后端 source-status 与 by-source 行为已有自动测试覆盖。
+- 新增统一维护模块与 CLI：`backup`、`verify-backup`、`restore --destination`、`doctor`；恢复只允许不存在或为空的新目录，不提供覆盖正式库的快捷操作。
+- 新增 Mac 双击启动/停止/备份/诊断入口；正式诊断实跑 7 项全部通过，数据库与 embedding SQLite 均为 `ok`，磁盘剩余 711.8 GiB。
+- 首次正式备份和恢复到废纸篓测试通过（7 文件、两库完整性 `ok`），但校验 SQLite 时生成了空 WAL/SHM 辅助文件；已改用 immutable 只读校验，准备重新生成更干净的正式基线包。
+- 数据集工作台新增每页 200 张分页；完整筛选集合继续负责全选和批量操作，卡片 DOM 与详情切换只处理当前页，保存 caption/草稿后保持当前页。
+- 首次整块 patch 因同一文件出现多个更新段被工具拒绝，文件未产生部分修改；改为小块定向 patch 后完成。
+- 定向 pytest 首轮被项目全局 80% coverage 门拦截（单测覆盖率仅代表本次采样）；改用 `--no-cov` 完成局部回归，最终发布仍保留全量 coverage 门。
+- 隔离规模夹具完成 1,000 与 10,000 张扫描：均为 100% 有效，SHA/pHash 与完全重复组正确；报告约 494 KiB / 4.8 MiB，相同 SHA 只产生一份缩略图。
+- 应用内浏览器 1280px 实测 10,000 张只渲染 200 张，显示 50 页；下一页从 `image-00001.webp` 切到 `image-00201.webp`，全选仍显示 10,000 张，清空后恢复 0 张；控制台 0 warning/error、无横向溢出。
+- 390×844 实测单列宽 322px、页面宽 390px、滚动宽 390px；第 4 页首图为 `image-00601.webp`，仍只渲染 200 张，控制台 0 warning/error。
+- 新增 `MAC_OPERATIONS_GUIDE.md`，覆盖一次创作、数据集审核、LoRA 训练、Windows 回传、日常启动/停止/备份/诊断/恢复和明天 SMB 配置顺序。
+- 最终正式备份生成于 `backups/prompt-hub/mac-pre-windows-final-20260901`；manifest 包含 `remote-nodes`，verify 与恢复到新目录均通过，两库 integrity 为 `ok`。
+- 全量 pytest 76/76 通过，coverage 81.97%；Ruff format/check、ty、整页 JavaScript、`git diff --check`、OpenAPI 83 路径、两库完整性与 credential-shaped 敏感信息扫描通过。
+- 首轮全量 Ruff 暴露 `search_web.py` 尚未加入内嵌页面模块的 E501/RUF001 精确例外；只新增该文件 per-file ignore 后全量复验通过，未放宽全项目 lint。
+- 正式 8765 已重启到最终代码；doctor 7 项全部 `ok`，磁盘剩余约 711.6 GiB。
+- 正式浏览器 `gothic` 返回 4 分组、29 张结果卡；设备页显示 4070S/5060 Ti 两张卡与 LoRA snapshot 空状态。1280px 与 390px 均无横向溢出，控制台 0 warning/error。
+
+## 会话：2026-09-01（完整目标继续：M7 Mac 本地能力）
+
+- **状态：** in progress
+- 上一轮阶段报告不是完整目标完成证明；根据 `completion_audit.md` 继续开发 M7A/M7D/M7B/M7C。
+- 新增资料源安全增量同步领域与 API：只处理干净且有 upstream 的 Git 仓库，执行 fetch + fast-forward-only；本地改动和无 upstream 仓库明确跳过。
+- 首轮静态检查发现 `api.py` import 排序和 `Path` 仅用于类型标注；已按 Ruff 建议调整，不改变同步行为。
+- 资料同步真实 Git 测试首轮 Ruff 报告测试进程路径与安全标注；测试改为解析本机 Git 绝对路径，并只对受控临时仓库命令添加精确 `S603` 说明。
+- 定向测试通过但 ty 拒绝测试进度替身，因为同步服务最初绑定了具体 `JobContext`；已改为只要求 `update()` 的结构化 Protocol，便于本机 runner、测试和未来 Windows 编排共同复用。
+- M7A 加入全量回归后 63 项 pytest 通过，覆盖率 82.68%；资料源仍只执行 `fetch --prune` 与 `merge --ff-only`，脏工作树不覆盖。
+- 审计本项目运行环境：当前只有 ONNX Runtime、Pillow 与 NumPy，没有 torch/transformers/MLX/open_clip，也未发现本机 CLIP/SigLIP 模型；M7B/M7C 不使用随机向量或颜色直方图冒充语义 embedding。
+- 新增 Krea 2 VLM 本地原生 Chat 调用：图片缩到 1024px、`reasoning=off`、只接受英文 ASCII 自然语言草稿与结构化观察；合法成年 SFW/NSFW 可客观描述，疑似未成年人成人内容降级为非露骨描述并返回警告。
+- 新增 `dataset_krea2_vlm` 可恢复后台队列、源 SHA-256 校验、selected/missing/failed/all 范围、逐图失败记录与重试；模型结果只写 `krea2_vlm.draft`，不修改正式 Krea 2 或 Anima caption。
+- 新增草稿保存/确认 API；只有确认动作才创建 Krea 2 caption snapshot，并以 `source=vlm-confirmed` 写入正式 caption。
+- 数据集工作台已加入视觉模型选择、草稿队列按钮、卡片状态、正式 caption/模型草稿对照、警告、保存草稿与确认写入入口。
+- 11 项相关定向测试实际通过；该定向命令因全项目 80% coverage 门只覆盖 45.66% 而返回失败，属于测试选择造成的覆盖率门问题，需以随后全量 pytest 为准。Ruff、ty 与数据集页面 JavaScript 语法检查当前通过。
+- M7D 加入全量回归后 66 项 pytest 通过，覆盖率 82.41%。隔离浏览器验证草稿保存不覆盖正式 Krea 2；确认后生成 KREA2 快照、`source=vlm-confirmed`，Anima 不变。
+- 浏览器发现手工草稿状态会显示空模型时间分隔符，已修正为“人工保存草稿”；桌面无横向溢出，390×844 下 `scrollWidth=375`、Caption desk 单列、详情草稿可见，控制台 0 warning/error。
+- 隔离 QA 数据目录已停止并移入 `/Users/soda/.Trash/prompt-hub-m7-qa-6Kaeqo`，可恢复；正式 8765 没有导入 QA 工作区。
+- 新增独立版本化 embedding SQLite 索引：按 model ID + revision + dimension 并存版本，float32 单位向量、asset 类型/路径/源 SHA-256/生成设备/worker/metadata 均保留。
+- 新增 5060 Ti embedding 批量结果导入与向量查询 API；导入必须通过 Mac 预期 SHA-256 回验，查询返回 cosine score、真实来源和匹配原因。当前只完成索引与远程接口，不宣称 Mac 已有 CLIP 生成 runtime。
+- 新增远程 `vlm_caption_batch` 结果导入 API；Mac 按扫描报告回验每张源图 SHA-256，结果仍只进入 Krea 2 草稿，必须人工确认。
+- embedding + 远程 VLM 的 7 项定向测试、Ruff 与 ty 通过。
+- 首轮最终检查发现 Ruff format 会改写 3 个文件；已执行项目格式化后重新运行完整验证。
+- 最终新鲜验证通过：68 项 pytest、82.31% coverage、70 文件 Ruff format、Ruff lint、ty、整页 JavaScript、`git diff --check`、73 条 OpenAPI 路径、正式 SQLite 与 embedding SQLite `integrity_check=ok`。
+- 正式 8765 已重启到 M7 Mac 接口版本；健康检查、空 embedding 索引与资料同步状态接口返回正常。本轮未 commit、未 push、未创建 PR。
+
+## 会话：2026-09-01（M5 ComfyUI 回流与 Windows worker 接口收口）
+
+- **状态：** feature complete / final full regression pending
+- 新增独立 ComfyUI 回流库：PNG/JPEG/WebP 校验、SHA-256 去重、原图/缩略图、只读目录导入、disposition 与项目关联索引。
+- 解析 ComfyUI `prompt` / `workflow`、KSampler 参数、checkpoint、LoRA、尺寸及 CLIP 正负 Prompt 节点引用；A1111 `parameters` 和无 metadata 图片安全降级。
+- 新增回流 API 与“结果回流”页面，固定为导入→核对→选择项目→关联/候选/失败/分支四步；只有候选进入 `dataset_selected`。
+- 3 项 M5 专项测试通过；隔离服务桌面 1280px、手机 390×844 无横向溢出，真实候选点击成功，控制台 0 warning/error。
+- 全局 tag 边界审计补齐 LoRA 风险标记：页面显示中文 + canonical 英文，项目 JSON 继续只保存英文 ID。
+- `/api/compute/contract` 增加 `comfyui_generate`、`lora_train`、`embedding_batch`、`vlm_caption_batch` 的 payload/result、worker 注册和源 SHA-256 回验规则；未保存 Windows 地址、共享路径或凭据。
+- M7 向量索引和批量 VLM 不标记完成；等待明天连接 5060 Ti 后，用真实模型与 SMB 任务流实现和验收。
+- 完成前全量验证通过：62/62 pytest、82.76% coverage、Ruff format/check、ty、整页 JavaScript、`git diff --check`、65 条 OpenAPI 路径与正式 SQLite `integrity_check=ok`。
+- 隔离 QA 目录已停止服务并移入可恢复的废纸篓：`/Users/soda/.Trash/prompt-hub-m5-qa-7xQejS`；正式回流库保持空列表，未写入测试图。
+- 正式 8765 已重启到 M5 版本；资料仍为 33,631 条、4 个来源，正式回流页空状态无横向溢出，浏览器控制台 0 warning/error。
+- 本轮未 commit、未 push、未创建 PR。
+
+## 会话：2026-09-01（完整目标审计与 M5 启动）
+
+- **状态：** in progress
+- 按持久目标重新审计 Mac 本机完成度，确认上一轮 M3/M4 属于有效进展，但 M5 ComfyUI 元数据回流、M7 部分本地能力、全局 tag 本地化审计和统一最终测试报告仍未完成。
+- 新增 `completion_audit.md`，逐项记录明确要求、当前证据、完成判定和下一步，防止用局部通过替代完整目标。
+- 当前优先实现不依赖 Windows 的 M5；Windows SMB、驱动和训练 smoke test 留到设备连接后执行。
+
+## 会话：2026-09-01（V1.8 LoRA 项目台与 5060 Ti 交付接口）
+
+- **状态：** M3 + M4 feature complete / real dataset and Windows smoke test pending
+- 新增四类 LoRA 项目、Trigger、fixed/controllable/variable/forbidden drift、OC Manager 只读来源、数据集工作区图片引用和八维覆盖矩阵。
+- 每个项目在 `prompt-library/lora-projects` 下建立标准项目根目录、管理文件、训练/正则/导出/测试/丹炉导入目录；网页索引不是唯一事实源。
+- 图片仅保存 workspace ID、相对路径、SHA-256、pHash、状态、覆盖和风险标记；自动测试确认源图片、源 caption 与 OC 记录不变。
+- 新增不可变冻结包：Anima/Krea2 独立 train/reg caption 树、manifest、文件与 caption 哈希、测试 prompt、run 占位 ID 和 5060 Ti 16GB 配置草案。
+- Krea 2 草案固定 Raw FP8、Qwen3-VL FP8、28 层 block swap、batch 1、grad checkpoint、`krea2_shift`、关闭 shuffle/dropout；正式训练前仍需 Windows smoke test。
+- 浏览器隔离验收发现保存后左侧 revision 摘要滞后一轮；修正为活动项目更新时同步列表摘要，复验显示 R2/R3 与磁盘一致。
+- 桌面 1280px 与手机 390×844 无横向溢出，正式页面控制台 0 warning/error；隔离 QA 项目已移入废纸篓 `prompt-hub-m3-qa-bF2adZ`。
+- 最终发布门通过：59/59 测试、coverage 83.41%、Ruff format/check、ty、整页 JavaScript、`git diff --check`、正式 SQLite `integrity_check=ok`；OpenAPI 58 条路径含 6 条 LoRA 路径。
+- 正式 8765 已重启到最新 M3/M4；桌面 1280px、手机 390×844、冻结入口与浏览器 0 warning/error 复核通过。
+- 本轮未 commit、未配置 remote、未 push、未创建 PR。
+
+## 会话：2026-09-01（M2 WD14 长队列、双 Caption 与版本化导出）
+
+- **状态：** feature complete / user dataset scale gate pending
+- 恢复阶段 17 / M2 上下文，确认本轮继续 Mac 本地能力，不保存 Windows 地址、共享路径或凭据。
+- 双语标签、WD14、Anima/Krea 2 英文编译和非英文 caption 导出保护的 19 项定向测试通过；`ty` 通过。
+- 首轮 Ruff 检查发现 `creative.py` 一处长行和 `dataset_export.py` 一处全角分号；均为静态格式问题，已按原语义修正，等待复验。
+- 新增 M2 工作区策展模块后的首次静态检查发现领域模块尚未配置既有异常/复杂度豁免、一个频率字典类型过宽，以及全角逗号提示；已改为显式常量和类型，并按 `dataset_workspace.py` 同级规则配置，等待复验。
+- 新增 `dataset_curation.py`：WD14 单次加载模型后连续处理任意长度队列，逐图保存 rating/general/character、置信度、阈值、模型、provider、耗时、失败信息和任务 ID。
+- 同一任务中断后按 `job_id` 跳过已完成图片；30 张文件级回归在第 10 张中断，恢复时只处理剩余 20 张。人工确认 Anima 与 Krea 2 均保持不变。
+- 每张图维护独立 Anima canonical tags 与 Krea 2 英文自然语言记录；中文仅用于 chips 显示。手工与批量修改生成带 `profile_id` 的快照，可预览、查看和按原分支回退。
+- 增加频率、低频、疑似拼写、可配置冲突规则、批量增加/删除/替换/排序/标准化，以及不静默删除的冲突提示。
+- 增加只读来源的版本化导出：只允许已标记保留、英文 caption、无完全重复哈希的图片；输出独立 Anima/Krea 2 目录与 ZIP、`manifest.json`、`audit.json` 和图片/caption 哈希。
+- 网页流程收敛为“选图 → WD14 → 大图双 Caption 审核 → 冻结导出”；真实 WD14 对 3 张图片完成，桌面和 390×844 手机无横向溢出，控制台 0 warning/error。
+- 浏览器验收发现旧 Krea 2 快照缺少显式分支；已增加 `profile_id`，并按旧 `edit-krea2` 操作名兼容识别。首屏超过 500 标签的中文预载改为分批请求，避免 422。
+- 55 项全量功能测试、Ruff、ty 与 JavaScript 语法检查已通过；完成文档更新后还需执行最终 coverage、正式数据库与服务复核。
+- 最终 coverage 运行升级为 56 项并全部通过，总覆盖率 84.60%。首个整页 JavaScript 提取命令误把 `</body>` 送入 Node，产生工具命令语法错误；模块脚本此前均通过，已改用正则只提取 `<script>` 内容复验。
+- 临时验收工作区已由 API 移除，返回 `source_untouched=true`；两条对应后台任务已按精确 workspace ID 清理。直接永久删除测试目录的命令被安全策略拒绝，改用移动到 macOS 废纸篓的可恢复清理方式。
+- 移动后复核命令误用 zsh 特殊变量名 `path`，覆盖了命令搜索路径并使末尾 `curl` 未找到；两个目录移动本身均已成功，后续改用绝对命令路径查询。
+- 工作区空列表与健康检查已返回正常；后台任务复核 URL 首次未加引号，`?` 被 zsh 当成 glob，随后改用带引号 URL。
+- 服务日志显示 500 条分批后首屏仍有一次标签映射 422；根因是资料卡的中文标题也被送入 canonical tag 解析。前端改为只批量映射 ASCII tags，原中文标题直接显示。
+- 进一步复现确认实际拒绝项是加权 Prompt 语法 `{black bodystocking:1.2}`；它虽为 ASCII，但不是 canonical tag。前端最终改为使用与后端一致的 canonical 字符规则，权重片段原样保留、不进入本地化接口。
+- **最终验证：** 56/56 测试通过，coverage 84.60%；Ruff format/check、ty、整页 JavaScript 语法和 `git diff --check` 通过。正式 SQLite `integrity_check=ok`，资料 33,631 条、来源 4 个；OpenAPI 52 条路径包含 M2 与 compute contract。
+- 正式 8765 已使用最新代码重启。最终首屏标签本地化为 200，数据集工作区恢复为空；桌面页面身份、空状态、无横向溢出和浏览器 0 warning/error 复核通过。
+- 临时 QA 图片与测试导出已移动到 macOS 废纸篓，名称为 `prompt-hub-m2-qa-20260901-Uaerst` 和 `prompt-hub-m2-export-20260901-b101b24e`，可恢复；未触碰用户真实数据集。
+- 本轮工作树未 commit、未配置 remote、未 push、未创建 PR。
+
+## 会话：2026-09-01（V1.7A 数据集工作台前端与 5060 Ti 接口预留）
+
+- **状态：** complete / M1 feature complete, release-scale gate pending
+- 在主导航增加“数据集”，实现目录读取、最近工作区、重新扫描、移除派生记录和只读边界说明。
+- 新增独立 `workspace_web.py`，提供统计、坏图/caption/审核/重复/格式/尺寸筛选、缩略图网格、
+  多选与全选当前结果、批量保留/待复查/排除、大图审核弹窗和键盘上一张/下一张。
+- 审核状态保存在工作区 `review.json`，按相对路径与 SHA-256 追踪；扫描报告不会被改写，源目录
+  不会被移动、改名、覆盖。原图路由只允许访问当前报告中登记且有效的图片。
+- 增加移除工作区 API，只清理 Prompt Hub 自己的 manifest、报告与缩略图；自动测试逐字节确认源图片
+  与 caption 保持不变。
+- 浏览器首次验收发现小数据集同秒完成时前端因 `updated_at` 秒级相同未加载报告；改为只要工作区
+  有报告且页面尚未加载就强制读取，复测统计与 4 张卡片正确。
+- 桌面端真实交互完成：完全重复筛选得到 2 张、全选、批量标记保留、大图打开与键盘切换均通过；
+  控制台 0 warning/error。390×844 下 `innerWidth=390`、`scrollWidth=390`，无横向溢出。
+- 浏览器截图方法与技能说明不一致：实际截图位于标签页对象而非页面控制对象；未重复审核写入，改用
+  正确接口后完成证据截图。
+- 临时 `/tmp` 验收目录及正式库中的临时工作区记录已删除；源目录删除前由 API 确认
+  `source_untouched=true`，正式工作区列表恢复为空。
+- 新增 `/api/compute/contract`：固定 `soda-compute-bridge-v1` 任务信封、SMB 目录状态流、4070S/
+  5060 Ti 能力角色与安全边界；尚未保存 Windows 地址、共享路径或凭据，也未发起连接。
+- 完整测试 49 项通过、覆盖率 86.10%；ruff、ty 与 diff 静态检查通过。正式 SQLite
+  `integrity_check=ok`。正式 8765 已重启，OpenAPI 42 条路径、新计算协议、空工作区、33,631 条资料
+  与 4 个来源均复核通过；正式浏览器页面保持打开，控制台 0 warning/error。
+- V1.7 新改动仍保留为未提交工作树；未创建第三个 commit，未配置 remote、未 push、未创建 PR。
+
+## 会话：2026-09-01（设备归属与 M7 细化）
+
+- **状态：** complete
+- 用户确认 M1、M2、M5、M7 应以 Mac 功能为主，并要求解释 M7；本轮只更新设备与架构计划，不修改业务代码或设备配置。
+- 明确 M1/M2/M3/M5 的产品状态与审核均在 Mac；M4 的准备与冻结在 Mac，smoke test/训练/checkpoint 测试在 5060 Ti。
+- 明确 M7 是 Mac 产品功能而不是 Windows 子系统：资料缓存、向量索引、混合检索、UI、caption 审核和版本状态均在 Mac。
+- M7 拆为资料同步、混合检索、相似图/聚类、Krea 2 VLM caption 四部分；单图与小批量可在 Mac，大批量 embedding/VLM 默认下放空闲的 5060 Ti，4070S 只作可选 worker。
+- Windows 只返回可重建计算结果与模型版本；Mac 校验文件哈希后写入版本化索引，Windows 离线不影响已有搜索和审核。
+
+## 会话：2026-09-01（完整交付计划）
+
+- **状态：** complete
+- 用户要求给出从当前状态到系统完全完成的计划；本轮只更新规划，不继续修改业务代码、数据库、正式服务或 Git 历史。
+- 将绘图主线完成定义为 V2.1：数据集工作台、WD14 长队列、LoRA 项目管理、ComfyUI 回流、两台 Windows 交付桥、视觉检索与 Krea 2 VLM caption 全部闭环。
+- 将执行顺序拆为 M1–M8，并为每个里程碑补充实施清单、真实验收门和最晚需要的用户输入。
+- MiniMax H3 作为 M9 独立视频阶段，复用资料、任务和版本基础，但不阻塞绘图主线发布，也不混入静态绘图槽位。
+- 全局完成标准固定为：原始数据不静默覆盖、模型结果先审核、Anima/Krea 2 分树、长任务可恢复、导出可追踪、Mac/Windows 分工明确、正式恢复测试通过。
+
+## 会话：2026-09-01（阶段 16 收口 / V1.7 第一段）
+
+- **状态：** complete / V1.7 first backend slice
+- 用户以“继续”明确确认创建第二个本地重构 commit，并继续 V1.7；授权不包含 remote、push、PR 或 Windows 操作。
+- 提交前重新执行 Ruff format/check、ty、43 项 pytest、OpenAPI 路径/方法集合和最终 HTML bundle 对照；网页 SHA-256 为 `4044ade48a9b8ef3daf139e6c2b0478d577d2aa4d61608300bfb8a3890c8b114`，31 条 API 路径与基线一致。
+- ty 新版本暴露一处测试对可空配方结果直接下标的问题；测试改为先断言配方存在，不改变业务行为。
+- 已创建第二个本地 commit `2235e57 refactor: split dataset routes and creative layout`；仓库仍无 remote、未 push、未创建 PR，提交后工作树干净。
+- 新增 SQLite 持久化后台任务：支持 queued/running/completed/failed/canceled、进度、合作式取消、服务重启恢复、自动重试和显式重试；首版单 worker 控制 Mac 内存与磁盘竞争。
+- 新增只读数据集工作区：来源目录只扫描不写入；Prompt Hub 自己的 `datasets/workspaces` 保存 manifest、版本化扫描报告和派生缩略图。
+- 扫描覆盖 PNG/JPEG/WebP 解码、尺寸、同目录同名 `.txt` 配对、缺失 caption、孤立 `.txt`、SHA-256 完全重复和 64-bit pHash 近似重复。
+- pHash 首版使用 32×32 灰度低频 DCT 与 Hamming distance 5；最初实现的 dHash 在规划复核时被主动纠正，不以泛称“感知哈希”代替计划中的 pHash。
+- 新增数据集工作区与任务 API：导入、列表、详情、当前报告、重新扫描、任务列表/详情/取消/重试，以及受限 WebP 缩略图读取。
+- 新增 4 项定向测试，覆盖中断恢复、自动重试、运行中取消、只读源字节不变、坏图、caption 配对、完全/近似重复、报告版本保留和真实 TestClient 后台扫描。
+- 完整验证通过：47 项 pytest、覆盖率 86.20%、Ruff format/check、ty 与 diff check 全部成功。
+- 正式 8765 已正常重启加载新版本；OpenAPI 从原 31 条兼容路径增加到 40 条，V1.7 导入、报告与任务端点均可达。
+- 正式首页 SHA-256 仍为 `4044ade48a9b8ef3daf139e6c2b0478d577d2aa4d61608300bfb8a3890c8b114`，确认这轮没有改变现有页面成品。
+- 正式 SQLite `integrity_check=ok`，仍为 33,631 条资料和 4 个来源；只新增空的 `background_jobs` 表与数据集工作区目录，没有导入或改写任何用户数据集。
+- V1.7 新改动按授权边界留在本机工作树，尚未创建第三个 commit；remote 仍为空，未 push、未创建 PR。
+
 ## 会话：2026-08-31（阶段 16 工程安全门）
 
 - **状态：** in_progress
@@ -387,6 +635,12 @@
 
 | 时间戳 | 错误 | 尝试次数 | 解决方案 |
 |--------|------|---------|---------|
+| 2026-09-01 | M5 新增 `comfy_results.py` 首轮 Ruff 报告领域异常消息、动态 JSON 类型与正则别名 | 1 | 沿用现有领域模块的有限 per-file ignore，并将 `re.I` 改为 `re.IGNORECASE`；随后重新执行完整静态检查 |
+| 2026-09-01 | Pillow 的 `Image.info` 类型允许 tuple key，ty 不接受直接传给字符串键元数据解析器 | 1 | 在读取图片信息时显式将 key 规范化为字符串，不改变元数据值 |
+| 2026-09-01 | M5 路由首轮 Ruff 报告 import 排序与关联 helper 6 参数复杂度 | 1 | 修正 import 顺序，并仅对该领域路由沿用现有 API helper 的参数数目例外 |
+| 2026-09-01 | ComfyUI 多节点提取器在加入正负 Prompt 连线识别后超过默认复杂度阈值 | 1 | 保持集中式节点解析以便核对 workflow，只对该领域模块增加复杂度例外，测试覆盖各参数分支 |
+| 2026-09-01 | ty 无法从 HTTP 异常转换 helper 的 `None` 返回类型推断路由必定中止 | 1 | 将 helper 明确标注为 `NoReturn`，与现有 LoRA 路由保持一致 |
+| 2026-09-01 | M5 前端首个整块补丁因预期存在重复变量、实际仅一行而整体未应用 | 1 | 确认无半成品文件后，改为先新增独立页面文件，再按精确锚点接入导航和页面组合 |
 | 2026-08-30 | 更新进度日志时批量补丁目标行位置不匹配 | 2 | 停止批量补丁，读取当前文件并按段落分别更新 |
 | 2026-08-30 | 浏览器中“KREA 2”同时匹配 Profile 与导出按钮 | 1 | 改用 Profile 数据属性精确定位 |
 | 2026-08-30 | Gemma 4 12B Heretic 在双模型已加载状态下 120 秒未返回 JSON | 1 | 默认优先当前已加载文本模型，缩短输出并限制等待时间 |
@@ -405,6 +659,8 @@
 | 2026-08-31 | V1.4 复盘端到端测试超过 50 statements | 1 | 将 iteration context/apply 场景拆成独立 API 测试，不放宽 lint 规则 |
 | 2026-08-31 | 两文件定向 pytest 未达到全项目 80% coverage | 1 | 定向断言已通过，最终运行全部测试确认真实覆盖率 |
 | 2026-08-31 | V1.4 隔离页 reload 后等待迭代标题超时 | 1 | reload 会回首页，改为重新点击“新建或继续绘图项目”后验收 |
+| 2026-09-01 | M4 首次整块补丁因路由参数上下文不匹配被拒绝 | 1 | 确认无部分应用，读取实际文件后拆分为领域、路由与 API 小补丁 |
+| 2026-09-01 | 隔离 LoRA 页按 label 读取 textarea 超时 | 1 | 先检查可见 DOM，确认保存已完成，再用唯一 ID 的只读页面状态核对 |
 | 2026-08-31 | V1.4 应用建议后成功提示未稳定出现 | 1 | 不重复应用，先检查字段与按钮状态，再修正异步重绘提示生命周期 |
 
 ## 五问重启检查
@@ -420,3 +676,199 @@
 ---
 
 *每个阶段完成后或遇到错误时更新。*
+
+### 阶段 23：V2.3 Windows worker 与 ComfyUI 最小闭环
+- **状态：** in_progress / 等待 Windows 真实自检与首张回传图
+- 已执行：
+  - 用户确认 Windows Python 3.12.10 与本机 ComfyUI `http://127.0.0.1:8188` 已就绪。
+  - 新增 stdlib-only `windows_worker.py`，实现单实例锁、outbox 原子领取、单 GPU 串行执行、processing 重启恢复与结果幂等清理。
+  - 定义 `soda-comfyui-package-v1`：生成包必须包含 workflow ID 与 ComfyUI API Format `api_prompt`。
+  - 实现 `/prompt` 提交、`/history/{prompt_id}` 轮询、`/view` 图片下载、超时中断和取消标记。
+  - 成功时回传图片、API workflow、run log、源哈希与输出 SHA-256；失败时回传错误信封与 traceback 文件。
+  - Mac 新增 returned task integrity API，校验 result/protocol/task type、源 manifest、输出归属、大小与 SHA-256。
+  - Mac 新增 queued/running 任务取消 API；设备页增加“取消任务”和“校验回传”操作。
+  - 新增 worker mock ComfyUI 自动测试，覆盖成功闭环、原子领取、路径越界、manifest 篡改、重启续查、幂等清理和单实例锁。
+  - 定向验证通过：12 项测试、Ruff 与 ty 均通过。
+  - Windows 双击启动包与中文说明已复制到 `/Volumes/PromptHub-5060Ti/prompt-hub/worker`；复制后源码 SHA-256 与 Mac 一致。
+  - 当前等待用户在 Windows 双击 `1-先自检.bat`，随后启动常驻 worker；Mac 尚未收到 `worker-status.json`，因此未虚报真实 ComfyUI/GPU 验收。
+  - Windows 启动 worker 后，主机与 445 端口仍在线，但 Mac 原 SMB 挂载的任何目录读取稳定卡住；该异常发生在 worker 持有共享根 `worker.lock` 后，先要求停止 worker 以验证因果。
+  - 为避免跨 SMB 文件锁影响 Finder，单实例锁已改为 Windows 本地 `%LOCALAPPDATA%\\PromptHub`；首次测试通过改写 `os.name` 模拟 Windows，导致 macOS `pathlib` 尝试实例化 `WindowsPath`，改为用 `sys.platform` 判断并记录此测试错误。
+  - 加固生成包边界：`generation_package` 必须出现在任务 manifest 中并先通过 SHA-256 验证，不能用未登记文件绕过完整性检查。
+  - 设备诊断新增 `worker_ready` 与 `worker_status`；页面可区分“SMB bridge ready”和“Windows worker + ComfyUI 自检 ready”。
+  - 最终新鲜工程门通过：84/84 pytest、80.95% coverage、86 文件 Ruff format、Ruff lint、ty、整页 JavaScript 与 `git diff --check` 全部通过；SMB 中 worker 源码 SHA-256 与项目版本一致。
+  - 正式 8765 已重启并完成浏览器验收：设备页共享状态为 ready，未自检时显示准确下一步，空状态文案已更新，无横向溢出，控制台 0 warning/error。
+  - 用户停止 worker 后，Mac SMB 目录读取仍稳定卡住，排除“worker 仍持有共享锁即可解释故障”；Windows ICMP 与 445 端口正常，故障收敛到 macOS 旧挂载会话。
+  - `diskutil unmount force` 与 `/sbin/umount -f` 同样等待底层 SMB I/O，未能在当前会话完成断开；已停止继续读取共享目录，避免累积更多阻塞进程。
+  - 当前请求用户重启 5060 Ti 主机，使远端 SMB 服务主动断线。重启后先恢复 Finder 挂载，再同步本地锁修正版；尚未投递任何真实 ComfyUI 任务。
+  - Windows 整机重启后用户曾再次启动旧 worker；随后再次停止 worker，但原挂载中的文件操作与强制卸载进程仍处于 macOS 内核不可中断等待。
+  - 使用 `forcenewsession + soft + nobrowse + nopassprompt` 尝试建立不复用旧会话的新 SMB 挂载，同样停在客户端连接阶段；结合 ping/445 正常，故障进一步定位为 Mac SMB 客户端内核状态，而非 Prompt Hub API、单个挂载点或 Windows 是否在线。
+  - 为避免继续累积阻塞操作，停止网络盘测试并请求重启 Mac。修正版尚未同步到 Windows，共享目录中仍是旧 worker；真实任务仍为零。
+
+### 阶段 23 完成：Windows Worker 与 ComfyUI 真实最小闭环
+- **状态：** complete
+- Mac 重启后确认旧 SMB 挂载和不可中断进程均已清除；Windows ICMP 与 TCP 445 正常。
+- Finder 重新挂载 `PromptHub-5060Ti` 成功，Mac 创建、读取并删除测试文件，确认共享可写。
+- 将使用 `%LOCALAPPDATA%\\PromptHub` 单实例锁的新版 worker 同步到共享目录；源与目标 SHA-256 均为 `172b8d5388271638efa403d29db5522ed2164d7ad6f4ae6f202bde1daa5ed985`。
+- Windows 重新自检成功：Python 3.12.10、协议 `soda-compute-bridge-v2`、角色 `compute_5060ti`、ComfyUI reachable、RTX 5060 Ti 16GB 均由 `worker-status.json` 记录。
+- 投递无 GPU 协议探针 `task-20260902T122109Z-6c85d6e5d061`；Worker 在约 2 秒内领取并按预期返回 manifest 缺失错误，验证失败回传链路。
+- 新增 `deploy/windows-worker/examples/comfyui-smoke-empty-image-v1.json`，使用 ComfyUI 内置 `EmptyImage → SaveImage` 生成 128×128 蓝色 PNG。
+- 投递真实烟雾任务 `task-20260902T122348Z-ec77bc7c56b1`；Windows 在约 1 秒内完成，回传图片、API workflow 与 run log。
+- Mac integrity 验收返回 `verified=true`、`errors=[]`、`source_count=1`、`output_count=3`；所有 SHA-256 与结果信封一致。
+- 首次完整性调用误用 POST 得到 405；读取 OpenAPI 后改用 GET，验收成功，未修改任务或文件。
+- Worker 持续运行期间 SMB 未再卡死。阶段 23 达到完成标准；下一阶段为 Anima / Krea 2 模型级 API workflow 接入。
+- 文档更新后的完成前新鲜验证通过：85/85 pytest、80.95% coverage、86 文件 Ruff format、Ruff lint、ty、示例生成包 JSON、整页 JavaScript 与 `git diff --check` 全部通过。
+
+### 阶段 24：Anima / Krea 2 模型级 workflow 审计
+- **状态：** in_progress
+- 收到用户提供的 `Krea2-for-ares-ocmanager (1).json` 与 `anima-测试-满穗.json`，只读校验为有效 JSON。
+- 两份文件均确认是 ComfyUI API Format：Krea 2 为 14 节点，Anima 为 58 节点。
+- Krea 2 默认包含 SeedVR2 1920 放大；Anima 默认包含角色 LoRA、SAM3 脸手精修和多段放大，均不适合作为首轮低成本测试的原样参数。
+- 决定保留原文件不变，新增受控 Profile 与低成本生成副本；只允许修改显式白名单节点字段。
+- 完成关键连线追踪：Anima 参数映射为 `184/75/84/150/135:103/135:104`，基础解码 `148:139`；Krea 2 映射为 `141/121/87/129`，基础解码 `132`。
+- 确定低成本编译方式：改接保存节点到基础解码结果，再按输出节点反向裁剪依赖闭包，结构性排除精修与放大分支。
+- 确认 Prompt Hub Anima 输出已自带质量前缀；Profile 注入时将清空 workflow 节点 `182`，避免与完整 positive 重复。
+- 确定以独立 workflow profile store/router 接入，不把模型节点映射耦合进 `creative.py` 或 Windows worker。
+- 确认创作台已有双 Profile 输出与 steps/CFG/seed，可直接增加“发送到 5060 Ti”，不新增重复 Prompt 表单。
+- 决定生成包先保存在 Mac 个人库，再按相同哈希复制到 SMB；workflow profile 数据将纳入现有备份范围。
+- 新增 `workflow_profiles.py` 与 `workflow_routes.py` 后首次定向格式检查发现一处过长集合需要 Ruff 自动排版；尚未执行 lint/type/test，不将其视为功能完成。
+- 已将 Workflow Profile store/router 接入应用构造与 lifespan；下一步补创作台控件及自动测试。
+- 创作台右侧已加入 workflow 选择、低成本模式与“发送到 5060 Ti”，会按当前 Anima/Krea 2 Profile 自动过滤，不暴露节点 JSON。
+- 首轮静态检查发现新模块需要沿用项目领域异常的 Ruff 例外，并有 import/type 细节；已记录并开始修正，尚未宣称通过。
+- 第二轮 Ruff 自动修复 import 后仍报告依赖闭包循环可改为 `extend`；已按等价逻辑修正，等待重新验证。
+- Ruff 已通过；ty 发现共享数字解析 helper 不能保证 seed/steps 返回整数，已拆成 `_run_int` 与 `_run_float`，防止类型边界含混。
+- 两份用户真实 workflow 在临时目录完成编译审计：Krea 2 为 14→11 节点，Anima 为 58→26 节点；Anima LoRA Manager 分支仍位于依赖闭包内。
+- 一次临时审计命令因包含清理命令被安全策略拒绝，未产生文件变更；改用自动释放的临时目录后成功。
+- 已加入 Profile 校验、幂等、哈希防篡改、字段替换、低成本裁剪、LoRA 保留、API 投递和备份恢复测试；等待执行。
+- 首轮定向测试为 8 pass / 2 fail：UI-workflow 测试夹具形状仍像合法 API 节点，另一个任务投递返回 422；定向测试的全局 coverage 34% 只是选测结果，不作为最终 coverage 结论。已修正首个夹具并为第二个断言保留响应详情，继续定位。
+- 复测定位任务 422 为内部 `run_id` 使用大写 `T/Z`，与自身安全 ID 白名单不一致；已改为小写时间分隔符。UI-workflow 拒绝测试现已通过。
+- Workflow Profile 4 项定向测试及其 Ruff/ty 已通过。
+- 首轮全量验证在 ty 阶段发现既有 Windows worker 测试的 `log_message` 覆写参数名与新版 stdlib stub 不一致；尚未进入 pytest。已按父类签名修正测试替身，不修改生产 worker 行为。
+- 第二轮全量验证在 Ruff 阶段指出该测试替身末尾显式 `return` 多余；已删除，继续从头验证。
+- 新鲜全量工程门通过：89/89 pytest、80.93% coverage、89 文件 Ruff format、Ruff lint、ty 与 `git diff --check` 全部通过。
+- README 与 Mac 操作指南已补充 Workflow Profile、低成本→完整工作流顺序，以及 Profile/run package 纳入备份的边界。
+- 正式 8765 已重启加载 Workflow Profile 路由；两份用户 JSON 已原样导入个人库并保留来源 SHA-256。
+- 浏览器验收通过：Anima/Krea 2 切换时只显示对应 Profile，低成本说明和发送按钮可用，页面宽度无溢出，console 0 warning/error；首次只读 DOM 检查因浏览器沙箱不提供 `HTMLButtonElement` 构造器失败，改用直接读取 `disabled` 后通过。
+- Krea 2 低成本真实任务 `task-20260902T130215Z-2d7d6e4b41c3` 已完成，26 秒回传 512×768 PNG、workflow 与日志；Mac integrity `verified=true`，图片人工查看与原 Prompt 主要元素一致。
+- 首次等待脚本误用了 zsh 只读变量 `status`，任务不受影响；改名为 `task_state` 后正常读取结果。
+- Anima 首次低成本任务 `task-20260902T130347Z-257730a5d034` 在 ComfyUI 校验阶段失败：随机 seed `4737174999481427` 超过 `Seed (rgthree)` 明确上限 `1125899906842624 (2^50)`。根因位于 Mac 编译器随机范围，不是模型、LoRA 或 Windows 环境。
+- 按 systematic-debugging 流程先加入可重复的 seed 上限回归测试，下一步先确认测试在旧实现上失败，再修改生产代码。
+- Seed 回归测试已按预期在旧实现失败，并捕获随机上限为 `2^53`；现将编译器随机/显式 seed 与 API 输入统一收紧到 ComfyUI `Seed (rgthree)` 的 `0..2^50`。
+- Seed 修复后 5 项 Profile 定向测试、Ruff 与 ty 通过；服务重启后新 Anima 任务 `task-20260902T130550Z-f0560673eff3` 真实完成，6.5 秒回传 PNG/workflow/log，Mac integrity `verified=true`。
+- Krea 2 与 Anima 两张图均已只读导入 Mac ComfyUI 结果库，原 SMB 文件未修改。
+- 回流解析发现 Anima 源 workflow 的 Image Saver steps/CFG 与真实 sampler 默认值不同；已先加入无显式覆盖场景的元数据同步回归测试，等待确认旧实现失败。
+- 元数据同步测试已按预期在旧实现失败；编译器现从实际 steps/CFG literal 与分辨率节点回填 Image Saver，而不是沿用其可能过期的显示值。
+- 元数据修复后 6 项 Workflow Profile 定向测试、Ruff 与 ty 通过；固定 seed 42 的 Anima 实机复验完成，Mac 回流正确解析为 12 steps / CFG 1 / 512×768。
+- 浏览器最终复核回到用户原有 Anima Profile：显示“Anima / 满穗 · 58 nodes”，发送按钮可用，无横向溢出，console 0 warning/error。
+- 浏览器切换验收曾触发当前项目自动保存并将 Profile 暂改为 Krea 2；已将“黄昏图书馆调查员”恢复为 Anima，内容未改，revision 因保存从 R12 增至 R14。
+- 开始补阶段 24 一键回流：计划在设备页对 completed ComfyUI 回传先做 integrity，再复制到 Mac 结果库；有 `project_id` 时复用现有安全关联逻辑。重复导入保持幂等，路径再次限制在已挂载 bridge root 内。
+- 已增加 `/api/workflow-tasks/{task_id}/import-results` 与设备页“验收并导入图片”；自动测试将模拟完整 Worker 回传，覆盖 SHA-256、Mac 复制、项目关联和重复导入。
+- 一键回流首轮 Ruff 指出 router 工厂达到 55 statements / complexity 16；沿用本项目其他领域 router 的集中路由例外，不放宽全局规则，继续执行 type/test。
+- ty 发现公开关联 helper 与原 FastAPI 内层 endpoint 同名，Python 闭包解析到了两参数 endpoint；已只重命名 endpoint 函数，URL 与行为不变，消除遮蔽。
+- 一键回流定向验证通过：13 项 workflow/comfy/API 测试，Ruff 与 ty 全部通过；模拟 Worker 回传覆盖完整性、Mac 复制、项目关联和重复导入。
+- 正式服务重启后，对真实 Anima 回传调用一键回流接口成功识别现有图片为 duplicate，未建立第二份文件。
+- 设备页浏览器复核最终显示 6 张任务卡、4 个“验收并导入图片”按钮，无横向溢出，console 0 warning/error；一次等待使用 exact text 匹配整段 task span 超时，读取 DOM 后确认只是选择器过严，页面已正常加载。
+- 最终新鲜工程门通过：91/91 pytest、81.02% coverage、89 文件 Ruff format、Ruff lint、ty、整页 JavaScript、正式健康接口、两份来源 SHA-256 与 `git diff --check` 全部通过。
+- 已建立正式个人数据备份 `/Users/soda/Documents/Codex/soda-person/backups/prompt-hub/20260902-131855`；24 个文件全部校验通过，两个 SQLite integrity 均为 `ok`，workflow 原件、run packages 与三张本机回流图都在 manifest 中。
+- 只读设备检查确认 SMB bridge 为 ready、状态文件中的 ComfyUI 为 reachable；一次未引用查询 URL 被 zsh 当作 glob 拒绝，重新引用后正常读取历史任务。
+
+### 阶段 25：林悔儿真实旧数据集导入
+- **状态：** in_progress
+- 找到 `/Users/soda/Downloads/linhuier-v012_data.rar`；QQ 下载沙箱中的同名文件与其 SHA-256 完全一致，因此只采用普通 Downloads 版本作为来源。
+- 归档安全审计通过：72 张图片、72 份 caption、单一顶层目录、0 个越界路径；Mac 可用空间约 714GB。
+- 建立 `/Users/soda/Documents/Codex/soda-person/datasets/incoming/linhuier-v012`，保存原 RAR 副本并解压到独立 `dataset` 目录；复制前后归档 SHA-256 一致。
+- 注册只读工作区 `dataset-4af72c6757de431081930100a27cb09e`，后台任务 `job-6be327b172244337ba724d4b2e7c3906` 在约 2 秒完成 72 张扫描。
+- 扫描结果为 72 有效、72 caption 配对、0 坏图、0 缺失/孤立 caption、0 完全/近似重复组。
+- 确认旧 caption 全部为英文、全部包含 `linhuieroc`，且未命中已知质量/来源污染标签；通过现有 API 将 72 份登记为 Anima reviewed，失败数为 0，未运行 WD14。
+- 正式网页只读验收通过：工作区、缩略图、72 张统计、263 个标签、trigger 72 次和 0 冲突提示均正确显示。
+- 用户更正中文名为“林悔儿”；已同步更正工作区、LoRA 项目及规划记录，trigger `linhuieroc` 不变。
+- 生成两页带文件名的视觉联系表并完成全量缩略图抽查；全部保留为候选，没有自动批准、排除或送训。
+- 建立 `lora-5eb67ac1316e435c991dd5ce8e2f4c6c` 角色项目，目标为 Anima，引用 72 张候选图；固定/可控/变量边界与 Civitai 来源已保存。
+- 依据明确文件名与人工 caption 为 72 张填写保守覆盖初审，项目仍为 draft；覆盖缺口由 43 项降至 11 项。
+- 发现 67 个 `.png` 扩展名文件内部实际为 JPEG；保持原字节不变，留待 Windows AnimaLoraStudio 读取 smoke test。
+- 完成新鲜一致性复核：归档双副本 SHA-256、72+72 文件、72 张有效扫描、72 份 reviewed Anima caption、72 张候选资产、11 个覆盖缺口、正确中文名、两页联系表与 `git diff --check` 全部通过。
+- 下一步：由用户在页面确认保留/排除、刘海外观边界和本轮覆盖建议，再验证冻结版本与 Windows 数据集交付。
+- 已完成原 caption 批量接续：后端提供 preview/apply 两步接口，支持 Anima/Krea 2、全部/已选、默认不覆盖和 draft/reviewed 状态；确认后整批只生成一个快照，原 `.txt` 不变。
+- 已完成 LoRA 保守覆盖初审：从文件名、原 caption、现有 Profile caption 和图片横竖尺寸提取明确证据；preview 不写入，apply 只合并新增项并登记 confirmed provenance，不改变候选/保留/排除状态。
+- 数据集、LoRA、设备与智能检索页面已清理“明天连接”“M4 再冻结”等过期文案；明确 Mac/Windows 分工与“当前 Worker 仅 ComfyUI 自动闭环”。README、Mac 操作指南和开发计划同步更新。
+- 实际浏览器验收：林悔儿 Anima 原 caption 预览为 72 张已有内容、0 变更；Krea 2 预览为 72 张可接续但未确认写入；LoRA 覆盖初审为 18 张、19 个新增建议但未确认应用。正式状态保持 72 Anima reviewed、0 Krea 2、72 candidate、revision 75、11 个缺口。
+- 新鲜工程门通过：89 文件 Ruff format、Ruff lint、ty、94/94 pytest、81.15% coverage、整页 JavaScript、98 条 OpenAPI 路径、正式 SQLite `integrity_check=ok` 与 `git diff --check`。
+- 浏览器页面 identity/非空/交互检查通过，console 0 warning/error；桌面截图确认覆盖初审操作与矩阵布局无重叠。
+
+## 本阶段错误记录
+
+| 错误 | 尝试次数 | 解决方案 |
+|------|---------|---------|
+| 首次归档计数直接调用未安装的 `unar`，得到空计数 | 1 | 改用本机已支持 RAR5 的 `bsdtar`，重新从头统计并验证 145 个归档项 |
+| 首次 caption 空文件/唯一行统计误用了 `rg` 短参数语义 | 1 | 改为逐文件非空检查与 SHA-256 唯一性统计，确认 0 空文件、72 份内容均不同 |
+| 首次同时更新三个规划文件时，`findings.md` 的尾部锚点与实际文本不匹配，补丁整体未应用 | 1 | 读取三个文件的实际尾部后按文件分别应用精确补丁 |
+| 首次格式/尺寸摘要的 `jq` 字符串拼接语法错误，管道提前关闭 | 1 | 改用 jq 字符串插值后成功确认 67 JPEG 内容、5 PNG 内容和 72 份 reviewed Anima caption |
+| 72 张覆盖写入完成后，摘要脚本读取了不存在的 `coverage_report.gaps` 字段 | 1 | 不重复写入；只读获取真实项目并按 `dimensions[].items` 汇总，确认 revision 75、72 候选和 11 个缺口 |
+| 新覆盖 helper 首次补丁插入到 `coverage_report()` 中段，导致 LoRA 创建测试返回 `None` | 1 | 按函数边界移动原报告逻辑，11 项定向测试随后全部通过 |
+| 单文件 pytest 功能断言通过但触发全项目 80% coverage 门 | 1 | 定向阶段使用 `--no-cov`，最终以 94 项全量测试和 81.15% coverage 为准 |
+| 首轮完整工程门发现 `lora_projects.py` 需要机械格式化，随后测试函数又因新增独立断言超过 statement 限制 | 1 | 运行 Ruff formatter，并把页面回归保留在既有 marker 集合内；从头重跑完整工程门通过 |
+| 首轮整页 JavaScript 临时文件清理命令被安全策略拒绝，第二轮临时文件无 `.js` 后缀被 Node 拒绝 | 2 | 使用明确的 `/tmp/prompt-hub-script-check.js` 路径后完成语法检查 |
+
+### 阶段 26：Windows LoRA Manager 只读清单闭环
+- **状态：** complete
+- Windows 已运行只读检查脚本并生成 `D:\PromptHub-Bridge\prompt-hub\diagnostics\lora-manager-inspection.json`；Mac 首次读取时文件尚未出现在 SMB 目录，约两秒后刷新可见，属于写入/SMB 刷新时序而非路径错误。
+- 诊断确认主机 `CHINAMI-5E1E3GQ`、ComfyUI 0.33.0、RTX 5060 Ti 16GB、LoRA 根 `F:\Comfyui\ComfyUI-aki-v3\ComfyUI\models\loras`，共 256 个模型和 375 个预览文件。
+- Mac 直接请求 LoRA Manager `/loras/api/list` 仍为空响应；不再把局域网直连私有插件 API作为实现前提。
+- 已确定实现边界：Worker 只访问配置登记的 LoRA 根，读取文件名/大小/mtime、可选 `.metadata.json` 与预览，不读取或复制权重；Mac 校验清单输出后再导入现有 `soda-windows-lora-catalog-v1`。
+- 一次只读检索命令把 Markdown 反引号直接放进 shell，导致 `comfyui_generate` 被 shell 当作命令并报 `command not found`；未产生文件变更，后续 shell 检索改用无反引号模式或安全引用。
+- Worker 已新增 `lora_catalog_snapshot`，LoRA 根目录使用配置白名单 `comfyui-main`；Windows 部署源码与 Mac 源码 SHA-256 一致，任务执行不打开或复制 `.safetensors` 内容。
+- 真实任务 `task-20260902T172354Z-8f3dcc8f59e5` 完成，快照为 `catalog-20260902T172356Z-60e595c5d3da`；清单输出 SHA-256 为 `e6143eaa1b579620c8d0af8ce2765488dd2525a2bec7989527be9630f57e53ed`，Mac 完整性结果为 `verified=true`。
+- Mac 验收导入 256 个 LoRA：233 个有 sidecar metadata、210 个有预览路径、122 个有 trigger words、233 个带 LoRA Manager 已有 SHA-256。设备页已提供同步、任务状态、完整性校验、验收导入与检索。
+- 浏览器实测导入提示为 256 条；搜索 `linhuier` 只返回 `Anima/Character/linhuier-anima_v01.safetensors`，模型族、标签与 Civitai `2885952/3262276` metadata 正确，console 为 0 warning/error。
+- 浏览器验收发现导入后搜索框保留但结果恢复全量；已让导入后的刷新沿用当前查询词，并增加页面契约回归断言。
+- 新鲜工程门：89 文件 Ruff format、Ruff lint、ty、96/96 pytest、80.60% coverage、整页 JavaScript、100 条 OpenAPI 路径、两库 `integrity_check=ok`、敏感密钥形状扫描与 `git diff --check` 通过。默认 coverage C tracer 曾在 96 项断言完成后的 macOS ONNX Runtime 清理阶段两次以 `recursive_mutex`/134 退出；无 coverage 全量测试稳定，纯 Python tracer 连续两次正常退出并保持相同覆盖率，因此在测试配置固定 `timid=true`。代价是全量测试约增加 6 秒，不改变生产运行。
+### 阶段 27：LoRA Manager 预览图同步
+- **状态：** in_progress
+- 用户已重新开启 Windows 并运行 Worker，开始实现 LoRA Manager 预览图到 Mac 分类页面的同步闭环。
+- 已确认本轮不复制 `.safetensors`，只同步受控预览资产；计划覆盖 Worker 输出、Mac 哈希验收与缓存、图片路由、卡片缩略图/大图以及真实跨设备验收。
+- 已完成现有扩展点审计：Worker 已解析主预览相对路径但只回传 catalog JSON；Mac 已具备统一结果 manifest 的路径与 SHA-256 校验，可直接复用。
+- 运行态诊断：Windows 已开机，但 Mac 的 `/Volumes/PromptHub-5060Ti` 当前未挂载；准备先恢复 Finder SMB 会话，再部署和实测。
+- 首次调用 Finder 打开 SMB 地址后 8 秒内未出现挂载点；已停止重复调用，下一步检查 Finder 是否有登录或确认界面。
+- Finder SMB 已恢复；共享桥 ready、Worker ready、ComfyUI reachable，白名单根目录含 256 个 LoRA。
+- `windows_worker.py` 现会收集同一 LoRA 的全部关联预览，按安全名复制到任务 inbox，并逐张登记 SHA-256、大小、lora_id 与顺序；不会打开或复制权重内容。
+- `remote_nodes.py` / `remote_routes.py` 现会在统一完整性校验后把图片原子写入 `remote-nodes/lora-previews`，保存多图映射并提供每次读取都复核哈希的本机图片路由。
+- `remote_web.py` 现显示缩略图、图片数量与无图占位；点击卡片图片可打开多图查看器，桌面双列、手机单列。
+- README、Mac/Windows 操作指南和 Windows 部署说明已更新，明确预览缓存可重新同步、不进入正式备份，`.safetensors` 始终不复制。
+- 定向 Ruff、ty、12 项 Worker/Remote 测试与 4 项 API 页面测试通过；缓存被篡改后图片路由返回 404。
+- 新鲜完整工程门通过：89 文件格式、Ruff lint、ty、96/96 pytest、80.55% coverage 与 `git diff --check` 全部正常。
+- 新版 Worker 已原子更新到 SMB 的 `prompt_hub_worker.py` 与 `worker.py`，两份 SHA-256 都与 Mac 源码一致：`359b7cd92d63b23a54c2bca1252f55492aabee80ac7a167d5149591d6e9610d5`；`worker-config.json` 未修改。
+- Mac 8765 服务已重启。浏览器检查确认 256 张旧清单卡片全部显示“暂无本地预览图”，15 个树根和大图 dialog 均存在，当前 684px 视口无横向溢出；等待重启 Windows Worker 后真实同步图片。
+- 最新真实任务 `task-20260903T070722Z-225c41f71aeb` 已由 Windows Worker 完成，Mac 导入快照 `catalog-20260903T070725Z-60e595c5d3da`：256 个 LoRA、221 个有视觉参照、386 张图片，完整性校验通过。
+- 浏览器已确认 `linhuier` 多图查看器两张图片完整解码，尺寸为 450×658 与 1664×2432；684px 视口没有横向溢出。
+- 一次规划文件补丁使用了不在 `findings.md` 中的锚点而未应用；读取文件实际尾部后改用精确锚点，未覆盖任何内容。
+- 浏览器分类树验收确认 15 个根目录；点击 `Anima/style` 后页面状态为“当前 49 / 256 个”，可见卡片标题均属于该目录。
+- 首次关闭查看器时误用不存在的 `tab.playwright.click()`；改用可访问性 role 定位按钮后成功关闭。首次统计筛选卡片时误用了不存在的容器 ID，改从可见 `article h3` 与页面状态读取，确认筛选实际正常。
+- 展开并点击 `Krea2/style` 后，页面状态为“当前 37 / 256 个”，首批条目为 `0801style`、`Alt-Girl/E-Girl` 等 Krea 2 画风 LoRA，当前桌面视口无横向溢出。
+- 内置 Browser 的 `setViewportSize()` 不存在，无法直接改成 390px。Playwright skill 自带 wrapper 先后因无执行权限和 CRLF `pipefail` 失败，直接 `npx playwright-cli open` 又在 30 秒内无可读结果；停止重复该路径，改用现有浏览器能力与 CSS/DOM 响应式审计完成窄屏证据。
+- 尝试在内置 Browser 中建立 390px 同源 iframe 时，受控 DOM 代理不允许 `document.createElement()`；未修改页面，改为审计 620px/540px 响应式规则，并保留 684px 无溢出的真实结果。
+- 本地缓存审计通过：386 个图片文件（223 WebP、136 PNG、27 JPEG），0 个 `.safetensors`。`linhuier` 的 `000.webp` 与 `001.png` 路由均返回 HTTP 200 和匹配的 Content-Type。
+- `Krea2/style` 精确渲染 37 张卡片、37 个预览入口、0 个占位。直接统计发现 19 张首屏外 lazy 图片尚未加载；未误报为损坏，下一步通过真实打开末尾卡片触发滚动与解码。
+- 通过通用 `.last()` 打开末尾卡片时，Browser 的 locator 使用了筛选前缓存位置，误点到 `Anima/Character/V1.safetensors` 并把筛选切回 `Anima/Character`；图片本身成功解码，但该结果不作为 Krea 2 证据。后续只用完整可访问名称定位目标。
+- 已用完整可访问名称重新定位并打开 `Z3ZZ4 Krea 2`；两张参照图均完整解码（450×644、1280×1832），确认首屏外 lazy-load 图片在真实滚动/打开后可用。
+- Worker 最终信封复核：completed，1 个 catalog + 386 个 preview，`weights_read=false`；10 个非支持格式候选按 `unsupported_format` 安全跳过。
+- API 与本机事实源一致：256 个条目、221 个带图、386 个唯一 URL；四个 SQLite（正式库、两个历史备份、embedding 库）完整性均为 `ok`。
+- 浏览器已关闭查看器并恢复“全部 LoRA 256”；最终状态显示 256/221/386，256 张卡片可见，当前窗口无横向溢出。
+- 阶段 27 完成前新鲜工程门通过：98/98 pytest、80.45% coverage、89 文件 Ruff format、Ruff lint、ty 与 `git diff --check` 全部通过。
+- 阶段 27 已标记 complete；未执行 commit、push 或创建 PR。
+
+### 阶段 28：GitHub 私有发布基线
+- **状态：** in_progress
+- 用户已明确授权整理当前代码、commit、创建 GitHub 仓库并 push；默认采用 private，避免公开个人设备信息、成人向工作流细节和仍在演进的工程。
+- 本地已有 `main` 与两次历史 commit，尚未配置 remote；GitHub 连接与 `gh` CLI 均确认当前账号为 `cOkieeman`，没有可用组织归属。
+- 当前有 23 个 tracked 文件修改及多批新增领域模块/测试/操作文档；下一步先做提交集合安全审计，不把 Prompt Library、模型、SQLite、缓存图、数据集或凭据纳入 Git。
+- 一次用于读取技能文件的 JavaScript 包装参数误写，调用在执行 shell 前即失败；修正后正常读取，未改动任何文件。
+- GitHub 只读查询确认 `cOkieeman/soda-prompt-hub` 当前不存在，可用于创建新仓库。
+- 首次分项密钥形状扫描因 shell 单引号嵌套导致 zsh 解析失败，未执行文件读取；后续改为不含危险嵌套引号的独立规则扫描。
+- 发布安全审计确认待提交集合共 98 个文件，无超过 1 MiB 文件，无模型权重、数据集、SQLite、归档或媒体文件；未发现私钥、GitHub Token 或真实 OpenAI Key。
+- 宽泛 `sk-` 规则的命中均来自 `task-...` 任务编号；凭据字段命中仅为测试系统拒绝 password/secret 的假数据。
+- `.gitignore` 已补充常见模型权重、RAR/7z、Windows worker 本地配置和运行产物；README、Mac/绘图指南、数据集路径占位和 Windows 示例已改为可移植写法，历史进度与测试夹具保留在 private 仓库。
+- 二次安全门确认所有新增忽略规则生效、JSON 示例可解析、提交集合仍无超过 1 MiB 文件；发布说明中最后一处真实 Windows 主机名已替换为通用描述。
+- 发布前新鲜工程门通过：98/98 pytest、80.45% coverage、89 文件 Ruff format、Ruff lint、ty、`uv lock --check` 与 `git diff --check` 全部通过。
+- 首次 staged 大 blob 循环把 zsh 特殊变量 `path` 用作文件名变量，覆盖了命令搜索路径，导致循环内后续 `git` 与末尾 staged diff 检查未执行；暂存本身成功，改用 `file_path` 后从头重跑这两项，不能沿用失败命令的结论。
+- staged 复核确认 78 个文件、无超过 1 MiB blob、无私钥或 Token 形状；`git diff --cached --check` 发现 `FINAL_TEST_REPORT.md` 一处 Markdown 行尾空格，已移除并要求重新执行完整工程门。
+- 修正行尾后最终工程门再次通过：98/98 pytest、80.45% coverage、89 文件 Ruff format、Ruff lint、ty、锁文件、staged diff、密钥形状与大 blob 检查全部通过。
+- 已创建本地发布 commit，并成功创建 private GitHub 仓库 `cOkieeman/soda-prompt-hub`；首次 HTTPS push 在 TLS 握手阶段遇到 `SSL_ERROR_SYSCALL`，不是认证或代码失败，保留本地 commit 后检查连接并重试。

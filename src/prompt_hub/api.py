@@ -9,6 +9,10 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
+from prompt_hub.background_jobs import BackgroundJobRunner, BackgroundJobStore
+from prompt_hub.comfy_results import ComfyResultStore
+from prompt_hub.comfy_routes import create_comfy_router
+from prompt_hub.compute_bridge import compute_contract
 from prompt_hub.config import Settings
 from prompt_hub.creative import (
     CreativeStore,
@@ -20,7 +24,12 @@ from prompt_hub.creative import (
     next_iteration_values,
 )
 from prompt_hub.database import PromptDatabase
+from prompt_hub.dataset_curation import DatasetCurationStore
 from prompt_hub.dataset_routes import create_dataset_router
+from prompt_hub.dataset_workspace import DatasetWorkspaceStore
+from prompt_hub.embedding_index import EmbeddingIndexStore
+from prompt_hub.embedding_routes import create_embedding_router
+from prompt_hub.hybrid_search import HybridSearchService
 from prompt_hub.importers import import_all
 from prompt_hub.local_model import (
     LocalModelError,
@@ -29,12 +38,23 @@ from prompt_hub.local_model import (
     list_local_models,
     organize_slots,
 )
+from prompt_hub.lora_projects import LoraProjectStore
+from prompt_hub.lora_routes import create_lora_router
 from prompt_hub.media import resolve_media_path
 from prompt_hub.oc_manager import archive_import, parse_oc_manager_json
+from prompt_hub.remote_nodes import RemoteNodeStore
+from prompt_hub.remote_routes import create_remote_router
 from prompt_hub.result_assets import find_result_asset
 from prompt_hub.result_media import ResultImageError, resolve_result_image, store_result_image
+from prompt_hub.search_routes import create_search_router
+from prompt_hub.source_routes import create_source_router
+from prompt_hub.source_sync import SourceSyncService
 from prompt_hub.sourcing import allowed_safety_levels, source_candidates
+from prompt_hub.tag_locale import TagLocaleError, localize_tags, tag_catalog
 from prompt_hub.web import INDEX_HTML
+from prompt_hub.workflow_profiles import WorkflowProfileStore
+from prompt_hub.workflow_routes import create_workflow_router
+from prompt_hub.workspace_routes import create_workspace_router
 
 MAX_OC_IMPORT_BYTES = 25 * 1024 * 1024
 
@@ -122,17 +142,53 @@ class CreativeReviewBranchInput(BaseModel):
     analysis: dict[str, Any]
 
 
+class TagLocaleInput(BaseModel):
+    tags: list[str] = Field(min_length=1, max_length=500)
+    language: Literal["zh", "en"] = "zh"
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or Settings.from_environment()
     database = PromptDatabase(active_settings.database_path)
     creative_store = CreativeStore(active_settings.database_path)
+    job_store = BackgroundJobStore(active_settings.database_path)
+    workspace_store = DatasetWorkspaceStore(active_settings)
+    curation_store = DatasetCurationStore(active_settings, workspace_store)
+    lora_store = LoraProjectStore(active_settings.lora_projects_root)
+    comfy_store = ComfyResultStore(active_settings.comfy_results_root)
+    embedding_store = EmbeddingIndexStore(active_settings.embedding_index_root)
+    source_sync = SourceSyncService(active_settings, database)
+    remote_store = RemoteNodeStore(active_settings.remote_nodes_root)
+    workflow_store = WorkflowProfileStore(active_settings.workflow_profiles_root)
+    hybrid_search = HybridSearchService(database, embedding_store, remote_store)
+    job_runner = BackgroundJobRunner(
+        job_store,
+        {
+            "dataset_scan": workspace_store.scan_job,
+            "dataset_wd14": curation_store.tag_job,
+            "dataset_krea2_vlm": curation_store.krea2_vlm_job,
+            "source_sync": source_sync.job,
+        },
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         active_settings.ensure_directories()
         database.initialize()
         creative_store.initialize()
-        yield
+        job_store.initialize()
+        workspace_store.initialize()
+        curation_store.initialize()
+        lora_store.initialize()
+        comfy_store.initialize()
+        embedding_store.initialize()
+        remote_store.initialize()
+        workflow_store.initialize()
+        job_runner.start()
+        try:
+            yield
+        finally:
+            job_runner.stop()
 
     application = FastAPI(
         title="Soda Prompt Hub",
@@ -141,6 +197,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.include_router(create_dataset_router(active_settings, creative_store))
+    application.include_router(
+        create_workspace_router(workspace_store, curation_store, job_store, job_runner)
+    )
+    application.include_router(
+        create_lora_router(lora_store, workspace_store, curation_store, database)
+    )
+    application.include_router(create_comfy_router(active_settings, comfy_store, creative_store))
+    application.include_router(create_embedding_router(embedding_store, workspace_store))
+    application.include_router(create_search_router(hybrid_search))
+    application.include_router(create_remote_router(remote_store))
+    application.include_router(create_source_router(source_sync, job_runner))
+    application.include_router(
+        create_workflow_router(
+            active_settings,
+            workflow_store,
+            creative_store,
+            comfy_store,
+            remote_store,
+        )
+    )
 
     @application.get("/", response_class=HTMLResponse, include_in_schema=False)
     def index() -> str:
@@ -149,6 +225,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "database": str(active_settings.database_path)}
+
+    @application.get("/api/compute/contract")
+    def get_compute_contract() -> dict[str, Any]:
+        return compute_contract()
+
+    @application.post("/api/tags/localize")
+    def get_localized_tags(payload: TagLocaleInput) -> dict[str, Any]:
+        try:
+            items = localize_tags(payload.tags, language=payload.language)
+        except TagLocaleError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"language": payload.language, "items": items}
+
+    @application.get("/api/tags/catalog")
+    def get_tag_catalog(
+        language: Literal["zh", "en"] = "zh",
+    ) -> dict[str, Any]:
+        return {"language": language, "items": tag_catalog(language=language)}
 
     @application.get("/api/stats")
     def stats() -> dict[str, Any]:

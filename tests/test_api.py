@@ -98,10 +98,74 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
                 "tagSelectedDataset",
                 "data-wd14-tag",
                 "导出精选数据集 ZIP",
+                "数据集工作台",
+                "datasetImportForm",
+                "datasetPagination",
+                "pageSize: 200",
+                "loraPage",
+                "loraCreateForm",
+                "结果回流",
+                "comfyFileForm",
+                "comfyDirectoryForm",
+                "sourceSyncButton",
+                "更新公共提示词库",
+                "设备连接",
+                "remoteNodeGrid",
+                "跨设备任务状态",
+                "remoteTaskList",
+                "ComfyUI LoRA 远程清单",
+                "LoRA Manager 插件",
+                "remoteLoraSync",
+                "remoteLoraTree",
+                "LoRA 目录树",
+                "data-lora-tree-toggle",
+                "data-lora-category",
+                "remoteLoraResultStatus",
+                "当前筛选没有结果",
+                "验收并导入 LoRA 清单",
+                "import-lora-catalog",
+                "await loadLoras($('#remoteLoraQuery').value.trim())",
+                "remotePreviewDialog",
+                "remote-lora-preview",
+                "preview_urls",
+                "暂无本地预览图",
+                "tagLanguageToggle",
+                "datasetTagSuggestions",
+                "datasetSourceCaptionProfile",
+                "/source-captions/preview",
+                "prepareTagLabels",
+                "coverageLabel",
+                "loraCoveragePreview",
+                "/coverage/preview",
+                "workflowProfile",
+                "workflowLowCost",
+                "sendWorkflow",
+                "发送到 5060 Ti",
+                "验收并导入图片",
+                "/api/workflow-tasks/",
             )
         )
         assert "导出 Anima + Krea 2 JSON" in page.text
         assert "data-creative-add" in page.text
+
+
+def test_compute_contract(settings) -> None:
+    with TestClient(create_app(settings)) as client:
+        compute = client.get("/api/compute/contract").json()
+        assert compute["protocol_version"] == "soda-compute-bridge-v2"
+        capabilities = compute["roles"]["compute_5060ti"]["capabilities"]
+        assert {"comfyui_generate", "lora_train", "embedding_batch"} <= set(capabilities)
+        assert compute["task_types"]["comfyui_generate"]["target_role"] == "compute_5060ti"
+        assert compute["security"]["credentials_in_tasks"] is False
+        assert compute["security"]["model_outputs_require_review"] is True
+        assert "returned" in compute["task_states"]
+        assert "retry_of" in compute["task_envelope"]["optional"]
+        assert compute["task_types"]["embedding_batch"]["item_required"][-1] == "sha256"
+        assert compute["task_types"]["vlm_caption_batch"]["constraints"] == {
+            "profile_id": "krea2",
+            "language": "en",
+            "result": "draft",
+        }
 
 
 def test_api_rebuild_index(source_tree, monkeypatch) -> None:

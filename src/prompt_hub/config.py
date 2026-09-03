@@ -41,9 +41,15 @@ class Settings:
             self.library_root / "private" / "characters",
             self.library_root / "test-results",
             self.result_images_root,
+            self.comfy_results_root,
             self.thumbnails_root,
             self.library_root / "exports",
             self.dataset_exports_root,
+            self.dataset_workspaces_root,
+            self.lora_projects_root,
+            self.embedding_index_root,
+            self.remote_nodes_root,
+            self.workflow_profiles_root,
         )
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
@@ -61,8 +67,32 @@ class Settings:
         return self.library_root / "test-results" / "prompt-hub"
 
     @property
+    def comfy_results_root(self) -> Path:
+        return self.library_root / "test-results" / "comfyui-imports"
+
+    @property
     def dataset_exports_root(self) -> Path:
         return self.library_root / "exports" / "datasets"
+
+    @property
+    def dataset_workspaces_root(self) -> Path:
+        return self.library_root / "datasets" / "workspaces"
+
+    @property
+    def lora_projects_root(self) -> Path:
+        return self.library_root / "lora-projects"
+
+    @property
+    def embedding_index_root(self) -> Path:
+        return self.library_root / "indexes" / "embeddings"
+
+    @property
+    def remote_nodes_root(self) -> Path:
+        return self.library_root / "remote-nodes"
+
+    @property
+    def workflow_profiles_root(self) -> Path:
+        return self.library_root / "workflow-profiles"
 
     @property
     def models_root(self) -> Path:

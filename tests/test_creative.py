@@ -173,19 +173,30 @@ def test_profiles_keep_adult_intent_and_warn_about_format() -> None:
     anima = compile_prompt(project, "anima")
     assert "victorian military uniform" in anima["positive"]
     assert "nude" not in anima["negative"]
+    assert anima["output_language"] == "en"
+    assert anima["ready"] is True
 
     project["safety_mode"] = "sfw"
     project["slots"]["character"] = "银发女性"
     sfw = compile_prompt(project, "anima")
     assert "nsfw" in sfw["negative"]
     assert any("Booru" in warning for warning in sfw["warnings"])
+    assert sfw["ready"] is False
 
     project["safety_mode"] = "suggestive"
     project["slots"]["style"] = ", ".join(f"tag-{index}" for index in range(12))
     krea = compile_prompt(project, "krea2")
-    assert "创作意图" in krea["positive"]
-    assert "明确性行为" in krea["negative"]
+    assert "Character: 银发女性" in krea["positive"]
+    assert "explicit sexual acts" in krea["negative"]
+    assert krea["output_language"] == "mixed"
+    assert krea["ready"] is False
     assert any("标签堆叠" in warning for warning in krea["warnings"])
+
+    english_krea = compile_prompt(sample_project(), "krea2")
+    assert "Character: 1girl, silver eyes" in english_krea["positive"]
+    assert "创作意图" not in english_krea["positive"]
+    assert english_krea["output_language"] == "en"
+    assert english_krea["ready"] is True
 
     with pytest.raises(ValueError, match="Unknown creative profile"):
         compile_prompt(project, "missing")
@@ -195,6 +206,7 @@ def test_empty_profile_has_actionable_warnings() -> None:
     result = compile_prompt({"slots": {}}, "krea2")
     assert len(result["warnings"]) == 2
     assert result["positive"] == ""
+    assert result["ready"] is False
 
 
 def test_creative_api_flow(settings, monkeypatch) -> None:

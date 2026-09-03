@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "mcp>=2.1.1",
+    "numpy>=2.0.0",
     "onnxruntime>=1.17.0",
     "pillow>=12.1.1",
     "uvicorn>=0.52.4",
@@ -48,22 +49,46 @@ ignore = ["COM812", "CPY001", "D", "ISC001"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ANN", "PLR2004", "S101"]
+"tests/test_dataset_curation.py" = ["PLR0915"]
 "src/prompt_hub/api.py" = ["C901", "FBT001", "FBT002", "PLR0913", "PLR0915", "PLR0917", "TC003"]
+"src/prompt_hub/background_jobs.py" = ["EM101", "RUF001", "TRY003"]
 "src/prompt_hub/dataset_routes.py" = ["C901", "PLR0915"]
-"src/prompt_hub/cli.py" = ["T201", "TC003"]
+"src/prompt_hub/dataset_curation.py" = ["C901", "EM101", "EM102", "PLR0912", "PLR0913", "PLR0915", "TRY003", "TRY301"]
+"src/prompt_hub/cli.py" = ["C901", "PLR0912", "T201", "TC003"]
 "src/prompt_hub/creative.py" = ["ANN401", "EM101", "EM102", "PLR2004", "RUF001", "TRY003"]
+"src/prompt_hub/comfy_results.py" = ["ANN401", "C901", "EM101", "EM102", "PLR0912", "RUF001", "TRY003", "TRY301"]
+"src/prompt_hub/comfy_routes.py" = ["C901", "PLR0913", "PLR0915", "RUF001", "TC003"]
+"src/prompt_hub/comfy_web.py" = ["E501", "RUF001"]
 "src/prompt_hub/dataset_export.py" = ["EM101", "EM102", "TRY003"]
 "src/prompt_hub/dataset_tagging.py" = ["EM101", "TRY003"]
+"src/prompt_hub/dataset_workspace.py" = ["ANN401", "EM101", "TRY003", "TRY004"]
+"src/prompt_hub/embedding_index.py" = ["EM101", "EM102", "PLR0913", "TC003", "TRY003"]
+"src/prompt_hub/embedding_routes.py" = ["EM101", "EM102", "TRY003"]
+"src/prompt_hub/hybrid_search.py" = ["EM101", "TRY003"]
 "src/prompt_hub/creative_web.py" = ["E501", "RUF001"]
 "src/prompt_hub/creative_web_layout.py" = ["E501", "RUF001"]
 "src/prompt_hub/database.py" = ["FLY002", "PLR0913", "S608", "TC003"]
 "src/prompt_hub/importers.py" = ["TC001", "TC003"]
 "src/prompt_hub/local_model.py" = ["ANN401", "EM101", "EM102", "PLR0913", "RUF001", "S310", "TRY003"]
+"src/prompt_hub/maintenance.py" = ["EM101", "EM102", "PLR0912", "RUF001", "S310", "TC003", "TRY003", "TRY301"]
+"src/prompt_hub/lora_projects.py" = ["ANN401", "EM101", "EM102", "PLR2004", "RUF001", "TRY003"]
+"src/prompt_hub/lora_freeze.py" = ["C901", "EM101", "EM102", "PLR0912", "PLR0915", "PLR2004", "TC003", "TRY003", "TRY301"]
+"src/prompt_hub/lora_routes.py" = ["C901", "PLR0915", "RUF001", "TC003"]
+"src/prompt_hub/lora_web.py" = ["E501", "RUF001"]
 "src/prompt_hub/result_media.py" = ["EM101", "TRY003", "TRY301"]
+"src/prompt_hub/remote_nodes.py" = ["C901", "EM101", "EM102", "PLR0912", "RUF001", "TRY003"]
+"src/prompt_hub/remote_routes.py" = ["C901", "EM101", "PLR0915", "TRY003"]
+"src/prompt_hub/windows_worker.py" = ["BLE001", "C901", "EM101", "EM102", "PLC0415", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004", "PTH105", "RUF001", "S310", "SLF001", "T201", "TRY003"]
+"src/prompt_hub/workflow_profiles.py" = ["ANN401", "EM101", "EM102", "PLR0913", "PLR2004", "RUF001", "TRY003"]
+"src/prompt_hub/workflow_routes.py" = ["C901", "EM101", "EM102", "FBT001", "FBT002", "PLR0915", "RUF001", "TRY003", "TRY301"]
+"src/prompt_hub/remote_web.py" = ["E501", "RUF001"]
+"src/prompt_hub/search_web.py" = ["E501", "RUF001"]
 "src/prompt_hub/sourcing.py" = ["ANN401", "PLR0913", "RUF001"]
+"src/prompt_hub/source_sync.py" = ["EM101", "PLR0913", "RUF001", "TRY003"]
 "src/prompt_hub/wd14.py" = ["EM101", "EM102", "PLR0913", "TRY003"]
 "src/prompt_hub/mcp_server.py" = ["FBT001", "FBT002", "PLR0913", "PLR0917"]
 "src/prompt_hub/web.py" = ["E501", "RUF001"]
+"src/prompt_hub/workspace_routes.py" = ["C901", "PLR0915"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -86,6 +111,7 @@ addopts = [
 branch = true
 source = ["src/prompt_hub"]
 omit = ["*/__main__.py"]
+timid = true
 
 [tool.coverage.report]
 fail_under = 80

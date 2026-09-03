@@ -126,6 +126,14 @@ CREATIVE_STYLES = r"""
   .wd14-review summary { cursor: pointer; color: var(--signal); font: 800 8px monospace; }
   .wd14-review p { margin: 6px 0 0; color: var(--muted); font: 8px/1.45 monospace; overflow-wrap: anywhere; }
   .wd14-review textarea { width: 100%; min-height: 110px; margin-top: 7px; resize: vertical; border: 1px solid var(--line); background: #fbf6ec; padding: 7px; color: var(--ink); font: 9px/1.45 monospace; }
+  .wd14-tag-locale { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-top: 8px; }
+  .wd14-tag-locale span { color: var(--muted); font: 8px/1.4 monospace; }
+  .wd14-tag-locale button { width: auto; margin: 0; padding: 5px 7px; }
+  .wd14-tag-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .result-card .wd14-tag-chip { width: auto; margin: 0; border-color: rgba(31,29,25,.28); color: var(--muted); padding: 5px 6px; font: 8px/1.25 monospace; }
+  .result-card .wd14-tag-chip.selected { border-color: var(--signal); background: var(--signal); color: white; }
+  .wd14-advanced { margin-top: 8px; }
+  .wd14-advanced summary { color: var(--muted); }
   .wd14-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
   .result-card .wd14-actions button:last-child { background: var(--signal); color: white; }
   .result-card .wd14-run { border-color: #3f5250; color: #284b48; }
@@ -172,6 +180,20 @@ CREATIVE_STYLES = r"""
   .warning-list { margin: 14px 0 0; padding: 0; list-style: none; }
   .warning-list li { margin-top: 6px; padding-left: 13px; color: #d8cdbd; font-size: 11px; position: relative; }
   .warning-list li::before { content: "!"; color: var(--acid); position: absolute; left: 0; font: 800 10px monospace; }
+  .workflow-dispatch { margin-top: 18px; padding: 12px; border: 1px solid rgba(244,237,223,.38); background: rgba(255,255,255,.045); }
+  .workflow-dispatch-head { display: flex; justify-content: space-between; gap: 10px; color: #f4eddf; }
+  .workflow-dispatch-head strong { font: 800 10px monospace; letter-spacing: .05em; }
+  .workflow-dispatch-head span { color: var(--acid); font: 800 9px monospace; }
+  .workflow-dispatch > label { display: block; margin-top: 11px; color: #b9ae9f; font: 800 8px monospace; text-transform: uppercase; }
+  .workflow-dispatch select { width: 100%; margin-top: 6px; border: 1px solid rgba(244,237,223,.38); background: #292824; color: #f4eddf; padding: 9px; font: 9px monospace; }
+  .workflow-dispatch .workflow-cost { display: flex; gap: 8px; align-items: start; text-transform: none; }
+  .workflow-cost input { margin-top: 2px; accent-color: var(--acid); }
+  .workflow-cost span, .workflow-cost strong, .workflow-cost small { display: block; }
+  .workflow-cost strong { color: #f4eddf; font: 800 9px monospace; }
+  .workflow-cost small { margin-top: 3px; color: #aaa395; font: 9px/1.4 "Avenir Next", sans-serif; }
+  .workflow-dispatch .creative-action { width: 100%; margin-top: 12px; }
+  .workflow-dispatch p { margin: 8px 0 0; color: #b9ae9f; font: 9px/1.45 monospace; overflow-wrap: anywhere; }
+  .workflow-task-link { margin-top: 8px; color: var(--acid); border-bottom: 1px solid currentColor; font: 800 8px monospace; }
   .output-actions { display: grid; gap: 8px; margin-top: 22px; }
   .output-actions .creative-action { color: #f4eddf; }
   .output-actions .creative-action.primary { background: var(--acid); color: var(--ink); border-color: var(--acid); }
@@ -197,7 +219,7 @@ CREATIVE_SCRIPT = r"""
     action: ['动作', '姿态、手部动作、表情与互动'], composition: ['构图', '景别、机位、视角与主体位置'],
     scene: ['场景', '地点、环境物件、天气与时间'], lighting: ['灯光', '光向、色温、明暗与氛围'], style: ['画风', '媒介、审美、质感、LoRA 与风格词']
   };
-  const creativeState = {project: null, projects: [], recipes: [], outputs: {}, profile: 'anima', datasetProfile: 'anima', datasetMessage: '', datasetMessageProjectId: '', suggestion: null, sourcing: null, sourcingProjectId: '', sourcingRun: 0, review: null, reviewAssetId: '', reviewProjectId: '', iteration: null, iterationProjectId: '', iterationRun: 0, iterationMessage: '', iterationMessageProjectId: '', visionAvailable: false, saveTimer: null, compileTimer: null, loadedMeta: false};
+  const creativeState = {project: null, projects: [], recipes: [], outputs: {}, profile: 'anima', workflowProfiles: [], workflowMessage: '', workflowMessageProjectId: '', datasetProfile: 'anima', datasetMessage: '', datasetMessageProjectId: '', suggestion: null, sourcing: null, sourcingProjectId: '', sourcingRun: 0, review: null, reviewAssetId: '', reviewProjectId: '', iteration: null, iterationProjectId: '', iterationRun: 0, iterationMessage: '', iterationMessageProjectId: '', visionAvailable: false, saveTimer: null, compileTimer: null, loadedMeta: false};
 
   async function creativeJson(url, options = {}) {
     const response = await fetch(url, options);
@@ -242,7 +264,7 @@ CREATIVE_SCRIPT = r"""
     });
     creativeState.profile = project.target_profile || creativeState.profile;
     document.querySelectorAll('[data-profile]').forEach(button => button.classList.toggle('active', button.dataset.profile === creativeState.profile));
-    renderCreativeReferences(); renderCreativeProjects(); renderLineageNotice(); renderIterationPanel(); renderSourcing(); renderResultGallery(); renderReviewProposal(); $('#creativeSaveState').textContent = `项目已加载 · V${iterationOf(project)} · R${project.revision || 1}`; compileCreative().catch(showCreativeError); loadIterationContext().catch(showCreativeError);
+    renderCreativeReferences(); renderCreativeProjects(); renderLineageNotice(); renderIterationPanel(); renderSourcing(); renderResultGallery(); renderReviewProposal(); renderWorkflowProfiles(); $('#creativeSaveState').textContent = `项目已加载 · V${iterationOf(project)} · R${project.revision || 1}`; compileCreative().catch(showCreativeError); loadIterationContext().catch(showCreativeError);
   }
 
   function renderCreativeProjects() {
@@ -296,6 +318,8 @@ CREATIVE_SCRIPT = r"""
     $('#tagSelectedDataset').disabled = selectedCount === 0 || selectedCount > 24;
     const savedMessage = creativeState.datasetMessageProjectId === creativeState.project?.project_id ? creativeState.datasetMessage : '';
     $('#datasetExportStatus').textContent = savedMessage || (selectedCount > 24 ? `已精选 ${selectedCount} 张；同步 WD14 每次最多 24 张，导出不受影响。` : selectedCount ? `已精选 ${selectedCount} 张；将按 ${profileLabel} 生成同名 caption。` : '先在上方手动精选结果图；导出不会改动原图。');
+    const localeTags = assets.flatMap(asset => { const tagging = asset.wd14_tagging || {}; return [...(tagging.general || []).map(item => item.tag), ...(tagging.characters || []).map(item => item.tag), ...String(tagging.draft_tags || '').split(',')]; }).filter(Boolean);
+    if (window.ensureTagLabels && localeTags.length) window.ensureTagLabels(localeTags).then(changed => { if (changed) renderResultGallery(); }).catch(console.error);
   }
 
   function renderResultCard(asset, profileLabel) {
@@ -306,9 +330,17 @@ CREATIVE_SCRIPT = r"""
   function renderWd14Review(asset) {
     const tagging = asset.wd14_tagging; if (!tagging) return '';
     const rating = tagging.rating?.tag || 'unknown'; const ratingScore = Number(tagging.rating?.score); const characters = (tagging.characters || []).map(item => item.tag).filter(Boolean);
-    const draft = tagging.draft_tags || ''; const animaCaption = asset.dataset_captions?.anima || ''; const confirmed = Boolean(tagging.confirmed_at) && animaCaption === draft;
+    const draft = tagging.draft_tags || ''; const draftValues = draft.split(',').map(value => value.trim()).filter(Boolean); const selectedTags = new Set(draftValues.map(value => value.toLowerCase())); const candidates = [...new Set([...(tagging.general || []).map(item => item.tag).filter(Boolean), ...draftValues])]; const animaCaption = asset.dataset_captions?.anima || ''; const confirmed = Boolean(tagging.confirmed_at) && animaCaption === draft;
     const state = confirmed ? '已确认到 Anima caption' : tagging.confirmed_at ? 'Anima caption 后续已修改' : '尚未确认';
-    return `<details class="wd14-review" open><summary>WD14 草稿 · ${escapeHtml(rating)} ${Number.isFinite(ratingScore) ? Math.round(ratingScore * 100) + '%' : ''} · ${state}</summary><p>角色候选：${escapeHtml(characters.join(', ') || '无（原创 OC 常见）')}<br>General ${Number(tagging.general_threshold).toFixed(2)} · Character ${Number(tagging.character_threshold).toFixed(2)} · ${escapeHtml(tagging.provider || 'CPU')}</p><textarea data-wd14-draft="${escapeHtml(asset.asset_id)}" maxlength="12000" aria-label="WD14 Anima 标签草稿">${escapeHtml(draft)}</textarea><div class="wd14-actions"><button data-save-wd14="${escapeHtml(asset.asset_id)}">保存审核草稿</button><button data-confirm-wd14="${escapeHtml(asset.asset_id)}">确认用作 Anima caption</button></div></details>`;
+    const chips = candidates.map(tag => `<button class="wd14-tag-chip ${selectedTags.has(tag.toLowerCase()) ? 'selected' : ''}" data-wd14-chip="${escapeHtml(asset.asset_id)}" data-tag-value="${escapeHtml(tag)}" aria-pressed="${selectedTags.has(tag.toLowerCase())}">${escapeHtml(window.displayCanonicalTag ? window.displayCanonicalTag(tag) : tag)}</button>`).join('');
+    const language = window.getTagDisplayLanguage?.() === 'en' ? 'TAGS: EN' : '标签：中英';
+    const characterLabels = characters.map(tag => window.displayCanonicalTag ? window.displayCanonicalTag(tag) : tag);
+    return `<details class="wd14-review" open><summary>WD14 草稿 · ${escapeHtml(rating)} ${Number.isFinite(ratingScore) ? Math.round(ratingScore * 100) + '%' : ''} · ${state}</summary><p>角色候选：${escapeHtml(characterLabels.join(', ') || '无（原创 OC 常见）')}<br>General ${Number(tagging.general_threshold).toFixed(2)} · Character ${Number(tagging.character_threshold).toFixed(2)} · ${escapeHtml(tagging.provider || 'CPU')}</p><div class="wd14-tag-locale"><span>点击标签保留或移除；保存和导出始终使用英文 tag。</span><button data-toggle-tag-language>${language}</button></div><div class="wd14-tag-chips">${chips}</div><details class="wd14-advanced"><summary>高级英文编辑</summary><textarea data-wd14-draft="${escapeHtml(asset.asset_id)}" maxlength="12000" aria-label="WD14 Anima 标签草稿">${escapeHtml(draft)}</textarea></details><div class="wd14-actions"><button data-save-wd14="${escapeHtml(asset.asset_id)}">保存审核草稿</button><button data-confirm-wd14="${escapeHtml(asset.asset_id)}">确认用作 Anima caption</button></div></details>`;
+  }
+
+  function toggleWd14Chip(assetId, tag) {
+    const asset = (creativeState.project?.generation?.result_assets || []).find(item => item.asset_id === assetId); if (!asset?.wd14_tagging) return;
+    const values = String(asset.wd14_tagging.draft_tags || '').split(',').map(value => value.trim()).filter(Boolean); const key = tag.toLowerCase(); const exists = values.some(value => value.toLowerCase() === key); asset.wd14_tagging.draft_tags = (exists ? values.filter(value => value.toLowerCase() !== key) : [...values, tag]).join(', '); renderResultGallery();
   }
 
   function updateVisionHint() {
@@ -367,6 +399,23 @@ CREATIVE_SCRIPT = r"""
     $('#creativeWarnings').innerHTML = (output.warnings || []).map(w => `<li>${escapeHtml(w)}</li>`).join('');
   }
 
+  function matchingWorkflowProfiles() {
+    return creativeState.workflowProfiles.filter(profile => profile.model_family === creativeState.profile);
+  }
+
+  function renderWorkflowProfiles() {
+    const select = $('#workflowProfile'); const profiles = matchingWorkflowProfiles(); const previous = select.value;
+    select.innerHTML = profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}">${escapeHtml(profile.label)} · ${profile.node_count} nodes</option>`).join('');
+    if (profiles.some(profile => profile.profile_id === previous)) select.value = previous;
+    const selected = profiles.find(profile => profile.profile_id === select.value) || profiles[0];
+    $('#sendWorkflow').disabled = !selected || !creativeState.project?.project_id;
+    const currentMessage = creativeState.workflowMessageProjectId === creativeState.project?.project_id ? creativeState.workflowMessage : '';
+    if (currentMessage) { $('#workflowRunStatus').textContent = currentMessage; return; }
+    if (!selected) { $('#workflowRunStatus').textContent = `尚未导入 ${creativeState.profile === 'anima' ? 'Anima' : 'Krea 2'} Workflow Profile。`; return; }
+    const omitted = (selected.low_cost_omits || []).join('、');
+    $('#workflowRunStatus').textContent = omitted ? `低成本模式会跳过：${omitted}。` : '使用当前项目 Prompt 与生成参数投递。';
+  }
+
   async function compileCreative() {
     if (!creativeState.project) return;
     const payload = collectCreative();
@@ -393,6 +442,25 @@ CREATIVE_SCRIPT = r"""
     renderCreativeProjects(); $('#creativeSaveState').textContent = `已保存 · R${creativeState.project.revision}`; await loadIterationContext();
   }
 
+  async function sendWorkflowProfile() {
+    if (!creativeState.project?.project_id) throw new Error('请先建立一个创作项目');
+    await saveCreative(); await compileCreative();
+    const profileId = $('#workflowProfile').value;
+    if (!profileId) throw new Error('当前模型类型还没有可用 Workflow Profile');
+    const button = $('#sendWorkflow'); button.disabled = true; button.textContent = '正在投递…';
+    creativeState.workflowMessageProjectId = creativeState.project.project_id;
+    creativeState.workflowMessage = '正在把生成包保存到 Mac，并发送到 5060 Ti…'; renderWorkflowProfiles();
+    try {
+      const result = await creativeJson(`/api/workflow-profiles/${encodeURIComponent(profileId)}/tasks`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id:creativeState.project.project_id, low_cost:$('#workflowLowCost').checked})});
+      creativeState.workflowMessage = `已投递 ${result.profile.label} · ${result.task.task_id} · ${result.node_count} nodes；到“设备连接”查看回传。`;
+    } catch (error) {
+      creativeState.workflowMessage = `投递失败：${error.message}`;
+      throw error;
+    } finally {
+      button.textContent = '发送到 5060 Ti'; renderWorkflowProfiles();
+    }
+  }
+
   async function createCreativeProject(seed = {}) {
     clearTimeout(creativeState.saveTimer);
     if (creativeState.project?.project_id) await saveCreative();
@@ -401,8 +469,9 @@ CREATIVE_SCRIPT = r"""
   }
 
   async function loadCreativeMeta() {
-    const [projects, recipes, models] = await Promise.all([creativeJson('/api/creative/projects'), creativeJson('/api/creative/recipes'), creativeJson('/api/local-models')]);
+    const [projects, recipes, models, workflowProfiles] = await Promise.all([creativeJson('/api/creative/projects'), creativeJson('/api/creative/recipes'), creativeJson('/api/local-models'), creativeJson('/api/workflow-profiles')]);
     creativeState.projects = projects; creativeState.recipes = recipes; renderCreativeProjects(); renderCreativeRecipes();
+    creativeState.workflowProfiles = workflowProfiles; renderWorkflowProfiles();
     const select = $('#lmModel'); select.innerHTML = models.models.map(model => `<option value="${escapeHtml(model.id)}">${model.loaded ? '● ' : ''}${escapeHtml(model.name || model.id)}${model.params ? ` · ${escapeHtml(model.params)}` : ''}</option>`).join('');
     const loaded = models.models.find(model => model.loaded);
     const quickFallback = models.models.find(model => model.id.includes('qwen3.5-9b'));
@@ -623,6 +692,8 @@ CREATIVE_SCRIPT = r"""
   $('#exportDataset').addEventListener('click', () => exportDataset().catch(showResultReviewError));
   $('#resultGallery').addEventListener('input', event => { const input = event.target.closest('[data-wd14-draft]'); if (!input) return; const asset = (creativeState.project?.generation?.result_assets || []).find(item => item.asset_id === input.dataset.wd14Draft); if (asset?.wd14_tagging) asset.wd14_tagging.draft_tags = input.value; });
   $('#resultGallery').addEventListener('click', event => {
+    const language = event.target.closest('[data-toggle-tag-language]'); if (language) { window.toggleTagDisplayLanguage?.(); return; }
+    const chip = event.target.closest('[data-wd14-chip]'); if (chip) { toggleWd14Chip(chip.dataset.wd14Chip, chip.dataset.tagValue); return; }
     const toggle = event.target.closest('[data-dataset-toggle]'); if (toggle) { toggleDatasetAsset(toggle.dataset.datasetToggle).catch(showResultReviewError); return; }
     const tag = event.target.closest('[data-wd14-tag]'); if (tag) { tagResultAsset(tag.dataset.wd14Tag).catch(showResultReviewError); return; }
     const saveTags = event.target.closest('[data-save-wd14]'); if (saveTags) { saveWd14Review(saveTags.dataset.saveWd14, false).catch(showResultReviewError); return; }
@@ -630,12 +701,16 @@ CREATIVE_SCRIPT = r"""
     const saveCaption = event.target.closest('[data-save-caption]'); if (saveCaption) { saveDatasetCaption(saveCaption.dataset.saveCaption).catch(showResultReviewError); return; }
     const review = event.target.closest('[data-review-asset]'); if (review) analyzeResultAsset(review.dataset.reviewAsset).catch(showResultReviewError);
   });
+  window.addEventListener('tag-language-change', renderResultGallery);
   $('#applyReviewSlots').addEventListener('click', () => applyResultReview(true).catch(showResultReviewError));
   $('#applyReviewNotes').addEventListener('click', () => applyResultReview(false).catch(showResultReviewError));
   $('#branchReview').addEventListener('click', () => branchResultReview().catch(showResultReviewError));
   $('#applyIterationSuggestions').addEventListener('click', () => applyIterationSuggestions().catch(showCreativeError));
   $('#closeReview').addEventListener('click', () => { creativeState.review = null; $('#reviewProposal').hidden = true; });
-  document.querySelectorAll('[data-profile]').forEach(button => button.addEventListener('click', () => { creativeState.profile = button.dataset.profile; creativeState.project.target_profile = creativeState.profile; document.querySelectorAll('[data-profile]').forEach(b => b.classList.toggle('active', b === button)); renderOutput(); queueCreativeSave(); }));
+  document.querySelectorAll('[data-profile]').forEach(button => button.addEventListener('click', () => { creativeState.profile = button.dataset.profile; creativeState.project.target_profile = creativeState.profile; document.querySelectorAll('[data-profile]').forEach(b => b.classList.toggle('active', b === button)); renderOutput(); renderWorkflowProfiles(); queueCreativeSave(); }));
+  $('#workflowProfile').addEventListener('change', renderWorkflowProfiles);
+  $('#workflowLowCost').addEventListener('change', renderWorkflowProfiles);
+  $('#sendWorkflow').addEventListener('click', () => sendWorkflowProfile().catch(showCreativeError));
   document.querySelectorAll('[data-copy-output]').forEach(button => button.addEventListener('click', async () => { const text = creativeState.outputs[creativeState.profile]?.[button.dataset.copyOutput] || ''; await navigator.clipboard.writeText(text); button.textContent = 'COPIED'; setTimeout(() => {button.textContent = 'COPY';}, 1200); }));
   $('#saveRecipe').addEventListener('click', async () => { try { await saveCreative(); const recipe = await creativeJson('/api/creative/recipes', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id:creativeState.project.project_id, name:$('#recipeName').value.trim()})}); creativeState.recipes.unshift(recipe); renderCreativeRecipes(); $('#recipeName').value=''; $('#creativeSaveState').textContent='配方已保存'; } catch (error) { showCreativeError(error); } });
   $('#creativeRecipeList').addEventListener('click', event => { const button = event.target.closest('[data-recipe-id]'); if (!button) return; const recipe = creativeState.recipes.find(r => r.recipe_id === button.dataset.recipeId); if (!recipe?.snapshot?.project) return; const keep = {project_id:creativeState.project.project_id, created_at:creativeState.project.created_at}; creativeState.project = {...recipe.snapshot.project, ...keep}; renderCreativeProject(); queueCreativeSave(); });

@@ -3,17 +3,34 @@
 本机优先的 AI 绘图提示词、风格、标签、wildcard 与视觉参照检索中枢。服务只监听
 `127.0.0.1`，资料与索引默认保存在：
 
-`/Users/soda/Documents/Codex/soda-person/prompt-library`
+`$HOME/Documents/Codex/soda-person/prompt-library`
+
+## 安装与启动
+
+需要 Python 3.12+ 与 [uv](https://docs.astral.sh/uv/)。代码仓库不包含模型权重、图片数据集、
+SQLite、个人 Prompt Library、结果图或 Windows 凭据。
+
+```bash
+git clone https://github.com/cOkieeman/soda-prompt-hub.git
+cd soda-prompt-hub
+uv sync
+uv run prompt-hub serve --host 127.0.0.1 --port 8765
+```
+
+如需把个人资料放到其他位置，可设置 `PROMPT_HUB_LIBRARY_ROOT`；模型根目录可用
+`PROMPT_HUB_MODELS_ROOT` 覆盖。默认值适配 `soda-person` 文件夹结构。
 
 ## 日常使用
 
 最简单的方式是双击：
 
-`/Users/soda/Documents/Codex/soda-person/启动-Prompt-Hub.command`
+`$HOME/Documents/Codex/soda-person/启动-Prompt-Hub.command`
 
 浏览器会打开 <http://127.0.0.1:8765>。关闭终端窗口或按 `Control-C` 即可停止。
 
-绘图 V1 的最短操作顺序见 [DRAWING_V1_GUIDE.md](DRAWING_V1_GUIDE.md)。首页点“新建或继续绘图项目”
+绘图 V1 的最短操作顺序见 [DRAWING_V1_GUIDE.md](DRAWING_V1_GUIDE.md)。完整的 Mac 日常使用、
+数据集审核、LoRA 训练交付、Windows 回传、备份恢复和 SMB 配置顺序见
+[MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)。首页点“新建或继续绘图项目”
 即可进入七槽位工作台；项目、锁定状态、参考资料、配方和实测记录都会保存在本机 SQLite。
 
 在创作台写好中文想法后，可直接点“从本地库智能取材”。页面会先从 33,631 条本机资料中按
@@ -59,15 +76,15 @@ caption，Krea 2 自然语言始终独立保存。
 也可以在终端中启动：
 
 ```bash
-cd /Users/soda/Documents/Codex/soda-person/projects/prompt-hub
-/opt/homebrew/bin/uv run prompt-hub serve --host 127.0.0.1 --port 8765
+cd "$HOME/Documents/Codex/soda-person/projects/prompt-hub"
+uv run prompt-hub serve --host 127.0.0.1 --port 8765
 ```
 
 ## 更新公共资料
 
 双击：
 
-`/Users/soda/Documents/Codex/soda-person/更新-Prompt-资料库.command`
+`$HOME/Documents/Codex/soda-person/更新-Prompt-资料库.command`
 
 它会按顺序更新 4 个公共资料源，然后重建本地索引与缺失缩略图。公共 Git 原始目录不要
 手工修改；个人 prompt 请放在 `prompt-library/private`。
@@ -100,28 +117,156 @@ Prompt Hub 数据结构。
 ## 常用维护命令
 
 ```bash
-cd /Users/soda/Documents/Codex/soda-person/projects/prompt-hub
-/opt/homebrew/bin/uv run prompt-hub stats
-/opt/homebrew/bin/uv run prompt-hub search "gothic cathedral" --limit 10
-/opt/homebrew/bin/uv run prompt-hub import
+cd "$HOME/Documents/Codex/soda-person/projects/prompt-hub"
+uv run prompt-hub stats
+uv run prompt-hub search "gothic cathedral" --limit 10
+uv run prompt-hub import
 ```
 
 ## WD14 本地图片打标
 
 已安装 `SmilingWolf/wd-swinv2-tagger-v3`，模型位置：
 
-`/Users/soda/Documents/Codex/soda-person/models/wd14/wd-swinv2-tagger-v3`
+`$HOME/Documents/Codex/soda-person/models/wd14/wd-swinv2-tagger-v3`
 
 网页结果图工作台已经接入单图与精选批量打标；也可以用命令独立检查任意图片：
 
 ```bash
-cd /Users/soda/Documents/Codex/soda-person/projects/prompt-hub
-/opt/homebrew/bin/uv run prompt-hub tag-image /绝对路径/图片.png --limit 50
+cd "$HOME/Documents/Codex/soda-person/projects/prompt-hub"
+uv run prompt-hub tag-image /绝对路径/图片.png --limit 50
 ```
 
 命令默认使用 general threshold `0.35`、character threshold `0.85`，只把 JSON 输出到终端，
 不会创建或覆盖 `.txt`。本机实测 CoreML 无法完整执行这只 SwinV2 ONNX，所以 `auto` 默认使用
 CPU；单张 1024×1536 图片首次加载加推理约 0.7 秒。
+
+## V1.7 数据集工作台
+
+V1.7 后端已经能把任意本地图片目录注册为只读工作区，并在后台检查 PNG/JPEG/WebP、尺寸、
+坏图、同名 `.txt`、缺失 caption、孤立 `.txt`、SHA-256 完全重复和 pHash 近似重复。扫描会生成
+安全 WebP 缩略图与版本化 JSON 报告，保存在
+`prompt-library/datasets/workspaces`；来源目录中的图片和 `.txt` 不会被移动、改名或覆盖。
+
+后台任务状态保存在 SQLite，支持进度、取消、失败重试和服务重启后恢复。网页主导航的“数据集”
+已经可以读取目录、查看缩略图和原图、筛选坏图/caption/重复组/尺寸/格式、批量选择，并保存
+“保留 / 待复查 / 排除”审核状态。移除工作区只删除 Prompt Hub 的派生记录，不删除源目录。
+
+工作台每页最多渲染 200 张图片，已经用 1,000 与 10,000 张隔离目录完成扫描和页面验证；翻页不会
+改变筛选结果。“选择当前筛选结果”仍选择完整筛选集合，不会只选择当前 200 张。
+
+V1.7B 已把工作区 WD14 接入可恢复后台队列，不再受结果图区域的 24 张同步上限约束。选择图片后
+可以运行未打标/失败/多选/整个工作区队列，逐图结果和失败会持久化；同一任务重启后只继续未完成
+图片。每张图片分别保存 Anima 英文 canonical tags 与 Krea 2 英文自然语言，批量标签修改会先预览
+并生成可回退快照，中文标签只用于显示。
+
+已有同名 `.txt` 时，可以先预览后批量接续到 Anima 或 Krea 2 Profile。默认只填空白 Profile、
+状态为“待审核”；确认后整批只生成一个快照，已有内容不会自动覆盖，源 `.txt` 始终不变。
+
+## V1.8 LoRA 项目台
+
+主导航“LoRA 项目”用于在 Mac 上管理角色、服装、角色与签名服装一体、画风四类训练项目。
+每个项目都要先固定 Trigger，并分别填写固定特征、可控特征、允许变化和禁止漂移。项目可以只读
+关联 OC Manager 角色，也可以从已扫描的数据集工作区引用图片；引用只保存工作区 ID、相对路径、
+SHA-256 和审核判断，不复制或改写来源。
+
+逐图可标记候选、保留、排除、待补图或正则图，并填写景别、视角、姿态、表情、服装、背景、
+光线和构图。“预览自动初审”会依据文件名、原 caption、现有 Profile caption 与图片横竖尺寸给出
+保守建议；只有用户确认后才合并，且不会覆盖人工标记或改变图片状态。页面同时提示完全重复、
+背景/姿态/构图偏置和人工标记的角色不一致或服装污染风险。
+
+“生成新冻结版本”只接受已保留或正则图片，并强制 Anima 与 Krea 2 caption 分别为英文、已人工
+审核且包含当前 Trigger。每次冻结都会在项目 `07_导出` 下新建不可变版本，分别输出 `Anima` 与
+`Krea2` 的 train/reg 树、manifest、固定测试 prompt 和 5060 Ti 16GB 配置草案。Krea 2 草案明确
+使用 Raw FP8、Qwen3-VL FP8、28 层 block swap、batch 1 和关闭 tag shuffle；交付 Windows 后仍需
+由 AnimaLoraStudio 在真实驱动、Torch、CUDA、底模和权重路径下先做 5–10 step smoke test。
+
+版本导出只读取已标记“保留”的图片，不写回来源目录。Anima 与 Krea 2 分别生成独立目录/ZIP，
+包含同名图片与 `.txt`、`manifest.json`、`audit.json` 和哈希。节点协议可在
+`/api/compute/contract` 查看；当前 Worker 已支持 ComfyUI 生成，训练仍由 Windows
+AnimaLoraStudio 独立执行，Prompt Hub 不保存 Windows 登录凭据。
+
+## V1.9 ComfyUI 结果回流
+
+主导航“结果回流”负责把 ComfyUI 生成图带回 Mac。可以上传单张 PNG/JPEG/WebP，也可以只读
+扫描本地或后续 SMB 挂载的输出目录。Prompt Hub 会按 SHA-256 去重，并从图片中读取真实存在的
+ComfyUI `prompt` / `workflow`、seed、steps、CFG、sampler、scheduler、checkpoint、LoRA、尺寸与
+正负 Prompt。普通 JPEG/WebP 没有这些字段时会明确显示“无生成元数据”，不会猜测或补写。
+
+日常顺序固定为：导入 → 核对参数 → 选择创作项目 → 只关联 / 加入数据集候选 / 记录失败测试 /
+创建下一版。只有“加入数据集候选”会设置 `dataset_selected=true`，之后仍需到创作台人工审核
+Anima 或 Krea 2 caption；失败测试不会进入训练集。由回流图创建下一版时，原始 metadata 会进入
+lineage，父项目与旧结果图保持不变。
+
+`/api/compute/contract` 已定义 `comfyui_generate`、`lora_train`、`embedding_batch`、
+`vlm_caption_batch` 与 `lora_catalog_snapshot` 的任务/结果字段、SHA-256 回验规则及 worker 注册字段。
+5060 Ti 的 SMB 节点和 Worker 已完成 ComfyUI 生成及 LoRA 只读清单实测；训练、Embedding 与 VLM
+仍按同一协议逐项接入，不需要把密钥或 Windows 路径写进项目 JSON。
+
+## V2.1 Mac 资料更新、Krea 2 草稿与向量接口
+
+“资料管理”可安全更新公共 Git 提示词库：只对干净且配置 upstream 的仓库执行 fast-forward-only，
+有本地改动时会跳过，完成后重建本地索引。不会覆盖个人收藏、评分、备注或公共仓库中的本地修改。
+
+“数据集工作台”的 Krea 2 视觉草稿队列会调用 LM Studio 视觉模型。模型结果只进入独立草稿，图片
+详情同时显示正式 Krea 2 caption 与草稿；“只保存草稿”不会改变正式 caption，只有“确认写入
+Krea 2”才创建可回退快照。Anima/WD14 始终保持独立。若 Qwen3 14B 正在驻留导致内存不足，请先
+在 LM Studio 手工切换到 Qwen3.5 9B Vision；Prompt Hub 不会擅自卸载用户模型。
+
+后续 5060 Ti 可将真实 embedding 结果提交到 `/api/embedding-indexes/import`，Mac 会按模型 ID、
+revision 和 dimension 建立独立版本，并用源 SHA-256 回验。查询接口为
+`/api/embedding-indexes/{index_id}/query`。远程 Krea 2 草稿提交到
+`/api/dataset-workspaces/{workspace_id}/krea2-vlm/import`，仍然只进入待确认草稿。当前 Mac 项目未
+安装 CLIP/SigLIP 生成 runtime，因此这些接口完成不等于真实视觉索引已经生成。
+
+主导航“智能检索”已经把结果分为提示词资料、视觉参考、我的数据集和 Windows LoRA。FTS 关键词
+检索始终可用；只有存在真实、版本兼容的 embedding 时才合并 cosine 结果。数据集详情的“以此图
+查相似”同样只在源图 SHA-256 已进入真实索引后启用，不用颜色或随机向量冒充语义相似。
+
+## Windows 设备接口
+
+主导航“设备连接”只保留一个 5060 Ti 制图与炼丹节点。它运行 ComfyUI、ComfyUI 内的 LoRA Manager
+插件，以及独立的 AnimaLoraStudio；批量 VLM 与 Embedding 也由这台设备承担。Prompt Hub 只登记设备角色、主机名和 Mac 已挂载的
+SMB 路径，不保存 Windows 用户名或密码。Finder 挂载完成后，页面可以检查
+目录并建立 `prompt-hub/outbox`、`inbox`、`processing`、`completed`、`failed` 五个交付目录。
+
+Mac 已实现共享目录任务投递、任务状态扫描和失败重试。每次投递都会在 Mac 的 `remote-nodes/tasks`
+保留原始事实副本；失败重试创建新 task ID、增加 attempt 并保留 `retry_of`，不会覆盖旧失败记录。
+“跨设备任务状态”只展示 queued/running/returned/completed/failed/canceled；returned 结果仍需走领域
+导入接口和人工审核。API 为 `/api/remote-nodes/{node_id}/tasks` 与
+`/api/remote-nodes/{node_id}/tasks/{task_id}/retry`。任务 payload 会拒绝密码、token 和凭据字段。
+
+单卡任务默认串行，已部署 Worker 使用同一 GPU 锁执行当前支持的 ComfyUI 生成与 LoRA 清单任务。
+训练、Embedding、批量 Caption 与 WD14 适配器接入后继续共用该锁；训练优先级和不可抢占边界届时
+再做真实负载验收。
+
+LoRA Manager 只负责 ComfyUI 本机的 LoRA 扫描、预览和选用，不直接连接 Mac，也不负责训练。
+Windows Worker 的 `lora_catalog_snapshot` 会读取 ComfyUI `LoraLoader` 名称、白名单 LoRA 根目录、
+同名 `.metadata.json` 及关联的封面/示例图，规范化后作为独立输出回传。设备页先逐文件校验
+SHA-256，用户再点“验收并导入 LoRA 清单”。Mac 将预览图放进独立 `remote-nodes/lora-previews`
+缓存，在分类卡片显示主图并支持查看同一 LoRA 的全部参照图；无图条目保留占位。整个过程不复制
+`.safetensors`，也不读取权重内容。
+
+### Anima / Krea 2 Workflow Profile
+
+创作台右侧会按当前 Prompt 类型只显示匹配的 ComfyUI Workflow Profile。选择 Profile 后点“发送到
+5060 Ti”，系统会先保存当前项目，在 Mac 的 `workflow-profiles/<profile>/runs` 留下不可丢失的生成
+包，再复制同字节、同 SHA-256 的包到 SMB 并建立任务。原始 workflow 不会被改写，Prompt、negative、
+seed、尺寸、steps 与 CFG 只允许写入已审核的节点字段。
+
+首轮建议勾选“低成本测试”：Krea 2 跳过 SeedVR2 放大，Anima 满穗跳过 SAM3 脸手精修和 Ultimate
+SD Upscale，只验证基础模型、LoRA、Prompt 与构图。基础图正确后再关闭低成本模式。Profile 原件、
+节点映射和历次生成包属于 Mac 个人事实数据，会随 Prompt Hub 备份保存。
+
+Worker 回传后，在“设备连接 → 跨设备任务状态”点“验收并导入图片”。系统会先验证源生成包和每个
+输出文件的 SHA-256，再复制到 Mac 结果库；从创作台发出的任务会自动关联回原创作项目，之后可在
+“结果回流”中加入数据集候选或建立下一版。重复点击只返回 duplicate，不会重复保存图片。
+
+## 备份、恢复与诊断
+
+双击 `$HOME/Documents/Codex/soda-person/备份-Prompt-Hub.command` 建立带 SHA-256 manifest 与
+SQLite integrity 结果的备份；双击 `$HOME/Documents/Codex/soda-person/诊断-Prompt-Hub.command`
+检查数据库、embedding 索引、WD14、磁盘与服务。CLI 还提供 `verify-backup` 和只允许恢复到新目录的
+`restore`。完整顺序见 [MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)。
 
 ## LM Studio
 
@@ -152,8 +297,9 @@ MCP 名称为 `soda-prompt-hub`，提供：
 ## 开发验证
 
 ```bash
-cd /Users/soda/Documents/Codex/soda-person/projects/prompt-hub
-/opt/homebrew/bin/uv run ruff check .
-/opt/homebrew/bin/uv run ty check src/
-/opt/homebrew/bin/uv run pytest
+cd "$HOME/Documents/Codex/soda-person/projects/prompt-hub"
+uv run ruff format --check .
+uv run ruff check .
+uv run ty check src/
+uv run pytest
 ```

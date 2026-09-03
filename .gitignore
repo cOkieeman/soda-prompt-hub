@@ -43,6 +43,16 @@ credentials*.json
 *.db
 *.db-*
 *.zip
+*.rar
+*.7z
+
+# Model weights and inference artifacts
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.gguf
 
 # Local Prompt Hub data and model assets
 prompt-library/
@@ -52,3 +62,9 @@ exports/
 test-results/
 thumbnails/
 sources/
+
+# Windows worker local configuration and runtime state
+worker-config.json
+deploy/windows-worker/diagnostics/
+deploy/windows-worker/output/
+deploy/windows-worker/worker-status.json

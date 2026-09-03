@@ -1,4 +1,9 @@
+from prompt_hub.comfy_web import COMFY_HTML, COMFY_SCRIPT, COMFY_STYLES
 from prompt_hub.creative_web import CREATIVE_HTML, CREATIVE_SCRIPT, CREATIVE_STYLES
+from prompt_hub.lora_web import LORA_HTML, LORA_SCRIPT, LORA_STYLES
+from prompt_hub.remote_web import REMOTE_HTML, REMOTE_SCRIPT, REMOTE_STYLES
+from prompt_hub.search_web import SEARCH_HTML, SEARCH_SCRIPT, SEARCH_STYLES
+from prompt_hub.workspace_web import WORKSPACE_HTML, WORKSPACE_SCRIPT, WORKSPACE_STYLES
 
 INDEX_HTML = r"""<!doctype html>
 <html lang="zh-CN">
@@ -82,6 +87,7 @@ INDEX_HTML = r"""<!doctype html>
     }
     .app-nav-button:hover { color: var(--ink); background: #e2dccd; }
     .app-nav-button[aria-current="page"] { background: var(--signal); color: #fff8eb; }
+    .tag-language-button { color: var(--ink); background: var(--acid); }
     .home-page {
       display: grid;
       grid-template-columns: minmax(0, 1.35fr) minmax(310px, .65fr);
@@ -152,6 +158,15 @@ INDEX_HTML = r"""<!doctype html>
     .management-sources { padding: 28px; background: var(--paper); box-shadow: var(--shadow); }
     .management-sources .source-list { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; padding-top: 0; border-top: 0; }
     .management-sources .source-row { padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .sync-actions { display: grid; gap: 9px; width: min(100%, 300px); }
+    .source-sync-message { min-height: 38px; margin: 18px 0 0; border-left: 4px solid var(--acid); background: #e6dfd0; padding: 10px 12px; font: 800 9px/1.5 monospace; }
+    .source-sync-list { display: grid; gap: 0; margin-top: 18px; border-top: 1px solid var(--line); }
+    .source-sync-row { display: grid; grid-template-columns: minmax(150px, 1fr) auto minmax(180px, .8fr); gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 11px; }
+    .source-sync-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .source-sync-row code { color: var(--muted); font-size: 9px; }
+    .source-sync-state { padding: 5px 7px; background: var(--paper-deep); color: var(--ink); font: 900 8px monospace; }
+    .source-sync-state.ready { background: var(--acid); }
+    .source-sync-state.dirty, .source-sync-state.failed { background: var(--signal); color: white; }
     .archive-notice { margin: 0 0 18px; padding: 14px 16px; background: #ded7c7; border-left: 4px solid var(--signal); color: #55564f; font-size: 12px; line-height: 1.6; }
     .archive-notice strong { color: var(--ink); }
     header {
@@ -554,6 +569,8 @@ INDEX_HTML = r"""<!doctype html>
       .home-footnote { display: block; }
       .home-footnote p + p { margin-top: 8px; }
       .management-sources .source-list { grid-template-columns: 1fr; }
+      .source-sync-row { grid-template-columns: 1fr auto; }
+      .source-sync-row code { grid-column: 1 / -1; }
       .masthead { padding: 26px 22px 80px; }
       .stats-panel, aside, main { padding: 22px; }
       .results { grid-template-columns: 1fr; }
@@ -569,8 +586,14 @@ INDEX_HTML = r"""<!doctype html>
       <div class="app-nav-items">
         <button class="app-nav-button" data-view="creative">创作台</button>
         <button class="app-nav-button" data-view="prompts">提示词库</button>
+        <button class="app-nav-button" data-view="discover">智能检索</button>
         <button class="app-nav-button" data-view="characters">角色库</button>
+        <button class="app-nav-button" data-view="datasets">数据集</button>
+        <button class="app-nav-button" data-view="lora">LoRA 项目</button>
+        <button class="app-nav-button" data-view="comfy">结果回流</button>
         <button class="app-nav-button" data-view="management">资料管理</button>
+        <button class="app-nav-button" data-view="remote">设备连接</button>
+        <button class="app-nav-button tag-language-button" id="tagLanguageToggle" type="button">标签：中英</button>
       </div>
     </nav>
 
@@ -583,6 +606,8 @@ INDEX_HTML = r"""<!doctype html>
           <button class="home-primary" data-start="creative">新建或继续绘图项目 →</button>
           <button class="home-secondary" data-start="prompts">浏览提示词与视觉参考</button>
           <button class="home-secondary" data-start="characters">从 OC 角色开始</button>
+          <button class="home-secondary" data-start="lora">整理 LoRA 数据集</button>
+          <button class="home-secondary" data-start="comfy">导入 ComfyUI 结果</button>
         </div>
         <button class="home-example" id="exampleButton">试一个真实示例：维多利亚军装 × 黄昏图书馆 ↗</button>
         <div class="home-targets">
@@ -630,12 +655,14 @@ INDEX_HTML = r"""<!doctype html>
             </div>
             <div class="personal-summary">My shelf / <strong id="favoriteCount">0</strong> saved <span class="divider">·</span> OC / <strong id="ocCount">0</strong></div>
           </div>
-          <button class="sync-button" id="importButton">↻ REBUILD LOCAL INDEX</button>
+          <div class="sync-actions"><button class="sync-button" id="sourceSyncButton">↻ 更新公共提示词库</button><button class="sync-button" id="importButton">仅重建本地索引</button></div>
         </section>
       </header>
       <section class="management-sources">
         <p class="section-label">Indexed sources / 已索引来源</p>
         <div class="source-list" id="sourceList"></div>
+        <div class="source-sync-message" id="sourceSyncMessage">正在读取本地资料源状态…</div>
+        <div class="source-sync-list" id="sourceSyncList"></div>
       </section>
     </section>
 
@@ -680,6 +707,53 @@ INDEX_HTML = r"""<!doctype html>
     let currentMode = 'home';
     let currentResults = [];
     let currentCharacters = [];
+    let tagDisplayLanguage = 'zh';
+    const tagLabelCache = new Map();
+
+    function displayCanonicalTag(tag) {
+      const value = String(tag || '').trim();
+      const item = tagLabelCache.get(value.toLowerCase());
+      if (!item || tagDisplayLanguage === 'en') return value;
+      return item.zh ? `${item.zh} (${item.en})` : item.en;
+    }
+
+    async function ensureTagLabels(tags) {
+      const values = tags.map(value => String(value || '').trim()).filter(Boolean);
+      const canonicalPattern = /^[A-Za-z0-9][A-Za-z0-9_()'./:+\- ]*$/;
+      const missing = [...new Set(values)].filter(value => canonicalPattern.test(value) && !tagLabelCache.has(value.toLowerCase()));
+      if (!missing.length) return false;
+      let changed = false;
+      for (let index = 0; index < missing.length; index += 500) {
+        const response = await fetch('/api/tags/localize', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tags:missing.slice(index,index+500), language:'zh'})});
+        if (!response.ok) continue;
+        const payload = await response.json();
+        (payload.items || []).forEach(item => tagLabelCache.set(String(item.en).toLowerCase(), item));
+        changed = true;
+      }
+      return changed;
+    }
+
+    function tagValuesFromItem(item) {
+      return item.kind === 'tag' ? [item.title, ...String(item.content || '').split(',')] : [];
+    }
+
+    function tagCardTitle(item) { return item.kind === 'tag' ? displayCanonicalTag(item.title) : item.title; }
+    function tagCardContent(item) {
+      if (item.kind !== 'tag') return item.content;
+      return tagDisplayLanguage === 'zh' ? `标准英文输出：${item.content}` : item.content;
+    }
+
+    function setTagDisplayLanguage(language) {
+      tagDisplayLanguage = language === 'en' ? 'en' : 'zh';
+      $('#tagLanguageToggle').textContent = tagDisplayLanguage === 'zh' ? '标签：中英' : 'TAGS: EN';
+      window.dispatchEvent(new CustomEvent('tag-language-change', {detail:{language:tagDisplayLanguage}}));
+      if (currentMode === 'prompts') searchPrompts().catch(console.error);
+    }
+
+    window.displayCanonicalTag = displayCanonicalTag;
+    window.ensureTagLabels = ensureTagLabels;
+    window.getTagDisplayLanguage = () => tagDisplayLanguage;
+    window.toggleTagDisplayLanguage = () => setTagDisplayLanguage(tagDisplayLanguage === 'zh' ? 'en' : 'zh');
 
     function visualMarkup(item) {
       if (!item.visuals?.length) return '';
@@ -762,6 +836,16 @@ INDEX_HTML = r"""<!doctype html>
       $('#sourceList').innerHTML = '<p class="section-label">Sources</p>' + sources.map(s => `<div class="source-row"><span>${escapeHtml(s.name)}</span><span>${formatNumber(s.entry_count)}</span></div>`).join('');
     }
 
+    async function loadSourceSyncStatus() {
+      const labels = {ready:'可以安全更新',dirty:'有本地改动',no_upstream:'没有上游',missing:'本地缺失',not_git:'不是 Git 仓库',failed:'检查失败'};
+      const response = await fetch('/api/sources/sync-status');
+      const sources = response.ok ? await response.json() : [];
+      $('#sourceSyncList').innerHTML = sources.map(item => `<div class="source-sync-row"><strong>${escapeHtml(item.name)}</strong><span class="source-sync-state ${escapeHtml(item.status)}">${escapeHtml(labels[item.status] || item.status)}</span><code>${escapeHtml(item.branch || '—')} · ${escapeHtml((item.before || '').slice(0, 10) || 'no commit')}</code></div>`).join('');
+      const dirty = sources.filter(item => item.status === 'dirty').length;
+      const ready = sources.filter(item => item.status === 'ready').length;
+      $('#sourceSyncMessage').textContent = dirty ? `${dirty} 个资料源有本地改动，会自动跳过；其余 ${ready} 个可以安全更新。` : `${ready} 个资料源可以安全检查更新；只允许 fast-forward，不会覆盖本地修改。`;
+    }
+
     async function loadOcWorlds() {
       const selectedWorld = $('#ocWorld').value;
       const worlds = await fetch('/api/oc-manager/worlds').then(r => r.json());
@@ -775,6 +859,7 @@ INDEX_HTML = r"""<!doctype html>
       const params = new URLSearchParams({query: $('#query').value, kind: $('#kind').value, safety: $('#safety').value, source_id: $('#source').value, favorites_only: $('#favoritesOnly').getAttribute('aria-pressed'), limit: '30'});
       const data = await fetch('/api/search?' + params).then(r => r.json());
       currentResults = data.results;
+      await ensureTagLabels(data.results.flatMap(tagValuesFromItem));
       $('#status').textContent = `${data.count} MATCHES`;
       if (!data.results.length) {
         $('#results').innerHTML = '<div class="empty"><strong>No matching cards</strong><span>换一个词，或放宽类型与安全等级筛选。</span></div>';
@@ -788,8 +873,8 @@ INDEX_HTML = r"""<!doctype html>
             <span class="badge">${escapeHtml(item.safety)}</span>
             ${item.model_family ? `<span class="badge soft">${escapeHtml(item.model_family)}</span>` : ''}
           </div>
-          <h3>${escapeHtml(item.title)}</h3>
-          <p class="content">${escapeHtml(item.content)}</p>
+          <h3>${escapeHtml(tagCardTitle(item))}</h3>
+          <p class="content">${escapeHtml(tagCardContent(item))}</p>
           <div class="archive-add-tools"><select data-creative-slot aria-label="选择创作槽位"><option value="character">角色</option><option value="outfit">服装</option><option value="action">动作</option><option value="composition">构图</option><option value="scene">场景</option><option value="lighting">灯光</option><option value="style" ${item.kind === 'style' ? 'selected' : ''}>画风</option></select><button class="archive-add-button" data-creative-add>加入创作</button></div>
           ${personalMarkup(item)}
           <footer><span>${escapeHtml(item.source_name)} · ${escapeHtml(item.category || 'uncategorized')}</span>${item.source_url ? `<a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">SOURCE ↗</a>` : ''}</footer>
@@ -835,6 +920,11 @@ INDEX_HTML = r"""<!doctype html>
       const archiveMode = view === 'prompts' || view === 'characters';
       $('#homePage').hidden = view !== 'home';
       $('#creativePage').hidden = view !== 'creative';
+      $('#discoveryPage').hidden = view !== 'discover';
+      $('#workspacePage').hidden = view !== 'datasets';
+      $('#loraPage').hidden = view !== 'lora';
+      $('#comfyPage').hidden = view !== 'comfy';
+      $('#remotePage').hidden = view !== 'remote';
       $('#managementPage').hidden = view !== 'management';
       $('#archiveWorkspace').hidden = !archiveMode;
       document.querySelectorAll('[data-view]').forEach(button => {
@@ -848,11 +938,30 @@ INDEX_HTML = r"""<!doctype html>
       } else if (view === 'creative' && window.ensureCreativeProject) {
         currentMode = view;
         await window.ensureCreativeProject();
+      } else if (view === 'discover' && window.ensureHybridSearch) {
+        currentMode = view;
+        await window.ensureHybridSearch();
+      } else if (view === 'datasets' && window.ensureDatasetWorkspace) {
+        currentMode = view;
+        await window.ensureDatasetWorkspace();
+      } else if (view === 'lora' && window.ensureLoraProject) {
+        currentMode = view;
+        await window.ensureLoraProject();
+      } else if (view === 'comfy' && window.ensureComfyResults) {
+        currentMode = view;
+        await window.ensureComfyResults();
+      } else if (view === 'remote' && window.ensureRemoteDevices) {
+        currentMode = view;
+        await window.ensureRemoteDevices();
+      } else if (view === 'management') {
+        currentMode = view;
+        await loadSourceSyncStatus();
       } else {
         currentMode = view;
       }
       window.scrollTo({top: 0, behavior: 'smooth'});
     }
+    window.setPromptHubView = setView;
 
     async function openExample() {
       await setView('prompts');
@@ -906,7 +1015,33 @@ INDEX_HTML = r"""<!doctype html>
         $('#status').textContent = `INDEXED ${formatNumber(result.stats.entries)}`;
       } finally {
         button.disabled = false;
-        button.textContent = '↻ REBUILD LOCAL INDEX';
+        button.textContent = '仅重建本地索引';
+      }
+    }
+
+    async function syncPublicSources() {
+      const button = $('#sourceSyncButton');
+      button.disabled = true;
+      button.textContent = '正在检查资料源…';
+      try {
+        const response = await fetch('/api/sources/sync', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"source_ids":[]}'});
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || `启动更新失败：${response.status}`);
+        let job = payload.job;
+        while (['queued','running'].includes(job.status)) {
+          $('#sourceSyncMessage').textContent = job.progress_message || '等待资料更新任务…';
+          await new Promise(resolve => setTimeout(resolve, 500));
+          job = await fetch(`/api/jobs/${encodeURIComponent(job.job_id)}`).then(result => result.json());
+        }
+        if (job.status !== 'completed') throw new Error(job.error || `资料更新${job.status}`);
+        const result = job.result || {};
+        $('#sourceSyncMessage').textContent = `更新完成：${result.updated || 0} 个有新版本，${result.unchanged || 0} 个已是最新，${result.skipped || 0} 个已安全跳过。`;
+        await Promise.all([loadStats(), loadSourceSyncStatus()]);
+      } catch (error) {
+        $('#sourceSyncMessage').textContent = error.message;
+      } finally {
+        button.disabled = false;
+        button.textContent = '↻ 更新公共提示词库';
       }
     }
 
@@ -983,16 +1118,26 @@ INDEX_HTML = r"""<!doctype html>
       try { await saveMark(item); } catch (error) { $('#status').textContent = 'SAVE ERROR'; console.error(error); await searchPrompts(); }
     });
     $('#importButton').addEventListener('click', rebuild);
+    $('#sourceSyncButton').addEventListener('click', syncPublicSources);
+    $('#tagLanguageToggle').addEventListener('click', window.toggleTagDisplayLanguage);
     Promise.all([loadStats(), loadOcWorlds(), searchPrompts()]).catch(error => { $('#status').textContent = 'ERROR'; console.error(error); });
   </script>
 </body>
 </html>
 """
 
-INDEX_HTML = INDEX_HTML.replace("</head>", f"{CREATIVE_STYLES}</head>", 1)
 INDEX_HTML = INDEX_HTML.replace(
-    '<section class="management-page" id="managementPage" hidden>',
-    f'{CREATIVE_HTML}<section class="management-page" id="managementPage" hidden>',
+    "</head>",
+    f"{CREATIVE_STYLES}{WORKSPACE_STYLES}{LORA_STYLES}{COMFY_STYLES}{SEARCH_STYLES}{REMOTE_STYLES}</head>",
     1,
 )
-INDEX_HTML = INDEX_HTML.replace("</body>", f"{CREATIVE_SCRIPT}</body>", 1)
+INDEX_HTML = INDEX_HTML.replace(
+    '<section class="management-page" id="managementPage" hidden>',
+    f'{CREATIVE_HTML}{SEARCH_HTML}{WORKSPACE_HTML}{LORA_HTML}{COMFY_HTML}{REMOTE_HTML}<section class="management-page" id="managementPage" hidden>',
+    1,
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>",
+    f"{CREATIVE_SCRIPT}{SEARCH_SCRIPT}{WORKSPACE_SCRIPT}{LORA_SCRIPT}{COMFY_SCRIPT}{REMOTE_SCRIPT}</body>",
+    1,
+)

@@ -1,0 +1,16 @@
+{
+  "bridge_root": "D:\\PromptHub-Bridge\\prompt-hub",
+  "comfyui_url": "http://127.0.0.1:8188",
+  "worker_id": "compute-5060ti-worker",
+  "role": "compute_5060ti",
+  "poll_interval_seconds": 2,
+  "history_poll_seconds": 1,
+  "task_timeout_seconds": 1800,
+  "http_timeout_seconds": 30,
+  "lora_roots": [
+    {
+      "root_id": "comfyui-main",
+      "path": "D:\\ComfyUI\\models\\loras"
+    }
+  ]
+}

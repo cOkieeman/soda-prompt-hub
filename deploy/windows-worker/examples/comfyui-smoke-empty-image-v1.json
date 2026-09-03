@@ -1,0 +1,31 @@
+{
+  "format": "soda-comfyui-package-v1",
+  "workflow_id": "comfyui-smoke-empty-image-v1",
+  "api_prompt": {
+    "1": {
+      "class_type": "EmptyImage",
+      "inputs": {
+        "width": 128,
+        "height": 128,
+        "batch_size": 1,
+        "color": 3368703
+      },
+      "_meta": {
+        "title": "Prompt Hub smoke image"
+      }
+    },
+    "2": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "1",
+          0
+        ],
+        "filename_prefix": "PromptHub/smoke-empty-image"
+      },
+      "_meta": {
+        "title": "Save Prompt Hub smoke image"
+      }
+    }
+  }
+}

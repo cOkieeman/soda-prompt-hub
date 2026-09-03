@@ -3,12 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
+from pathlib import Path
 
 import uvicorn
 
 from prompt_hub.config import Settings
 from prompt_hub.database import PromptDatabase
 from prompt_hub.importers import import_all
+from prompt_hub.maintenance import BackupManager, MaintenanceError, doctor, verify_backup
 from prompt_hub.mcp_server import main as run_mcp
 from prompt_hub.wd14 import WD14Error, tag_image
 
@@ -20,6 +22,15 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("import", help="Rebuild indexes from local source repositories")
     subparsers.add_parser("stats", help="Show database and source counts")
     subparsers.add_parser("sources", help="List indexed sources")
+    backup = subparsers.add_parser("backup", help="Create a verified personal-data backup")
+    backup.add_argument("--destination", default="")
+    verify = subparsers.add_parser("verify-backup", help="Verify a Prompt Hub backup")
+    verify.add_argument("backup_path")
+    restore = subparsers.add_parser("restore", help="Restore a backup into a new directory")
+    restore.add_argument("backup_path")
+    restore.add_argument("--destination", required=True)
+    diagnostics = subparsers.add_parser("doctor", help="Run local health diagnostics")
+    diagnostics.add_argument("--url", default="http://127.0.0.1:8765")
 
     search = subparsers.add_parser("search", help="Search the local library")
     search.add_argument("query", nargs="?", default="")
@@ -61,6 +72,29 @@ def main(argv: Sequence[str] | None = None) -> None:
     elif args.command == "sources":
         database.initialize()
         _print_json(database.list_sources())
+    elif args.command == "backup":
+        try:
+            destination = Path(args.destination) if args.destination else None
+            _print_json(BackupManager(settings).create(destination))
+        except MaintenanceError as error:
+            raise SystemExit(str(error)) from error
+    elif args.command == "verify-backup":
+        try:
+            _print_json(verify_backup(Path(args.backup_path)))
+        except MaintenanceError as error:
+            raise SystemExit(str(error)) from error
+    elif args.command == "restore":
+        try:
+            _print_json(
+                BackupManager(settings).restore_to_new_directory(
+                    Path(args.backup_path),
+                    Path(args.destination),
+                )
+            )
+        except MaintenanceError as error:
+            raise SystemExit(str(error)) from error
+    elif args.command == "doctor":
+        _print_json(doctor(settings, service_url=args.url))
     elif args.command == "search":
         database.initialize()
         _print_json(

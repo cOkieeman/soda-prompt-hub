@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from prompt_hub.tag_locale import TagLocaleError, resolve_canonical_tag
+
 MAX_BATCH_TAG_ASSETS = 24
 
 
@@ -63,7 +65,10 @@ def normalize_tag_draft(value: str) -> str:
     tags: list[str] = []
     seen: set[str] = set()
     for raw_tag in value.replace("\n", ",").split(","):
-        tag = raw_tag.strip()
+        try:
+            tag = resolve_canonical_tag(raw_tag)
+        except TagLocaleError as error:
+            raise DatasetTaggingError(str(error)) from error
         normalized = tag.casefold()
         if not tag or normalized in seen:
             continue

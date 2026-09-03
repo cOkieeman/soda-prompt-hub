@@ -239,6 +239,83 @@ def analyze_result_image(
     }
 
 
+def draft_krea2_caption(
+    *,
+    image_path: Path,
+    model: str,
+    existing_caption: str = "",
+    base_url: str = DEFAULT_LM_STUDIO_URL,
+) -> dict[str, Any]:
+    instruction = (
+        "You write concise English natural-language training captions for Krea 2 image datasets. "
+        "Return one JSON object only, with keys caption, observations, and safety_warning. "
+        "caption must be one fluent English paragraph describing only visible subject identity "
+        "cues, "
+        "appearance, outfit, pose, composition, setting, lighting, materials, and visual style. "
+        "observations must be an object with short English values for subject, appearance, outfit, "
+        "pose, composition, setting, lighting, and style. Do not output Booru tag lists. "
+        "Legal adult SFW or NSFW images may be described objectively without moral commentary. "
+        "If explicit sexual content may depict a minor, do not describe explicit details; set a "
+        "clear safety_warning and keep the caption non-explicit. Do not infer invisible anatomy or "
+        "identity. "
+        "Use ASCII English only and do not reveal reasoning."
+    )
+    context = (
+        f"Existing reviewed caption for reference only: {existing_caption[:1200]}"
+        if existing_caption.strip()
+        else "There is no existing reviewed caption."
+    )
+    payload = {
+        "model": model,
+        "system_prompt": instruction,
+        "input": [
+            {"type": "image", "data_url": _image_data_url(image_path)},
+            {
+                "type": "text",
+                "content": f"Draft a Krea 2 caption for this local dataset image. {context}",
+            },
+        ],
+        "temperature": 0.15,
+        "max_output_tokens": 650,
+        "reasoning": "off",
+        "stream": False,
+        "store": False,
+    }
+    server_root = base_url.rstrip("/").removesuffix("/v1")
+    response = _request_json(
+        f"{server_root}/api/v1/chat",
+        method="POST",
+        payload=payload,
+        timeout=180,
+    )
+    try:
+        content = "\n".join(
+            str(item.get("content", ""))
+            for item in response["output"]
+            if isinstance(item, dict) and item.get("type") == "message"
+        )
+        raw = _extract_json_object(content)
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        raise LocalModelError("本地视觉模型没有返回可识别的 Krea 2 草稿 JSON") from error
+    caption = " ".join(str(raw.get("caption", "")).split())
+    if not caption:
+        raise LocalModelError("本地视觉模型返回了空的 Krea 2 草稿")
+    if not caption.isascii():
+        raise LocalModelError("Krea 2 草稿必须使用英文 ASCII 文本")
+    raw_observations = raw.get("observations", {})
+    observations = raw_observations if isinstance(raw_observations, dict) else {}
+    return {
+        "model": model,
+        "draft": caption[:12000],
+        "observations": {
+            str(key)[:80]: " ".join(str(value).split())[:1000]
+            for key, value in observations.items()
+            if str(key).strip() and str(value).strip()
+        },
+        "safety_warning": " ".join(str(raw.get("safety_warning", "")).split())[:2000],
+    }
+
+
 def _request_json(
     url: str,
     *,

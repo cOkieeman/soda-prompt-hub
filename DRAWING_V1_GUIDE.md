@@ -2,7 +2,7 @@
 
 ## 最短流程
 
-1. 双击 `/Users/soda/Documents/Codex/soda-person/启动-Prompt-Hub.command`。
+1. 双击 `$HOME/Documents/Codex/soda-person/启动-Prompt-Hub.command`。
 2. 首页点“新建或继续绘图项目”。
 3. 先用中文写一句创作想法，不希望被检索或改动的槽位点成 `LOCKED`。
 4. 点“从本地库智能取材”，先看即时出现的真实资料候选；看到合适的图片或文字再点“加入槽位”。
@@ -84,14 +84,14 @@
 5. 在图库下方选择 `Anima tags` 或 `Krea 2 自然语言`。选择只决定这次导出的 caption 格式，不改变项目的出图 Profile。
 6. 默认 caption 使用当前项目对应 Profile 的 Positive prompt。某张图需要单独修正时，也可展开普通 caption 编辑区保存；两个 Profile 的单图覆盖分开保存。
 7. 点“导出精选数据集 ZIP”。包内 `dataset` 文件夹包含原图和同名 `.txt`，可直接复制到 Windows 继续筛选或训练；`manifest.json` 记录项目版本、分级、图片来源和 caption 来源。
-8. 导出文件同时保存在 `/Users/soda/Documents/Codex/soda-person/prompt-library/exports/datasets`。移出精选不会删除原图，导出也不会重新编码图片。
+8. 导出文件同时保存在 `$HOME/Documents/Codex/soda-person/prompt-library/exports/datasets`。移出精选不会删除原图，导出也不会重新编码图片。
 
 当前版本仍不做自动挑图或 SSH 传输：WD14 只生成可审核草稿，入选图片和最终 caption 仍由你确认，完成后再手动把 ZIP 复制到 9800X3D 训练机。
 
 ## 数据位置与备份
 
-- 主数据库：`/Users/soda/Documents/Codex/soda-person/prompt-library/database/prompt-library.sqlite`
-- V1 迁移前备份：`/Users/soda/Documents/Codex/soda-person/prompt-library/database/backups/prompt-library-pre-creative-v1-20260830.sqlite`
+- 主数据库：`$HOME/Documents/Codex/soda-person/prompt-library/database/prompt-library.sqlite`
+- V1 迁移前备份：`$HOME/Documents/Codex/soda-person/prompt-library/database/backups/prompt-library-pre-creative-v1-20260830.sqlite`
 - 公共资料重建不会删除创作项目、配方、收藏、评分或备注。
-- 结果图原图与缩略图：`/Users/soda/Documents/Codex/soda-person/prompt-library/test-results/prompt-hub`
-- 精选数据集 ZIP：`/Users/soda/Documents/Codex/soda-person/prompt-library/exports/datasets`
+- 结果图原图与缩略图：`$HOME/Documents/Codex/soda-person/prompt-library/test-results/prompt-hub`
+- 精选数据集 ZIP：`$HOME/Documents/Codex/soda-person/prompt-library/exports/datasets`

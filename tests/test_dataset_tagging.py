@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from io import BytesIO
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
 from prompt_hub.api import create_app
-from prompt_hub.dataset_tagging import normalize_tag_draft, review_wd14_draft, store_wd14_result
+from prompt_hub.dataset_tagging import (
+    DatasetTaggingError,
+    normalize_tag_draft,
+    review_wd14_draft,
+    store_wd14_result,
+)
 from prompt_hub.wd14 import WD14Error
 
 
@@ -171,3 +177,6 @@ def test_tag_normalization() -> None:
     assert normalize_tag_draft(" 1girl, solo, SOLO, blue_eyes\nfull_body ") == (
         "1girl, solo, blue_eyes, full_body"
     )
+    assert normalize_tag_draft("银发, 单人") == "silver_hair, solo"
+    with pytest.raises(DatasetTaggingError, match="无法确认中文标签"):
+        normalize_tag_draft("自创中文标签")

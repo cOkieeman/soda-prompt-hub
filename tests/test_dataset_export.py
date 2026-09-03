@@ -116,7 +116,9 @@ def test_krea_profile_fallback_and_export_path_safety(settings) -> None:
             caption_name = next(name for name in archive.namelist() if name.endswith(".txt"))
             caption = archive.read(caption_name).decode()
             manifest = json.loads(archive.read("manifest.json"))
-        assert "创作意图" in caption
+        assert "Character: 1woman, adult, silver hair" in caption
+        assert "创作意图" not in caption
+        assert caption.isascii()
         assert manifest["profile"]["profile_id"] == "krea2"
         assert manifest["items"][0]["caption_source"] == "profile"
 
@@ -142,3 +144,23 @@ def test_krea_profile_fallback_and_export_path_safety(settings) -> None:
 
     assert resolve_dataset_export(settings, "../outside.zip") is None
     assert resolve_dataset_export(settings, "not-a-zip.txt") is None
+
+
+def test_dataset_export_rejects_non_english_final_caption(settings) -> None:
+    with TestClient(create_app(settings)) as client:
+        project = client.post("/api/creative/projects", json=_project()).json()
+        asset = _upload(client, project["project_id"], "mixed.png", "purple")
+        client.put(
+            f"/api/creative/projects/{project['project_id']}/results/{asset['asset_id']}/dataset",
+            json={
+                "selected": True,
+                "profile_id": "krea2",
+                "caption_override": "银发调查员 in a library",
+            },
+        )
+        response = client.post(
+            f"/api/creative/projects/{project['project_id']}/dataset-export",
+            json={"profile_id": "krea2"},
+        )
+        assert response.status_code == 422
+        assert "最终 caption 必须是英文" in response.json()["detail"]
