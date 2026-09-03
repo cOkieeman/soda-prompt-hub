@@ -260,10 +260,10 @@
 - [x] 整理 `.gitignore`、README 与仓库交付文档，只保留可复现代码和安全模板
 - [x] 对待提交集合执行密钥形状、个人数据和大文件安全门
 - [x] 重新执行 pytest、coverage、Ruff、ty 与 diff 检查
-- [ ] 创建本地发布 commit
-- [ ] 在已连接 GitHub 账号创建 private 仓库并推送 `main`
-- [ ] 从远端复核默认分支、可见性与 commit SHA
-- **状态：** in_progress
+- [x] 创建本地发布 commit
+- [x] 在已连接 GitHub 账号创建 private 仓库并推送 `main`
+- [x] 从远端复核默认分支、可见性与 commit SHA
+- **状态：** complete
 
 ### 延后阶段：MiniMax H3 视频
 - [ ] 绘图 V1 完成后重新确认范围

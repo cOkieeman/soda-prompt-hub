@@ -872,3 +872,5 @@
 - staged 复核确认 78 个文件、无超过 1 MiB blob、无私钥或 Token 形状；`git diff --cached --check` 发现 `FINAL_TEST_REPORT.md` 一处 Markdown 行尾空格，已移除并要求重新执行完整工程门。
 - 修正行尾后最终工程门再次通过：98/98 pytest、80.45% coverage、89 文件 Ruff format、Ruff lint、ty、锁文件、staged diff、密钥形状与大 blob 检查全部通过。
 - 已创建本地发布 commit，并成功创建 private GitHub 仓库 `cOkieeman/soda-prompt-hub`；首次 HTTPS push 在 TLS 握手阶段遇到 `SSL_ERROR_SYSCALL`，不是认证或代码失败，保留本地 commit 后检查连接并重试。
+- `gh auth setup-git` 后重试 push 成功；远端确认为 private、默认分支为 `main`，首次发布远端 SHA 与本地 `9871e7ae4e7476a32fa38fa86d41e55f383c6b84` 一致。
+- 阶段 28 已完成；本条完成记录将作为独立文档 commit 推送，最终再以新 SHA 复核远端。
