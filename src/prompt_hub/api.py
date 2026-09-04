@@ -38,10 +38,12 @@ from prompt_hub.local_model import (
     list_local_models,
     organize_slots,
 )
+from prompt_hub.local_visual import LocalVisualEncoder, LocalVisualIndexService
 from prompt_hub.lora_projects import LoraProjectStore
 from prompt_hub.lora_routes import create_lora_router
 from prompt_hub.media import resolve_media_path
 from prompt_hub.oc_manager import archive_import, parse_oc_manager_json
+from prompt_hub.project_journey import ProjectJourneyServices, create_project_journey_router
 from prompt_hub.remote_nodes import RemoteNodeStore
 from prompt_hub.remote_routes import create_remote_router
 from prompt_hub.result_assets import find_result_asset
@@ -51,7 +53,10 @@ from prompt_hub.source_routes import create_source_router
 from prompt_hub.source_sync import SourceSyncService
 from prompt_hub.sourcing import allowed_safety_levels, source_candidates
 from prompt_hub.tag_locale import TagLocaleError, localize_tags, tag_catalog
+from prompt_hub.visual_assets import VisualAssetCatalog
+from prompt_hub.visual_routes import create_visual_router
 from prompt_hub.web import INDEX_HTML
+from prompt_hub.web_capture import WebCaptureService
 from prompt_hub.workflow_profiles import WorkflowProfileStore
 from prompt_hub.workflow_routes import create_workflow_router
 from prompt_hub.workspace_routes import create_workspace_router
@@ -158,9 +163,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     comfy_store = ComfyResultStore(active_settings.comfy_results_root)
     embedding_store = EmbeddingIndexStore(active_settings.embedding_index_root)
     source_sync = SourceSyncService(active_settings, database)
+    web_capture = WebCaptureService(active_settings, database)
     remote_store = RemoteNodeStore(active_settings.remote_nodes_root)
     workflow_store = WorkflowProfileStore(active_settings.workflow_profiles_root)
     hybrid_search = HybridSearchService(database, embedding_store, remote_store)
+    visual_catalog = VisualAssetCatalog(
+        active_settings,
+        database,
+        workspace_store,
+        creative_store,
+        comfy_store,
+        remote_store,
+        web_capture,
+    )
+    visual_encoder = LocalVisualEncoder(
+        active_settings.models_root / "clip" / "clip-vit-base-patch32"
+    )
+    local_visual = LocalVisualIndexService(embedding_store, visual_catalog, visual_encoder)
     job_runner = BackgroundJobRunner(
         job_store,
         {
@@ -168,6 +187,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "dataset_wd14": curation_store.tag_job,
             "dataset_krea2_vlm": curation_store.krea2_vlm_job,
             "source_sync": source_sync.job,
+            "local_visual_index": local_visual.job,
         },
     )
 
@@ -198,7 +218,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.include_router(create_dataset_router(active_settings, creative_store))
     application.include_router(
-        create_workspace_router(workspace_store, curation_store, job_store, job_runner)
+        create_workspace_router(
+            workspace_store,
+            curation_store,
+            job_store,
+            job_runner,
+            remote_store,
+        )
     )
     application.include_router(
         create_lora_router(lora_store, workspace_store, curation_store, database)
@@ -207,7 +233,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(create_embedding_router(embedding_store, workspace_store))
     application.include_router(create_search_router(hybrid_search))
     application.include_router(create_remote_router(remote_store))
-    application.include_router(create_source_router(source_sync, job_runner))
+    application.include_router(create_source_router(source_sync, job_runner, web_capture))
+    application.include_router(create_visual_router(local_visual, embedding_store, job_runner))
     application.include_router(
         create_workflow_router(
             active_settings,
@@ -215,6 +242,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             creative_store,
             comfy_store,
             remote_store,
+        )
+    )
+    application.include_router(
+        create_project_journey_router(
+            ProjectJourneyServices(
+                settings=active_settings,
+                creative_store=creative_store,
+                workspace_store=workspace_store,
+                curation_store=curation_store,
+                job_store=job_store,
+                job_runner=job_runner,
+                remote_store=remote_store,
+            )
         )
     )
 

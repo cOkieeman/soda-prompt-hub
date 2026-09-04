@@ -43,10 +43,10 @@ def review_wd14_draft(
     generation, asset = _asset_copy(project, asset_id)
     raw_tagging = asset.get("wd14_tagging")
     if not isinstance(raw_tagging, dict):
-        raise DatasetTaggingError("请先对这张图片运行 WD14 自动打标")
+        raise DatasetTaggingError("请先用 WD14 为这张图片生成标签")
     clean_draft = normalize_tag_draft(draft_tags)
     if confirm_anima and not clean_draft:
-        raise DatasetTaggingError("确认 Anima caption 前请至少保留一个标签")
+        raise DatasetTaggingError("确认 Anima 标签前请至少保留一个标签")
 
     tagging = dict(raw_tagging)
     tagging["draft_tags"] = clean_draft

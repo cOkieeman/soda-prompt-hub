@@ -242,12 +242,164 @@ def test_workspace_wd14_captions_bulk_snapshots_and_export(settings, tmp_path) -
         names = archive.namelist()
         assert "manifest.json" in names
         assert "audit.json" in names
+        assert "hashes.sha256" in names
         assert len([name for name in names if name.endswith(".png")]) == 3
         assert len([name for name in names if name.endswith(".txt")]) == 3
         manifest = json.loads(archive.read("manifest.json"))
+        hashes = archive.read("hashes.sha256").decode("utf-8")
     assert manifest["profile_id"] == "krea2"
     assert manifest["caption_language"] == "en"
+    assert "train/image-0.png" in hashes
+    assert "manifest.json" in hashes
+    assert exported["file_count"] == 9
+    assert exported["total_bytes"] > 0
+    assert exported["archive_bytes"] == archive_path.stat().st_size
+    assert (
+        curation.list_exports(workspace["workspace_id"])[0]["version_id"] == exported["version_id"]
+    )
+    second = curation.export_version(
+        workspace["workspace_id"],
+        profile_id="krea2",
+        paths=[f"image-{index}.png" for index in range(3)],
+    )
+    assert second["version_id"] != exported["version_id"]
+    export_directory = curation.resolve_export_directory(
+        workspace["workspace_id"], exported["version_id"]
+    )
+    assert export_directory is not None
+    assert export_directory.is_dir()
     assert {path.name: path.read_bytes() for path in source.iterdir()} == source_before
+
+
+def test_export_preflight_reports_blockers_and_requires_reviewed_caption(
+    settings,
+    tmp_path,
+) -> None:
+    _source_path, workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=2)
+    curation = DatasetCurationStore(settings, workspace_store)
+    workspace_id = workspace["workspace_id"]
+    curation.update_caption(
+        workspace_id,
+        "image-0.png",
+        profile_id="anima",
+        caption="1girl, solo, portrait",
+        status="reviewed",
+    )
+    curation.update_caption(
+        workspace_id,
+        "image-1.png",
+        profile_id="anima",
+        caption="1girl, solo, outdoors",
+        status="draft",
+    )
+    workspace_store.update_review_state(
+        workspace_id,
+        [
+            {
+                "relative_path": "image-0.png",
+                "status": "approved",
+                "selected": True,
+                "note": "",
+            },
+            {
+                "relative_path": "image-1.png",
+                "status": "pending",
+                "selected": True,
+                "note": "",
+            },
+        ],
+    )
+
+    preflight = curation.preflight_export(
+        workspace_id,
+        profile_id="anima",
+        paths=["image-0.png", "image-1.png"],
+    )
+    assert preflight["ready"] is False
+    assert preflight["selected_count"] == 2
+    assert {item["code"] for item in preflight["blockers"]} == {
+        "caption_not_reviewed",
+        "image_not_approved",
+    }
+    with pytest.raises(DatasetWorkspaceError, match="交付前检查未通过"):
+        curation.export_version(
+            workspace_id,
+            profile_id="anima",
+            paths=["image-0.png", "image-1.png"],
+        )
+
+    ready = curation.preflight_export(
+        workspace_id,
+        profile_id="anima",
+        paths=["image-0.png"],
+    )
+    assert ready["ready"] is True
+    assert ready["blockers"] == []
+
+    source_image = workspace_store.resolve_source_image(workspace_id, "image-0.png")
+    assert source_image is not None
+    Image.new("RGB", (64, 80), "orange").save(source_image)
+    changed = curation.preflight_export(
+        workspace_id,
+        profile_id="anima",
+        paths=["image-0.png"],
+    )
+    assert "source_changed" in {item["code"] for item in changed["blockers"]}
+
+
+def test_export_preflight_blocks_exact_duplicates_and_caption_name_collisions(
+    settings,
+    tmp_path,
+) -> None:
+    source = tmp_path / "collision-source"
+    source.mkdir()
+    Image.new("RGB", (64, 80), "navy").save(source / "same.png")
+    Image.new("RGB", (64, 80), "purple").save(source / "same.jpg")
+    (source / "duplicate.png").write_bytes((source / "same.png").read_bytes())
+    workspace_store = DatasetWorkspaceStore(settings)
+    workspace_store.initialize()
+    workspace = workspace_store.register(source, name="Collision test")
+    job_store = BackgroundJobStore(settings.database_path)
+    job_store.initialize()
+    job = job_store.enqueue("dataset_scan", {"workspace_id": workspace["workspace_id"]})
+    assert job_store.claim_next({"dataset_scan"}) is not None
+    workspace_store.scan(
+        workspace["workspace_id"],
+        JobContext(job_store, job["job_id"], Event()),
+    )
+    curation = DatasetCurationStore(settings, workspace_store)
+    paths = ["same.png", "same.jpg", "duplicate.png"]
+    for relative_path in paths:
+        curation.update_caption(
+            workspace["workspace_id"],
+            relative_path,
+            profile_id="anima",
+            caption="1girl, solo, portrait",
+            status="reviewed",
+        )
+    workspace_store.update_review_state(
+        workspace["workspace_id"],
+        [
+            {
+                "relative_path": relative_path,
+                "status": "approved",
+                "selected": True,
+                "note": "",
+            }
+            for relative_path in paths
+        ],
+    )
+
+    preflight = curation.preflight_export(
+        workspace["workspace_id"],
+        profile_id="anima",
+        paths=paths,
+    )
+    assert preflight["ready"] is False
+    assert {item["code"] for item in preflight["blockers"]} == {
+        "caption_path_conflict",
+        "exact_duplicate",
+    }
 
 
 def test_source_captions_preview_and_apply_as_one_snapshot(settings, tmp_path) -> None:

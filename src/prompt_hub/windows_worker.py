@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import sys
@@ -20,20 +21,42 @@ from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO, Self
 from uuid import uuid4
 
+WORKER_BUILD_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 COMPUTE_PROTOCOL_VERSION = "soda-compute-bridge-v2"
 TASK_FORMAT = "soda-compute-task-v1"
 RESULT_FORMAT = "soda-compute-result-v1"
 PACKAGE_FORMAT = "soda-comfyui-package-v1"
 TARGET_ROLE = "compute_5060ti"
-SAFE_TASK_TYPES = {"comfyui_generate", "lora_catalog_snapshot"}
+SAFE_TASK_TYPES = {"comfyui_generate", "lora_catalog_snapshot", "model_catalog_snapshot"}
 FINAL_DIRECTORIES = ("inbox", "completed", "failed")
 LORA_MODEL_SUFFIXES = {".safetensors", ".ckpt", ".pt", ".pth"}
+MODEL_ASSET_SUFFIXES = {
+    ".bin",
+    ".ckpt",
+    ".gguf",
+    ".onnx",
+    ".pt",
+    ".pth",
+    ".safetensors",
+}
+MODEL_ASSET_TYPES = {
+    "checkpoint",
+    "controlnet",
+    "diffusion_model",
+    "text_encoder",
+    "upscaler",
+    "vae",
+}
 LORA_PREVIEW_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp", ".gif")
-LORA_PREVIEW_SIDECAR_STEMS = ("civitai_bak",)
+LORA_PREVIEW_SIDECAR_STEMS = ("civitai_bak", "preview")
+MODEL_METADATA_SIDECARS = (".metadata.json", ".civitai.info", ".info.json", ".json")
+CIVITAI_HOSTS = {"civitai.com", "www.civitai.com", "civitai.red", "www.civitai.red"}
+CIVITAI_MODEL_PATH_RE = re.compile(r"^/models/(?P<model_id>[1-9]\d*)(?:/[^/?#]+)?/?$")
 MAX_LORA_METADATA_BYTES = 2 * 1024 * 1024
 MAX_LORA_PREVIEW_BYTES = 32 * 1024 * 1024
 MAX_LORA_PREVIEW_COUNT = 1024
 MAX_LORA_PREVIEW_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+MAX_CIVITAI_URL_LENGTH = 2000
 
 
 class WorkerError(RuntimeError):
@@ -51,6 +74,14 @@ class LoraRootConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelRootConfig:
+    root_id: str
+    asset_type: str
+    path: Path
+    model_family: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class WorkerConfig:
     bridge_root: Path
     comfyui_url: str
@@ -61,6 +92,7 @@ class WorkerConfig:
     task_timeout_seconds: float = 900.0
     http_timeout_seconds: float = 30.0
     lora_roots: tuple[LoraRootConfig, ...] = ()
+    model_roots: tuple[ModelRootConfig, ...] = ()
 
     @classmethod
     def load(cls, path: Path) -> WorkerConfig:
@@ -87,6 +119,7 @@ class WorkerConfig:
         if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
             raise WorkerError("comfyui_url 必须指向本机 HTTP 地址")
         lora_roots = _parse_lora_roots(raw.get("lora_roots", []))
+        model_roots = _parse_model_roots(raw.get("model_roots", []))
         return cls(
             bridge_root=Path(root_value),
             comfyui_url=comfyui_url,
@@ -97,6 +130,7 @@ class WorkerConfig:
             task_timeout_seconds=_positive_float(raw, "task_timeout_seconds", 900.0),
             http_timeout_seconds=_positive_float(raw, "http_timeout_seconds", 30.0),
             lora_roots=lora_roots,
+            model_roots=model_roots,
         )
 
 
@@ -247,10 +281,12 @@ class WindowsWorker:
         probe.unlink()
         stats = self.client.system_stats()
         lora_roots = [_lora_root_status(root) for root in self.config.lora_roots]
+        model_roots = [_model_root_status(root) for root in self.config.model_roots]
         result = {
             "format": "soda-worker-status-v1",
             "status": "ready",
             "worker_id": self.config.worker_id,
+            "worker_build_sha256": WORKER_BUILD_SHA256,
             "hostname": socket.gethostname(),
             "python": sys.version.split()[0],
             "protocol_version": COMPUTE_PROTOCOL_VERSION,
@@ -259,6 +295,7 @@ class WindowsWorker:
             "comfyui_reachable": True,
             "capabilities": sorted(SAFE_TASK_TYPES),
             "lora_roots": lora_roots,
+            "model_roots": model_roots,
             "checked_at": _now(),
             "system_stats": stats,
         }
@@ -409,7 +446,67 @@ class WindowsWorker:
             return self._run_comfyui(task)
         if task["task_type"] == "lora_catalog_snapshot":
             return self._run_lora_catalog_snapshot(task)
+        if task["task_type"] == "model_catalog_snapshot":
+            return self._run_model_catalog_snapshot(task)
         raise WorkerError(f"当前 worker 不支持任务类型：{task['task_type']}")
+
+    def _run_model_catalog_snapshot(
+        self,
+        task: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        payload = task["payload"]
+        requested = payload.get("model_roots")
+        if not isinstance(requested, list) or not requested:
+            raise WorkerError("model_roots 必须是非空 root_id 列表")
+        configured = {root.root_id: root for root in self.config.model_roots}
+        roots = []
+        for value in requested:
+            root_id = str(value).strip()
+            if not _safe_identifier(root_id) or root_id not in configured:
+                raise WorkerError(f"模型根目录未在 Worker 配置中登记：{root_id}")
+            root = configured[root_id]
+            if not root.path.is_dir():
+                raise WorkerError(f"模型根目录不存在：{root_id}")
+            roots.append(root)
+
+        items = [item for root in roots for item in _scan_model_root(root)]
+        if not items:
+            raise WorkerError("配置的模型根目录中没有可用模型")
+        items.sort(
+            key=lambda item: (
+                str(item["asset_type"]),
+                str(item["relative_path"]).casefold(),
+                str(item["asset_id"]),
+            )
+        )
+        snapshot_id = _model_snapshot_id(items)
+        output_root = self.config.bridge_root / "inbox" / str(task["task_id"])
+        preview_outputs, preview_summary = _copy_model_previews(
+            items,
+            {root.root_id: root.path for root in roots},
+            self.config.bridge_root,
+            output_root,
+        )
+        catalog = {
+            "format": "soda-windows-model-catalog-v1",
+            "snapshot_id": snapshot_id,
+            "worker_id": self.config.worker_id,
+            "source_manager": str(payload.get("source_manager", "ComfyUI model folders"))[:200],
+            "created_at": _now(),
+            "items": items,
+        }
+        output_path = output_root / "model-catalog.json"
+        _write_json(output_path, catalog)
+        output = _output_record(self.config.bridge_root, output_path, "model_catalog")
+        return [output, *preview_outputs], {
+            "snapshot_id": snapshot_id,
+            "item_count": len(items),
+            **preview_summary,
+            "model_roots": [root.root_id for root in roots],
+            "type_counts": dict(Counter(str(item["asset_type"]) for item in items)),
+            "weights_read": False,
+            "weights_copied": False,
+        }
 
     def _run_lora_catalog_snapshot(
         self,
@@ -595,6 +692,7 @@ class WindowsWorker:
             "task_id": task["task_id"],
             "task_type": task["task_type"],
             "worker_id": self.config.worker_id,
+            "worker_build_sha256": WORKER_BUILD_SHA256,
             "status": status,
             "started_at": started_at,
             "finished_at": _now(),
@@ -629,6 +727,7 @@ class WindowsWorker:
             "task_id": safe_task_id,
             "task_type": task_type,
             "worker_id": self.config.worker_id,
+            "worker_build_sha256": WORKER_BUILD_SHA256,
             "status": status,
             "started_at": started_at,
             "finished_at": _now(),
@@ -667,6 +766,37 @@ def _parse_lora_roots(value: object) -> tuple[LoraRootConfig, ...]:
     return tuple(roots)
 
 
+def _parse_model_roots(value: object) -> tuple[ModelRootConfig, ...]:
+    if value in (None, []):
+        return ()
+    if not isinstance(value, list):
+        raise WorkerError("model_roots 配置必须是列表")
+    roots = []
+    seen = set()
+    for item in value:
+        if not isinstance(item, dict):
+            raise WorkerError("model_roots 配置条目必须是对象")
+        root_id = str(item.get("root_id", "")).strip()
+        asset_type = str(item.get("asset_type", "")).strip()
+        path = Path(str(item.get("path", "")).strip())
+        if not _safe_identifier(root_id) or root_id in seen:
+            raise WorkerError(f"模型 root_id 无效或重复：{root_id}")
+        if asset_type not in MODEL_ASSET_TYPES:
+            raise WorkerError(f"模型 asset_type 无效：{asset_type}")
+        if not path.is_absolute():
+            raise WorkerError(f"模型根目录必须是绝对路径：{root_id}")
+        roots.append(
+            ModelRootConfig(
+                root_id=root_id,
+                asset_type=asset_type,
+                path=path,
+                model_family=str(item.get("model_family", "")).strip()[:160],
+            )
+        )
+        seen.add(root_id)
+    return tuple(roots)
+
+
 def _lora_root_status(root: LoraRootConfig) -> dict[str, Any]:
     exists = root.path.is_dir()
     count = 0
@@ -683,6 +813,79 @@ def _lora_root_status(root: LoraRootConfig) -> dict[str, Any]:
     }
 
 
+def _model_root_status(root: ModelRootConfig) -> dict[str, Any]:
+    exists = root.path.is_dir()
+    count = 0
+    if exists:
+        count = sum(
+            path.is_file() and path.suffix.casefold() in MODEL_ASSET_SUFFIXES
+            for path in root.path.rglob("*")
+        )
+    return {
+        "root_id": root.root_id,
+        "asset_type": root.asset_type,
+        "model_family": root.model_family,
+        "path": str(root.path),
+        "exists": exists,
+        "model_count": count,
+    }
+
+
+def _scan_model_root(root: ModelRootConfig) -> list[dict[str, Any]]:
+    items = []
+    for path in root.path.rglob("*"):
+        if not path.is_file() or path.suffix.casefold() not in MODEL_ASSET_SUFFIXES:
+            continue
+        relative = path.relative_to(root.path).as_posix()
+        stat = path.stat()
+        metadata, metadata_path = _read_asset_metadata(path)
+        previews = _find_model_previews(root.path, path, metadata)
+        public_metadata = _public_lora_metadata(metadata)
+        public_metadata.update(
+            {
+                "suffix": path.suffix.casefold(),
+                "metadata_sidecar": bool(metadata_path),
+                "metadata_sidecar_name": metadata_path.name if metadata_path else "",
+            }
+        )
+        items.append(
+            {
+                "asset_id": _model_asset_id(root.root_id, root.asset_type, relative),
+                "asset_type": root.asset_type,
+                "root_id": root.root_id,
+                "name": path.stem,
+                "relative_path": relative,
+                "size_bytes": stat.st_size,
+                "modified_at": datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(),
+                "model_family": _model_family(relative, root.model_family),
+                "source_url": _civitai_source_url(metadata),
+                "preview_relative_path": previews[0] if previews else "",
+                "preview_relative_paths": previews,
+                "metadata": public_metadata,
+            }
+        )
+    return items
+
+
+def _model_asset_id(root_id: str, asset_type: str, relative_path: str) -> str:
+    raw = f"{asset_type}\0{root_id}\0{relative_path.casefold()}".encode()
+    return f"asset-{hashlib.sha256(raw).hexdigest()[:24]}"
+
+
+def _model_snapshot_id(items: list[dict[str, Any]]) -> str:
+    compact = [
+        {
+            "asset_id": item["asset_id"],
+            "size_bytes": item["size_bytes"],
+            "modified_at": item["modified_at"],
+        }
+        for item in items
+    ]
+    raw = json.dumps(compact, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return f"models-{stamp}-{hashlib.sha256(raw).hexdigest()[:12]}"
+
+
 def _scan_lora_root(
     root: LoraRootConfig,
     visible_names: set[str],
@@ -692,7 +895,7 @@ def _scan_lora_root(
         if not path.is_file() or path.suffix.casefold() not in LORA_MODEL_SUFFIXES:
             continue
         relative = path.relative_to(root.path).as_posix()
-        metadata = _read_lora_metadata(path.with_suffix(".metadata.json"))
+        metadata, metadata_path = _read_asset_metadata(path)
         civitai = metadata.get("civitai")
         civitai = civitai if isinstance(civitai, dict) else {}
         civitai_model = civitai.get("model")
@@ -721,7 +924,8 @@ def _scan_lora_root(
                 "root_id": root.root_id,
                 "modified_at": datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat(),
                 "comfyui_visible": relative.casefold() in visible_names,
-                "metadata_sidecar": path.with_suffix(".metadata.json").is_file(),
+                "metadata_sidecar": bool(metadata_path),
+                "metadata_sidecar_name": metadata_path.name if metadata_path else "",
             }
         )
         items.append(
@@ -733,6 +937,7 @@ def _scan_lora_root(
                 "size_bytes": path.stat().st_size,
                 "base_model": base_model,
                 "model_family": family,
+                "source_url": _civitai_source_url(metadata),
                 "trigger_words": trigger_words,
                 "tags": tags,
                 "preview_relative_path": previews[0] if previews else "",
@@ -756,7 +961,33 @@ def _read_lora_metadata(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {"metadata_error": "sidecar_not_object"}
 
 
+def _read_asset_metadata(model: Path) -> tuple[dict[str, Any], Path | None]:
+    candidates = [model.with_name(f"{model.stem}{suffix}") for suffix in MODEL_METADATA_SIDECARS]
+    first_error: tuple[dict[str, Any], Path] | None = None
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        metadata = _read_lora_metadata(candidate)
+        if "metadata_error" not in metadata:
+            return metadata, candidate
+        if first_error is None:
+            first_error = metadata, candidate
+    return first_error if first_error is not None else ({}, None)
+
+
 def _find_lora_previews(root: Path, model: Path, metadata: dict[str, Any]) -> list[str]:
+    return _find_asset_previews(root, model, metadata)
+
+
+def _find_model_previews(
+    root: Path,
+    model: Path,
+    metadata: dict[str, Any] | None = None,
+) -> list[str]:
+    return _find_asset_previews(root, model, metadata or {})
+
+
+def _find_asset_previews(root: Path, model: Path, metadata: dict[str, Any]) -> list[str]:
     discovered: list[Path] = []
     preview_value = _metadata_text(metadata, "preview_url", "previewUrl", "preview")
     if preview_value:
@@ -802,13 +1033,51 @@ def _copy_lora_previews(
     bridge_root: Path,
     output_root: Path,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    return _copy_asset_previews(
+        items,
+        roots,
+        bridge_root,
+        output_root,
+        id_field="lora_id",
+        target_directory="lora-previews",
+        output_kind="lora_preview",
+    )
+
+
+def _copy_model_previews(
+    items: list[dict[str, Any]],
+    roots: dict[str, Path],
+    bridge_root: Path,
+    output_root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    return _copy_asset_previews(
+        items,
+        roots,
+        bridge_root,
+        output_root,
+        id_field="asset_id",
+        target_directory="model-previews",
+        output_kind="model_preview",
+    )
+
+
+def _copy_asset_previews(
+    items: list[dict[str, Any]],
+    roots: dict[str, Path],
+    bridge_root: Path,
+    output_root: Path,
+    *,
+    id_field: str,
+    target_directory: str,
+    output_kind: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     outputs: list[dict[str, Any]] = []
     total_bytes = 0
     skipped = 0
     skipped_reasons: Counter[str] = Counter()
     for item in items:
         copied_sources = []
-        root_id = str(item.get("metadata", {}).get("root_id", ""))
+        root_id = str(item.get("root_id") or item.get("metadata", {}).get("root_id", ""))
         root = roots.get(root_id)
         if root is None:
             continue
@@ -855,8 +1124,8 @@ def _copy_lora_previews(
             index = len(copied_sources)
             target = (
                 output_root
-                / "lora-previews"
-                / str(item["lora_id"])
+                / target_directory
+                / str(item[id_field])
                 / f"{index:03d}{detected_suffix}"
             )
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -867,10 +1136,10 @@ def _copy_lora_previews(
             finally:
                 with suppress(OSError):
                     temporary.unlink()
-            record = _output_record(bridge_root, target, "lora_preview")
+            record = _output_record(bridge_root, target, output_kind)
             record.update(
                 {
-                    "lora_id": item["lora_id"],
+                    id_field: item[id_field],
                     "preview_index": index,
                     "source_relative_path": clean_relative,
                 }
@@ -945,6 +1214,96 @@ def _metadata_sha256(metadata: dict[str, Any]) -> str:
     return ""
 
 
+def _positive_metadata_id(value: object) -> int | None:
+    text = str(value).strip() if isinstance(value, (str, int, float)) else ""
+    if not text.isdigit():
+        return None
+    parsed = int(text)
+    return parsed if parsed > 0 else None
+
+
+def _civitai_ids(metadata: dict[str, Any]) -> tuple[int | None, int | None]:
+    civitai = metadata.get("civitai")
+    civitai = civitai if isinstance(civitai, dict) else {}
+    model_id = next(
+        (
+            value
+            for value in (
+                _positive_metadata_id(metadata.get("modelId")),
+                _positive_metadata_id(metadata.get("civitai_model_id")),
+                _positive_metadata_id(civitai.get("modelId")),
+                _positive_metadata_id(civitai.get("civitai_model_id")),
+            )
+            if value is not None
+        ),
+        None,
+    )
+    version_id = next(
+        (
+            value
+            for value in (
+                _positive_metadata_id(metadata.get("modelVersionId")),
+                _positive_metadata_id(metadata.get("civitai_version_id")),
+                _positive_metadata_id(civitai.get("modelVersionId")),
+                _positive_metadata_id(civitai.get("civitai_version_id")),
+                _positive_metadata_id(civitai.get("id")),
+                _positive_metadata_id(metadata.get("id")) if model_id else None,
+            )
+            if value is not None
+        ),
+        None,
+    )
+    return model_id, version_id
+
+
+def _normalize_civitai_page_url(value: object) -> tuple[str, int | None, int | None]:
+    if not isinstance(value, str) or len(value) > MAX_CIVITAI_URL_LENGTH:
+        return "", None, None
+    with suppress(ValueError):
+        parsed = urllib.parse.urlsplit(value.strip())
+        host = (parsed.hostname or "").casefold()
+        matched = CIVITAI_MODEL_PATH_RE.fullmatch(parsed.path)
+        if parsed.scheme in {"http", "https"} and host in CIVITAI_HOSTS and matched:
+            model_id = int(matched.group("model_id"))
+            query = urllib.parse.parse_qs(parsed.query)
+            version_id = _positive_metadata_id((query.get("modelVersionId") or [""])[0])
+            base = f"https://{host}/models/{model_id}"
+            suffix = f"?modelVersionId={version_id}" if version_id else ""
+            return f"{base}{suffix}", model_id, version_id
+    return "", None, None
+
+
+def _explicit_civitai_page_url(metadata: dict[str, Any]) -> tuple[str, int | None, int | None]:
+    pending: list[tuple[object, int]] = [(metadata, 0)]
+    inspected = 0
+    while pending and inspected < 500:
+        value, depth = pending.pop()
+        inspected += 1
+        if isinstance(value, dict) and depth < 4:
+            pending.extend((item, depth + 1) for item in value.values())
+        elif isinstance(value, list) and depth < 4:
+            pending.extend((item, depth + 1) for item in value[:100])
+        elif isinstance(value, str):
+            normalized = _normalize_civitai_page_url(value)
+            if normalized[0]:
+                return normalized
+    return "", None, None
+
+
+def _civitai_source_url(metadata: dict[str, Any]) -> str:
+    explicit_url, explicit_model_id, explicit_version_id = _explicit_civitai_page_url(metadata)
+    model_id, version_id = _civitai_ids(metadata)
+    if explicit_url:
+        chosen_version = explicit_version_id or version_id
+        base = explicit_url.split("?", 1)[0]
+        return f"{base}?modelVersionId={chosen_version}" if chosen_version else base
+    chosen_model = explicit_model_id or model_id
+    if chosen_model is None:
+        return ""
+    base = f"https://civitai.com/models/{chosen_model}"
+    return f"{base}?modelVersionId={version_id}" if version_id else base
+
+
 def _public_lora_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     allowed = (
         "modelId",
@@ -973,21 +1332,41 @@ def _public_lora_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
             value = civitai.get(source_key)
             if isinstance(value, (str, int, float)):
                 result[target_key] = str(value)[:1000] if isinstance(value, str) else value
+    model_id, version_id = _civitai_ids(metadata)
+    if model_id is not None:
+        result["civitai_model_id"] = model_id
+    if version_id is not None:
+        result["civitai_version_id"] = version_id
     return result
 
 
 def _model_family(relative: str, base_model: str) -> str:
+    directory_aliases = {
+        "anima": "anima",
+        "flux": "flux",
+        "flux.1": "flux",
+        "flux1_dev": "flux",
+        "illustrious": "illustrious",
+        "krea2": "krea2",
+        "noobai": "illustrious",
+        "pony": "sdxl",
+        "sdxl": "sdxl",
+    }
+    parts = PurePosixPath(relative.replace("\\", "/")).parts
+    for part in parts[:-1]:
+        if family := directory_aliases.get(part.casefold()):
+            return family
     text = f"{relative} {base_model}".casefold()
-    if "anima" in text:
-        return "anima"
-    if "krea" in text:
-        return "krea2"
-    if "illustrious" in text or "noob" in text:
-        return "illustrious"
-    if "flux" in text:
-        return "flux"
-    if "sdxl" in text or "pony" in text:
-        return "sdxl"
+    patterns = (
+        ("anima", r"(?<![a-z0-9])anima(?![a-z0-9])"),
+        ("krea2", r"(?<![a-z0-9])krea(?:[ ._-]*2)?(?![a-z0-9])"),
+        ("illustrious", r"(?<![a-z0-9])(?:illustrious|noob(?:ai)?)(?![a-z0-9])"),
+        ("flux", r"(?<![a-z0-9])flux(?:[ ._-]*1)?(?![a-z0-9])"),
+        ("sdxl", r"(?<![a-z0-9])(?:sdxl|pony)(?![a-z0-9])"),
+    )
+    for family, pattern in patterns:
+        if re.search(pattern, text):
+            return family
     return "unknown"
 
 

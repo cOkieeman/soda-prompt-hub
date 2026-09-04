@@ -44,10 +44,18 @@ class DatasetWorkspaceStore:
     def initialize(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def register(self, source_path: Path | str, *, name: str = "") -> dict[str, Any]:
+    def register(
+        self,
+        source_path: Path | str,
+        *,
+        name: str = "",
+        origin: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         source = self._validate_source(source_path)
         existing = self.find_by_source(source)
         if existing is not None:
+            if origin is not None:
+                return self._update_workspace(existing["workspace_id"], origin=dict(origin))
             return existing
         workspace_id = f"dataset-{uuid4().hex}"
         now = _now()
@@ -60,6 +68,7 @@ class DatasetWorkspaceStore:
             "current_report": "",
             "summary": {},
             "error": "",
+            "origin": dict(origin) if origin is not None else {},
             "created_at": now,
             "updated_at": now,
         }

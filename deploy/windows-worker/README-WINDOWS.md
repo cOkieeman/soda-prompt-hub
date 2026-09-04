@@ -10,13 +10,19 @@
 4. 看到 `[OK] Worker and local ComfyUI are ready.` 后，双击 `2-启动Worker.bat`。
 5. 保持 Worker 黑色窗口开启。窗口显示“等待任务”时，Mac 才能投递真实任务。
 
+自检写出的 `worker-status.json` 包含 `worker_build_sha256`，代表实际启动脚本的 SHA-256。任务成功
+或失败时，结果信封也会回显同一字段。它可以确认当前接任务的是刚同步的新版 Worker，而不是仍在
+后台运行的旧窗口。如果该值与共享目录当前 Worker 脚本的 SHA-256 不一致，请关闭所有旧 Worker
+窗口，再重新双击 `2-启动Worker.bat`。
+
 需要接入 ComfyUI LoRA Manager 时，可在 PowerShell 运行 `3-检查LoRAManager.ps1`。脚本只读取插件
 源码、metadata/预览文件清单、ComfyUI 本机公开接口和 LoRA 目录统计，结果写入共享目录
 `diagnostics/lora-manager-inspection.json`；它不会修改插件、下载模型或读取权重内容。
 
 不需要安装 pip 包，不需要 Windows 密码，也不需要 API Key。`worker-config.json` 中的
-`lora_roots` 只登记允许扫描的 LoRA 根目录；Mac 任务只能使用 `root_id`，不能传入任意
-Windows 路径。
+`lora_roots` 只登记允许扫描的 LoRA 根目录；`model_roots` 分别登记 Checkpoint、Diffusion Model、
+VAE、Text Encoder、放大模型和 ControlNet 目录。Mac 任务只能使用配置中的 `root_id`，不能传入
+任意 Windows 路径。复制示例配置后，必须把示例盘符改成这台电脑的真实 ComfyUI 目录。
 
 ## 日常顺序
 
@@ -34,8 +40,25 @@ Windows 路径。
 4. 任务返回后，在任务卡点击“验收并导入 LoRA 清单”。
 5. Mac 逐文件校验 SHA-256，保存可检索清单与独立预览缓存；不会复制 `.safetensors`。
 
+metadata 中有可靠的 Civitai model/version ID 或模型页 URL 时，Mac 会显示“查看 Civitai / 提示词”。
+本地路径、下载 API 和其他网站不会作为来源链接同步。
+
 快照不会读取权重内容，也不会为大模型计算文件 SHA-256。清单 JSON 与每张预览图分别校验；
 图片限制为受支持扩展名、单张不超过 32 MiB、最多 1024 张且总计不超过 2 GiB。
+
+## 同步模型资产清单
+
+1. 在 `worker-config.json` 的 `model_roots` 中填写这台电脑真实的六类 ComfyUI 模型目录；没有的
+   类型可以删除对应条目。
+2. 重新运行 `1-先自检.bat`，确认输出的 `model_roots` 中所需目录为 `exists: true`。
+3. 启动 Worker，在 Mac“设备连接 → ComfyUI 模型资产”点击“刷新模型清单”。
+4. 任务返回后，在任务卡点击“验收并导入模型清单”。
+5. Mac 会显示类型、文件夹、名称、大小、修改时间和可用的同名示例图，不会复制模型权重。
+
+模型清单支持 `.safetensors`、`.ckpt`、`.pt`、`.pth`、`.bin`、`.gguf` 与 `.onnx`。Worker 只调用
+文件系统属性，不打开权重，也不计算大权重 SHA-256。模型旁边与权重同名或以 `.civitai_bak` / `.preview`
+结尾的 PNG/JPEG/WebP/GIF 会作为独立预览输出；Mac 对清单 JSON 与每张图片分别做 SHA-256 验收。
+同名 `.metadata.json`、`.civitai.info`、`.info.json` 或 `.json` 中的可靠 Civitai ID/模型页也会进入清单。
 
 ## ComfyUI workflow 要求
 
@@ -85,4 +108,4 @@ Mac 投递时会在任务 manifest 中记录生成包的 SHA-256。Worker 校验
 - 任务中的相对路径不能越过共享目录。
 - 所有 manifest 与输出文件都做 SHA-256 校验。
 - 配置、任务、日志都不保存 SMB 密码、API Key 或 token。
-- 当前执行 `comfyui_generate` 与只读 `lora_catalog_snapshot`；训练、VLM 和 Embedding 接口保留，但尚不会被这个 Worker 误执行。
+- 当前执行 `comfyui_generate`、只读 `lora_catalog_snapshot` 与只读 `model_catalog_snapshot`；训练、VLM 和 Embedding 接口保留，但尚不会被这个 Worker 误执行。

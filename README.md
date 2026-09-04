@@ -28,9 +28,9 @@ uv run prompt-hub serve --host 127.0.0.1 --port 8765
 
 浏览器会打开 <http://127.0.0.1:8765>。关闭终端窗口或按 `Control-C` 即可停止。
 
-绘图 V1 的最短操作顺序见 [DRAWING_V1_GUIDE.md](DRAWING_V1_GUIDE.md)。完整的 Mac 日常使用、
-数据集审核、LoRA 训练交付、Windows 回传、备份恢复和 SMB 配置顺序见
-[MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)。首页点“新建或继续绘图项目”
+绘图 V1 的最短操作顺序见 [DRAWING_V1_GUIDE.md](DRAWING_V1_GUIDE.md)。按具体情况操作和人工验收见
+[MANUAL_ACCEPTANCE_GUIDE.md](MANUAL_ACCEPTANCE_GUIDE.md)；完整的 Mac 日常使用、数据集审核、
+LoRA 训练交付、Windows 回传、备份恢复和 SMB 配置顺序见 [MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)。首页点“新建或继续绘图项目”
 即可进入七槽位工作台；项目、锁定状态、参考资料、配方和实测记录都会保存在本机 SQLite。
 
 在创作台写好中文想法后，可直接点“从本地库智能取材”。页面会先从 33,631 条本机资料中按
@@ -72,6 +72,34 @@ caption，Krea 2 自然语言始终独立保存。
 收藏、评分和备注保存在 `prompt-library/database/prompt-library.sqlite`。它们使用来源与原始条目
 编号关联，执行“更新公共资料”或重建索引后仍会保留。这个数据库从 V1.2 起包含不可重建的个人
 资料，需要和 `private`、`test-results`、`exports` 一起备份。
+
+## 本地来源中心与以图找图
+
+“资料管理”已集中展示本地 Git 库、网页摘录的来源、许可、更新时间、可检索条目和视觉参照数。
+粘贴 GitHub 或 raw 直链时，系统按固定白名单保存允许缓存的正文或图片；Civitai、OpenArt、
+PromptHero 与 Promptomania 默认只保存网址和个人备注。每个条目都保留原网址、抓取时间、策略与
+SHA-256；重复保存同一 URL 采用增量更新，不会清除个人标记。
+
+“智能检索”包含文字检索、图片查相似图和视觉簇三个独立入口。Mac 本地使用固定版本的
+`Xenova/clip-vit-base-patch32` ONNX 视觉 encoder，不需要文字 encoder，也不会把图片上传。当前
+正式索引为 1,450 张，覆盖提示词视觉、数据集、ComfyUI 回流、LoRA 预览和底模预览。
+建立索引支持进度、暂停/继续、失败恢复和增量更新；没有真实向量时保持空结果，不用随机或颜色
+特征伪造相似度。
+
+## 项目总览与数据集来源
+
+创作台顶部现在按六个阶段汇总同一项目：灵感与 OC、Anima/Krea 2 Prompt、5060 Ti 出图、
+结果图、数据集工作区和交付版本。每张卡只读取真实数量与最近状态，并把“继续”按钮带到对应
+操作区；总览本身不会自动精选、审核、冻结或向 Windows 投递任务。
+
+在结果图中手动勾选“加入数据集”后，点总览里的“送入数据集工作区”。Prompt Hub 会复制原图
+和目标 Profile caption 到项目专属只读来源目录，同时记录项目、结果图、Prompt、ComfyUI workflow、
+checkpoint、LoRA、seed、尺寸、Steps、CFG 与 SHA-256。重复同步不会重复复制；项目或精选内容更新
+后，卡片会提示“更新并打开工作区”。
+
+进入数据集页后，项目来源工作区可以返回原创作项目；冻结版本的 manifest 也保留来源结果图。
+新同步的图片仍然是“未审核、未选择”，必须按数据集五步人工确认。直接导入本地文件夹的旧数据集
+继续显示为“外部独立数据集”，不要求绑定任何创作项目。
 
 也可以在终端中启动：
 
@@ -162,6 +190,13 @@ V1.7B 已把工作区 WD14 接入可恢复后台队列，不再受结果图区�
 已有同名 `.txt` 时，可以先预览后批量接续到 Anima 或 Krea 2 Profile。默认只填空白 Profile、
 状态为“待审核”；确认后整批只生成一个快照，已有内容不会自动覆盖，源 `.txt` 始终不变。
 
+“冻结交付”会先执行正式交付前检查，强制核对坏图、来源变化、图片审核、目标 Profile Caption、
+英文格式、完全重复和同名 `.txt` 冲突，并把近似重复单独列为警告。通过后可保存新的 Mac 版本，
+固定包含原图副本、同名 `.txt`、`manifest.json`、`audit.json` 和 `hashes.sha256`。交付历史按
+Anima/Krea 2 分开显示图片数、文件数、容量和时间，并可下载 ZIP、打开 Finder，或复制到已挂载的
+5060 Ti `prompt-hub/datasets/数据集名/版本号`。复制采用临时目录、全目录哈希校验和原子改名；
+目标已有不同内容时停止且不覆盖。
+
 ## V1.8 LoRA 项目台
 
 主导航“LoRA 项目”用于在 Mac 上管理角色、服装、角色与签名服装一体、画风四类训练项目。
@@ -198,11 +233,12 @@ Anima 或 Krea 2 caption；失败测试不会进入训练集。由回流图创�
 lineage，父项目与旧结果图保持不变。
 
 `/api/compute/contract` 已定义 `comfyui_generate`、`lora_train`、`embedding_batch`、
-`vlm_caption_batch` 与 `lora_catalog_snapshot` 的任务/结果字段、SHA-256 回验规则及 worker 注册字段。
+`vlm_caption_batch`、`lora_catalog_snapshot` 与 `model_catalog_snapshot` 的任务/结果字段、SHA-256
+回验规则及 worker 注册字段。
 5060 Ti 的 SMB 节点和 Worker 已完成 ComfyUI 生成及 LoRA 只读清单实测；训练、Embedding 与 VLM
 仍按同一协议逐项接入，不需要把密钥或 Windows 路径写进项目 JSON。
 
-## V2.1 Mac 资料更新、Krea 2 草稿与向量接口
+## V2.1 Mac 资料更新、Krea 2 草稿与视觉检索
 
 “资料管理”可安全更新公共 Git 提示词库：只对干净且配置 upstream 的仓库执行 fast-forward-only，
 有本地改动时会跳过，完成后重建本地索引。不会覆盖个人收藏、评分、备注或公共仓库中的本地修改。
@@ -212,11 +248,10 @@ lineage，父项目与旧结果图保持不变。
 Krea 2”才创建可回退快照。Anima/WD14 始终保持独立。若 Qwen3 14B 正在驻留导致内存不足，请先
 在 LM Studio 手工切换到 Qwen3.5 9B Vision；Prompt Hub 不会擅自卸载用户模型。
 
-后续 5060 Ti 可将真实 embedding 结果提交到 `/api/embedding-indexes/import`，Mac 会按模型 ID、
-revision 和 dimension 建立独立版本，并用源 SHA-256 回验。查询接口为
-`/api/embedding-indexes/{index_id}/query`。远程 Krea 2 草稿提交到
-`/api/dataset-workspaces/{workspace_id}/krea2-vlm/import`，仍然只进入待确认草稿。当前 Mac 项目未
-安装 CLIP/SigLIP 生成 runtime，因此这些接口完成不等于真实视觉索引已经生成。
+当前 Mac 已安装固定 revision 的 CLIP 视觉 encoder，并按模型 ID、revision 和 dimension 维护独立
+版本。用户上传图片时只查询当前 encoder 的精确索引，不会与其他同维模型串用。通用的版本化
+导入与查询接口仍保留；5060 Ti `embedding_batch` 只作为未来超大批加速选项，不是日常使用前提。
+远程 Krea 2 草稿提交到 `/api/dataset-workspaces/{workspace_id}/krea2-vlm/import`，仍然只进入待确认草稿。
 
 主导航“智能检索”已经把结果分为提示词资料、视觉参考、我的数据集和 Windows LoRA。FTS 关键词
 检索始终可用；只有存在真实、版本兼容的 embedding 时才合并 cosine 结果。数据集详情的“以此图
@@ -225,7 +260,7 @@ revision 和 dimension 建立独立版本，并用源 SHA-256 回验。查询接
 ## Windows 设备接口
 
 主导航“设备连接”只保留一个 5060 Ti 制图与炼丹节点。它运行 ComfyUI、ComfyUI 内的 LoRA Manager
-插件，以及独立的 AnimaLoraStudio；批量 VLM 与 Embedding 也由这台设备承担。Prompt Hub 只登记设备角色、主机名和 Mac 已挂载的
+插件，以及独立的 AnimaLoraStudio；批量 VLM 与 Embedding 只在 Mac 本地速度不足时再作为可选加速。Prompt Hub 只登记设备角色、主机名和 Mac 已挂载的
 SMB 路径，不保存 Windows 用户名或密码。Finder 挂载完成后，页面可以检查
 目录并建立 `prompt-hub/outbox`、`inbox`、`processing`、`completed`、`failed` 五个交付目录。
 
@@ -235,7 +270,8 @@ Mac 已实现共享目录任务投递、任务状态扫描和失败重试。每�
 导入接口和人工审核。API 为 `/api/remote-nodes/{node_id}/tasks` 与
 `/api/remote-nodes/{node_id}/tasks/{task_id}/retry`。任务 payload 会拒绝密码、token 和凭据字段。
 
-单卡任务默认串行，已部署 Worker 使用同一 GPU 锁执行当前支持的 ComfyUI 生成与 LoRA 清单任务。
+单卡任务默认串行，已部署 Worker 使用同一 GPU 锁执行当前支持的 ComfyUI 生成、LoRA 清单和模型
+资产清单任务。
 训练、Embedding、批量 Caption 与 WD14 适配器接入后继续共用该锁；训练优先级和不可抢占边界届时
 再做真实负载验收。
 
@@ -244,14 +280,31 @@ Windows Worker 的 `lora_catalog_snapshot` 会读取 ComfyUI `LoraLoader` 名称
 同名 `.metadata.json` 及关联的封面/示例图，规范化后作为独立输出回传。设备页先逐文件校验
 SHA-256，用户再点“验收并导入 LoRA 清单”。Mac 将预览图放进独立 `remote-nodes/lora-previews`
 缓存，在分类卡片显示主图并支持查看同一 LoRA 的全部参照图；无图条目保留占位。整个过程不复制
-`.safetensors`，也不读取权重内容。
+`.safetensors`，也不读取权重内容。sidecar 中有可靠的 Civitai model/version ID 或模型页 URL 时，
+设备页和创作台会显示“查看 Civitai / 提示词”；本地路径、下载 API 和其他站点不会变成链接。
+
+设备页的“ComfyUI 模型资产”是另一份只读事实清单。Windows Worker 只扫描配置白名单中的
+Checkpoint、Diffusion Model/UNet、VAE、Text Encoder、放大模型和 ControlNet 目录，回传名称、
+相对路径、类型、大小、修改时间及同名 sidecar 示例图；不会打开、哈希或复制权重。任务返回后点
+“验收并导入模型清单”，即可在 Mac 上按“模型类型 → 顶层文件夹”浏览、搜索和查看底模示例图。
+Worker 也会在同名 `.metadata.json`、`.civitai.info`、`.info.json` 或 `.json` 中查找 Civitai 来源，
+有可信来源的底模会出现同样的返回入口。
+创作台可把选中的底模安全写入 Profile 声明的 Workflow 节点；大量 LoRA 通过搜索和 Windows
+文件夹筛选器添加，不再使用包含整份清单的超长原生下拉框。
 
 ### Anima / Krea 2 Workflow Profile
 
 创作台右侧会按当前 Prompt 类型只显示匹配的 ComfyUI Workflow Profile。选择 Profile 后点“发送到
 5060 Ti”，系统会先保存当前项目，在 Mac 的 `workflow-profiles/<profile>/runs` 留下不可丢失的生成
 包，再复制同字节、同 SHA-256 的包到 SMB 并建立任务。原始 workflow 不会被改写，Prompt、negative、
-seed、尺寸、steps 与 CFG 只允许写入已审核的节点字段。
+seed、尺寸、steps、CFG、Sampler、Scheduler、底模/UNet、VAE、Text Encoder 与附加 LoRA 只允许
+写入当前 Profile 明确声明的节点字段。
+
+展开“模型、LoRA 与采样参数”即可调整当前 Profile。模型和 LoRA 选项来自 Mac 已验收的 Windows
+清单；已知模型族不兼容的条目不会显示，服务端投递时还会再次校验。留空表示继续使用 Profile
+原始值。附加 LoRA 最多 4 个，不会删除工作流原有的基础/工具 LoRA；每个项目分别保存 Anima 与
+Krea 2 的选择。当前两份真实工作流的主模型都是 Diffusion Model/UNet，所以 Checkpoint 只在资产
+页可浏览，不会被错误绑定到不存在的主 Checkpoint 节点。
 
 首轮建议勾选“低成本测试”：Krea 2 跳过 SeedVR2 放大，Anima 满穗跳过 SAM3 脸手精修和 Ultimate
 SD Upscale，只验证基础模型、LoRA、Prompt 与构图。基础图正确后再关闭低成本模式。Profile 原件、
@@ -266,7 +319,9 @@ Worker 回传后，在“设备连接 → 跨设备任务状态”点“验收�
 双击 `$HOME/Documents/Codex/soda-person/备份-Prompt-Hub.command` 建立带 SHA-256 manifest 与
 SQLite integrity 结果的备份；双击 `$HOME/Documents/Codex/soda-person/诊断-Prompt-Hub.command`
 检查数据库、embedding 索引、WD14、磁盘与服务。CLI 还提供 `verify-backup` 和只允许恢复到新目录的
-`restore`。完整顺序见 [MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)。
+`restore`。完整顺序见 [MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)，不使用终端的情景说明和
+人工验收清单见 [MANUAL_ACCEPTANCE_GUIDE.md](MANUAL_ACCEPTANCE_GUIDE.md)。外部原始数据集不在
+Prompt Hub 备份内，需要单独备份。
 
 ## LM Studio
 

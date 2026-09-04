@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Never
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from prompt_hub.dataset_workspace import DatasetWorkspaceError, DatasetWorkspaceStore
+from prompt_hub.remote_nodes import RemoteNodeError, RemoteNodeStore
 
 if TYPE_CHECKING:
     from prompt_hub.background_jobs import BackgroundJobRunner, BackgroundJobStore
@@ -103,11 +106,16 @@ class DatasetWorkspaceExportInput(BaseModel):
     paths: list[str] = Field(min_length=1, max_length=100000)
 
 
+class DatasetWorkspaceCopyInput(BaseModel):
+    node_id: str = Field(default="compute_5060ti", min_length=1, max_length=160)
+
+
 def create_workspace_router(
     workspace_store: DatasetWorkspaceStore,
     curation_store: DatasetCurationStore,
     job_store: BackgroundJobStore,
     job_runner: BackgroundJobRunner,
+    remote_store: RemoteNodeStore,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -381,6 +389,61 @@ def create_workspace_router(
         except DatasetWorkspaceError as error:
             _raise_workspace_http(error)
 
+    @router.post("/api/dataset-workspaces/{workspace_id}/preflight")
+    def preflight_dataset_workspace_export(
+        workspace_id: str,
+        payload: DatasetWorkspaceExportInput,
+    ) -> dict[str, Any]:
+        try:
+            return curation_store.preflight_export(
+                workspace_id,
+                profile_id=payload.profile_id,
+                paths=payload.paths,
+            )
+        except DatasetWorkspaceError as error:
+            _raise_workspace_http(error)
+
+    @router.get("/api/dataset-workspaces/{workspace_id}/exports")
+    def list_dataset_workspace_exports(workspace_id: str) -> list[dict[str, Any]]:
+        try:
+            return curation_store.list_exports(workspace_id)
+        except DatasetWorkspaceError as error:
+            _raise_workspace_http(error)
+
+    @router.post(
+        "/api/dataset-workspaces/{workspace_id}/exports/{version_id}/copy",
+        status_code=status.HTTP_201_CREATED,
+    )
+    def copy_dataset_workspace_export(
+        workspace_id: str,
+        version_id: str,
+        payload: DatasetWorkspaceCopyInput,
+        response: Response,
+    ) -> dict[str, Any]:
+        try:
+            result = curation_store.copy_export_to_share(
+                workspace_id,
+                version_id,
+                node_id=payload.node_id,
+                bridge_root=_required_delivery_root(remote_store, payload.node_id),
+            )
+        except (DatasetWorkspaceError, RemoteNodeError) as error:
+            _raise_workspace_http(error)
+        if result["status"] == "already_present":
+            response.status_code = status.HTTP_200_OK
+        return result
+
+    @router.post("/api/dataset-workspaces/{workspace_id}/exports/{version_id}/reveal")
+    def reveal_dataset_workspace_export(workspace_id: str, version_id: str) -> dict[str, Any]:
+        try:
+            path = curation_store.resolve_export_directory(workspace_id, version_id)
+        except DatasetWorkspaceError as error:
+            _raise_workspace_http(error)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Dataset export version not found")
+        _reveal_in_finder(path)
+        return {"workspace_id": workspace_id, "version_id": version_id, "revealed": True}
+
     @router.get(
         "/dataset-workspaces/{workspace_id}/exports/{filename}",
         response_class=FileResponse,
@@ -481,6 +544,24 @@ def create_workspace_router(
     return router
 
 
-def _raise_workspace_http(error: DatasetWorkspaceError) -> Never:
+def _reveal_in_finder(path: Path) -> None:
+    result = subprocess.run(  # noqa: S603 - executable and arguments are fixed by the app.
+        ["/usr/bin/open", "-R", str(path)],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode:
+        raise HTTPException(status_code=503, detail="无法打开 Finder, 请稍后重试")
+
+
+def _required_delivery_root(remote_store: RemoteNodeStore, node_id: str) -> Path:
+    diagnostic = remote_store.diagnostics(node_id)
+    if not diagnostic.get("bridge_prepared") or not diagnostic.get("bridge_writable"):
+        message = "5060 Ti 共享目录离线或不可写, 请先在 Finder 挂载"
+        raise RemoteNodeError(message)
+    return Path(str(diagnostic["bridge_root"]))
+
+
+def _raise_workspace_http(error: DatasetWorkspaceError | RemoteNodeError) -> Never:
     status_code = 404 if "not found" in str(error).lower() else 422
     raise HTTPException(status_code=status_code, detail=str(error)) from error

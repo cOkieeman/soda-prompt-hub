@@ -80,6 +80,112 @@ class EmbeddingIndexStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def known_hashes(self, index_id: str) -> dict[str, str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT asset_id, source_sha256 FROM embeddings WHERE index_id = ?",
+                (index_id,),
+            ).fetchall()
+        return {str(row["asset_id"]): str(row["source_sha256"]) for row in rows}
+
+    def type_counts(self, index_id: str) -> dict[str, int]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT asset_type, COUNT(*) AS item_count
+                FROM embeddings WHERE index_id = ?
+                GROUP BY asset_type ORDER BY asset_type
+                """,
+                (index_id,),
+            ).fetchall()
+        return {str(row["asset_type"]): int(row["item_count"]) for row in rows}
+
+    def prune_assets(
+        self,
+        index_id: str,
+        present_ids: set[str],
+        *,
+        asset_types: set[str],
+    ) -> int:
+        if not asset_types:
+            return 0
+        with self._lock, self.connect() as connection:
+            placeholders = ",".join("?" for _ in asset_types)
+            rows = connection.execute(
+                f"SELECT asset_id FROM embeddings WHERE index_id = ? "
+                f"AND asset_type IN ({placeholders})",
+                [index_id, *sorted(asset_types)],
+            ).fetchall()
+            stale = [
+                str(row["asset_id"]) for row in rows if str(row["asset_id"]) not in present_ids
+            ]
+            connection.executemany(
+                "DELETE FROM embeddings WHERE index_id = ? AND asset_id = ?",
+                [(index_id, asset_id) for asset_id in stale],
+            )
+            connection.commit()
+        return len(stale)
+
+    def clusters(
+        self,
+        index_id: str,
+        *,
+        asset_types: set[str] | None = None,
+        limit: int = 240,
+        threshold: float = 0.84,
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            index = connection.execute(
+                "SELECT * FROM embedding_indexes WHERE index_id = ?",
+                (index_id,),
+            ).fetchone()
+            if index is None:
+                raise EmbeddingIndexError("Embedding index not found")
+            sql = "SELECT * FROM embeddings WHERE index_id = ?"
+            parameters: list[Any] = [index_id]
+            if asset_types:
+                sql += f" AND asset_type IN ({','.join('?' for _ in asset_types)})"
+                parameters.extend(sorted(asset_types))
+            sql += " ORDER BY updated_at DESC LIMIT ?"
+            parameters.append(max(1, min(limit, 1000)))
+            rows = connection.execute(sql, parameters).fetchall()
+        groups: list[dict[str, Any]] = []
+        for row in rows:
+            vector = np.frombuffer(row["vector"], dtype=np.float32)
+            target = next(
+                (
+                    group
+                    for group in groups
+                    if float(np.dot(vector, group["centroid"])) >= threshold
+                ),
+                None,
+            )
+            item = {
+                "asset_id": str(row["asset_id"]),
+                "asset_type": str(row["asset_type"]),
+                "source_sha256": str(row["source_sha256"]),
+                "metadata": json.loads(str(row["metadata_json"])),
+            }
+            if target is None:
+                groups.append({"centroid": vector.copy(), "vectors": [vector], "items": [item]})
+                continue
+            target["items"].append(item)
+            target["vectors"].append(vector)
+            centroid = np.mean(target["vectors"], axis=0)
+            target["centroid"] = centroid / max(float(np.linalg.norm(centroid)), 1e-12)
+        prepared = [
+            {
+                "cluster_id": f"cluster-{number}",
+                "size": len(group["items"]),
+                "items": group["items"],
+            }
+            for number, group in enumerate(
+                sorted(groups, key=lambda value: len(value["items"]), reverse=True),
+                start=1,
+            )
+        ]
+        return {"index": dict(index), "clusters": prepared}
+
     def compatible_index(self, dimension: int) -> dict[str, Any] | None:
         """Return the newest real index matching a caller-provided vector dimension."""
         with self.connect() as connection:
@@ -321,6 +427,10 @@ class EmbeddingIndexStore:
 def _index_id(model_id: str, revision: str, dimension: int) -> str:
     digest = hashlib.sha256(f"{model_id}\0{revision}\0{dimension}".encode()).hexdigest()[:20]
     return f"embedding-{digest}"
+
+
+def embedding_index_id(model_id: str, revision: str, dimension: int) -> str:
+    return _index_id(model_id, revision, dimension)
 
 
 def _normalize_vector(value: object, dimension: int) -> np.ndarray:

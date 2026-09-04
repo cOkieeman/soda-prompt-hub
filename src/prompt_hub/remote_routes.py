@@ -204,6 +204,72 @@ def create_remote_router(store: RemoteNodeStore) -> APIRouter:
             raise HTTPException(status_code=404, detail=str(error)) from error
         return FileResponse(path, media_type=media_type)
 
+    @router.post(
+        "/api/remote-nodes/{node_id}/model-catalog/sync",
+        status_code=status.HTTP_201_CREATED,
+    )
+    def sync_windows_model_catalog(node_id: str) -> dict[str, Any]:
+        try:
+            return store.submit_model_catalog_snapshot(node_id)
+        except RemoteNodeError as error:
+            code = 404 if "尚未登记" in str(error) else 422
+            raise HTTPException(status_code=code, detail=str(error)) from error
+
+    @router.post(
+        "/api/remote-nodes/{node_id}/tasks/{task_id}/import-model-catalog",
+        status_code=status.HTTP_201_CREATED,
+    )
+    def import_returned_windows_model_catalog(node_id: str, task_id: str) -> dict[str, Any]:
+        try:
+            return store.import_returned_model_catalog(node_id, task_id)
+        except RemoteNodeError as error:
+            code = 404 if "不存在" in str(error) or "尚未" in str(error) else 422
+            raise HTTPException(status_code=code, detail=str(error)) from error
+
+    @router.get("/api/windows-models/status")
+    def windows_model_status() -> dict[str, Any]:
+        return store.model_catalog_status()
+
+    @router.get(
+        "/api/windows-models/previews/{snapshot_id}/{asset_id}/{filename}",
+        response_class=FileResponse,
+        include_in_schema=False,
+    )
+    def get_windows_model_preview(
+        snapshot_id: str,
+        asset_id: str,
+        filename: str,
+    ) -> FileResponse:
+        try:
+            path, media_type = store.resolve_model_preview(snapshot_id, asset_id, filename)
+        except RemoteNodeError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return FileResponse(path, media_type=media_type)
+
+    @router.get("/api/windows-models")
+    def search_windows_models(
+        query: str = "",
+        asset_type: str = "",
+        model_family: str = "",
+        limit: Annotated[int, Query(ge=1, le=2000)] = 200,
+    ) -> dict[str, Any]:
+        try:
+            results = store.search_models(
+                query,
+                asset_type=asset_type,
+                model_family=model_family,
+                limit=limit,
+            )
+        except RemoteNodeError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {
+            "query": query,
+            "asset_type": asset_type,
+            "model_family": model_family,
+            "count": len(results),
+            "results": results,
+        }
+
     @router.post("/api/windows-loras/import", status_code=status.HTTP_201_CREATED)
     def import_windows_loras(payload: LoraCatalogImportInput) -> dict[str, Any]:
         try:

@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import uuid4
 
@@ -17,6 +17,15 @@ PACKAGE_FORMAT = "soda-comfyui-package-v1"
 MAX_WORKFLOW_BYTES = 2 * 1024 * 1024
 MAX_PROMPT_LENGTH = 20_000
 MAX_SEED = 2**50
+MAX_ADDITIONAL_LORAS = 4
+ALLOWED_SAMPLERS = {
+    "dpmpp_2m",
+    "dpmpp_2m_sde",
+    "er_sde",
+    "euler",
+    "euler_ancestral",
+}
+ALLOWED_SCHEDULERS = {"beta", "exponential", "karras", "normal", "sgm_uniform", "simple"}
 _SAFE_ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,79}$")
 _CREDENTIAL_KEYS = {"api_key", "apikey", "authorization", "password", "secret", "token"}
 
@@ -33,6 +42,9 @@ class WorkflowRule:
     output_node: str
     direct_image_node: str
     omitted_low_cost: tuple[str, ...]
+    model_inputs: Mapping[str, tuple[str, str]]
+    lora_node: str
+    sampler_node: str
 
 
 RULES = {
@@ -41,6 +53,7 @@ RULES = {
         model_family="anima",
         required_nodes={
             "75": "String Literal",
+            "77": "Lora Loader (LoraManager)",
             "81": "Image Saver",
             "84": "Seed (rgthree)",
             "150": "ResolutionMasterSimplify",
@@ -48,26 +61,48 @@ RULES = {
             "184": "ImpactWildcardEncode",
             "135:103": "Int Literal",
             "135:104": "Cfg Literal",
+            "135:65": "VAELoader",
+            "135:66": "CLIPLoader",
+            "135:111": "UNet loader with Name (Image Saver)",
             "148:139": "VAEDecode",
+            "148:146": "ImpactKSamplerBasicPipe",
         },
         output_node="81",
         direct_image_node="148:139",
         omitted_low_cost=("SAM3 / face-hand detailer", "CR / Ultimate SD Upscale"),
+        model_inputs={
+            "diffusion_model": ("135:111", "unet_name"),
+            "vae": ("135:65", "vae_name"),
+            "text_encoder": ("135:66", "clip_name"),
+        },
+        lora_node="77",
+        sampler_node="148:146",
     ),
     "krea2-ares-ocmanager": WorkflowRule(
         profile_id="krea2-ares-ocmanager",
         model_family="krea2",
         required_nodes={
+            "65": "VAELoader",
+            "66": "CLIPLoader",
             "87": "ImpactKSamplerBasicPipe",
             "121": "CLIPTextEncode",
+            "123": "UNETLoader",
             "129": "EmptyLatentImage",
             "132": "VAEDecode",
             "133": "SaveImage",
             "141": "ImpactWildcardEncode",
+            "142": "Lora Loader (LoraManager)",
         },
         output_node="133",
         direct_image_node="132",
         omitted_low_cost=("SeedVR2 1920 upscaler",),
+        model_inputs={
+            "diffusion_model": ("123", "unet_name"),
+            "vae": ("65", "vae_name"),
+            "text_encoder": ("66", "clip_name"),
+        },
+        lora_node="142",
+        sampler_node="87",
     ),
 }
 
@@ -150,6 +185,10 @@ class WorkflowProfileStore:
         height: int | None = None,
         steps: int | None = None,
         cfg: float | None = None,
+        model_overrides: Mapping[str, str] | None = None,
+        additional_loras: list[Mapping[str, Any]] | None = None,
+        sampler: str | None = None,
+        scheduler: str | None = None,
         low_cost: bool = True,
     ) -> dict[str, Any]:
         profile = self.get_profile(profile_id)
@@ -171,6 +210,14 @@ class WorkflowProfileStore:
             _patch_anima(workflow, values, run_id=run_id, low_cost=low_cost)
         else:
             _patch_krea2(workflow, values, run_id=run_id, low_cost=low_cost)
+        controls = _apply_controls(
+            workflow,
+            rule,
+            model_overrides=model_overrides or {},
+            additional_loras=additional_loras or [],
+            sampler=sampler,
+            scheduler=scheduler,
+        )
         if low_cost:
             workflow = _dependency_closure(workflow, rule.output_node)
         return {
@@ -180,6 +227,7 @@ class WorkflowProfileStore:
             "model_family": rule.model_family,
             "source_sha256": profile["source_sha256"],
             "low_cost": low_cost,
+            "controls": controls,
             "compiled_at": _now(),
             "api_prompt": workflow,
         }
@@ -197,12 +245,170 @@ class WorkflowProfileStore:
         _write_json(path, package)
         return path
 
-    @staticmethod
-    def _decorate(profile: Mapping[str, Any]) -> dict[str, Any]:
+    def _decorate(self, profile: Mapping[str, Any]) -> dict[str, Any]:
         result = dict(profile)
         result["ready"] = True
         result["source_workflow_saved"] = True
+        profile_id = str(profile.get("profile_id", ""))
+        rule = _rule(profile_id)
+        raw = (self.root / profile_id / "source-workflow.json").read_bytes()
+        result["controls"] = _control_schema(_parse_workflow(raw), rule)
         return result
+
+
+def _control_schema(
+    workflow: Mapping[str, dict[str, Any]],
+    rule: WorkflowRule,
+) -> dict[str, Any]:
+    model_inputs = []
+    for asset_type, (node_id, input_key) in rule.model_inputs.items():
+        node = workflow.get(node_id, {})
+        inputs = node.get("inputs", {})
+        current = inputs.get(input_key, "") if isinstance(inputs, Mapping) else ""
+        model_inputs.append({"asset_type": asset_type, "current": str(current)})
+    lora_node = workflow.get(rule.lora_node, {})
+    lora_inputs = lora_node.get("inputs", {})
+    default_loras = _active_loras(lora_inputs if isinstance(lora_inputs, Mapping) else {})
+    sampler_inputs = workflow.get(rule.sampler_node, {}).get("inputs", {})
+    return {
+        "model_inputs": model_inputs,
+        "additional_loras": True,
+        "max_additional_loras": MAX_ADDITIONAL_LORAS,
+        "default_loras": default_loras,
+        "samplers": sorted(ALLOWED_SAMPLERS),
+        "schedulers": sorted(ALLOWED_SCHEDULERS),
+        "current_sampler": str(sampler_inputs.get("sampler_name", "")),
+        "current_scheduler": str(sampler_inputs.get("scheduler", "")),
+    }
+
+
+def _apply_controls(
+    workflow: dict[str, dict[str, Any]],
+    rule: WorkflowRule,
+    *,
+    model_overrides: Mapping[str, str],
+    additional_loras: list[Mapping[str, Any]],
+    sampler: str | None,
+    scheduler: str | None,
+) -> dict[str, Any]:
+    applied_models = {}
+    for asset_type, value in model_overrides.items():
+        target = rule.model_inputs.get(str(asset_type))
+        normalized_name = str(value).strip().replace("\\", "/")
+        relative = PurePosixPath(normalized_name)
+        if (
+            target is None
+            or not normalized_name
+            or len(normalized_name) > 4096
+            or relative.is_absolute()
+            or ".." in relative.parts
+        ):
+            raise WorkflowProfileError(f"{asset_type} 模型覆盖无效")
+        model_name = relative.as_posix().replace("/", "\\")
+        node_id, input_key = target
+        workflow[node_id]["inputs"][input_key] = model_name
+        applied_models[str(asset_type)] = model_name
+    applied_loras = []
+    if additional_loras:
+        lora_node = workflow.get(rule.lora_node)
+        if lora_node is None:
+            raise WorkflowProfileError("Workflow 缺少受控 LoRA Loader")
+        applied_loras = _append_loras(lora_node["inputs"], additional_loras)
+    sampler_node = workflow.get(rule.sampler_node)
+    if sampler_node is None and (sampler is not None or scheduler is not None):
+        raise WorkflowProfileError("Workflow 缺少受控采样器节点")
+    sampler_inputs = sampler_node["inputs"] if sampler_node is not None else {}
+    if sampler is not None:
+        clean_sampler = str(sampler).strip()
+        if clean_sampler not in ALLOWED_SAMPLERS:
+            raise WorkflowProfileError("Sampler 不在允许列表中")
+        sampler_inputs["sampler_name"] = clean_sampler
+    if scheduler is not None:
+        clean_scheduler = str(scheduler).strip()
+        if clean_scheduler not in ALLOWED_SCHEDULERS:
+            raise WorkflowProfileError("Scheduler 不在允许列表中")
+        sampler_inputs["scheduler"] = clean_scheduler
+    return {
+        "model_overrides": applied_models,
+        "additional_loras": applied_loras,
+        "sampler": str(sampler_inputs.get("sampler_name", "")),
+        "scheduler": str(sampler_inputs.get("scheduler", "")),
+    }
+
+
+def _active_loras(inputs: Mapping[str, Any]) -> list[dict[str, Any]]:
+    container = inputs.get("loras", {})
+    values = container.get("__value__", []) if isinstance(container, Mapping) else []
+    return [
+        {
+            "name": str(item.get("name", "")),
+            "strength": float(item.get("strength", 1) or 0),
+            "clip_strength": float(item.get("clipStrength", item.get("strength", 1)) or 0),
+        }
+        for item in values
+        if isinstance(item, Mapping) and item.get("active") is True and str(item.get("name", ""))
+    ]
+
+
+def _append_loras(
+    inputs: dict[str, Any],
+    additions: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    if len(additions) > MAX_ADDITIONAL_LORAS:
+        raise WorkflowProfileError(f"附加 LoRA 最多 {MAX_ADDITIONAL_LORAS} 个")
+    container = inputs.get("loras")
+    if not isinstance(container, dict) or not isinstance(container.get("__value__"), list):
+        raise WorkflowProfileError("Workflow 的 LoRA Loader 结构不受支持")
+    values = container["__value__"]
+    applied = []
+    for item in additions:
+        name = str(item.get("name", "")).strip()
+        if not name or len(name) > 300 or any(char in name for char in "<>\r\n"):
+            raise WorkflowProfileError("LoRA 名称无效")
+        strength = _number(
+            float(item.get("strength", 1)),
+            minimum=-2,
+            maximum=2,
+            label="LoRA strength",
+        )
+        clip_strength = _number(
+            float(item.get("clip_strength", strength)),
+            minimum=-2,
+            maximum=2,
+            label="LoRA CLIP strength",
+        )
+        strength_value = float(strength if strength is not None else 0)
+        clip_strength_value = float(clip_strength if clip_strength is not None else 0)
+        values[:] = [
+            value
+            for value in values
+            if not isinstance(value, Mapping) or str(value.get("name", "")) != name
+        ]
+        values.append(
+            {
+                "name": name,
+                "strength": strength_value,
+                "active": True,
+                "expanded": False,
+                "clipStrength": clip_strength_value,
+                "selected": True,
+                "locked": False,
+            }
+        )
+        applied.append(
+            {
+                "name": name,
+                "strength": strength_value,
+                "clip_strength": clip_strength_value,
+            }
+        )
+    if applied:
+        existing_text = str(inputs.get("text", "")).strip()
+        additions_text = " ".join(
+            f"<lora:{item['name']}:{item['strength']:.2f}>" for item in applied
+        )
+        inputs["text"] = " ".join(value for value in (existing_text, additions_text) if value)
+    return applied
 
 
 def _patch_anima(

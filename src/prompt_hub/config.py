@@ -46,6 +46,7 @@ class Settings:
             self.library_root / "exports",
             self.dataset_exports_root,
             self.dataset_workspaces_root,
+            self.project_dataset_sources_root,
             self.lora_projects_root,
             self.embedding_index_root,
             self.remote_nodes_root,
@@ -63,6 +64,10 @@ class Settings:
         return self.library_root / "sources" / "imports" / "oc-manager"
 
     @property
+    def web_sources_root(self) -> Path:
+        return self.library_root / "sources" / "web"
+
+    @property
     def result_images_root(self) -> Path:
         return self.library_root / "test-results" / "prompt-hub"
 
@@ -77,6 +82,10 @@ class Settings:
     @property
     def dataset_workspaces_root(self) -> Path:
         return self.library_root / "datasets" / "workspaces"
+
+    @property
+    def project_dataset_sources_root(self) -> Path:
+        return self.library_root / "datasets" / "project-sources"
 
     @property
     def lora_projects_root(self) -> Path:
