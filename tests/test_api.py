@@ -266,6 +266,23 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
         assert "data-creative-add" in page.text
 
 
+def test_page_uses_scoped_headers_and_accessible_contrast(settings) -> None:
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        page = client.get("/")
+
+    assert page.status_code == 200
+    assert page.text.count('class="output-block-head"') == 2
+    assert ".output-block header" not in page.text
+    assert ".output-block-head {" in page.text
+    assert '<header class="archive-header">' in page.text
+    assert "    header {" not in page.text
+    assert "--muted: #5b5a53;" in page.text
+    assert "--signal: #a33822;" in page.text
+    assert ".comfy-head .section-label, .comfy-head label { color: #b9ae9f; }" in page.text
+
+
 def test_compute_contract(settings) -> None:
     with TestClient(create_app(settings)) as client:
         compute = client.get("/api/compute/contract").json()

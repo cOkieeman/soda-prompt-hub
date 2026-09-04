@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
@@ -34,6 +35,7 @@ from prompt_hub.importers import import_all
 from prompt_hub.local_model import (
     LocalModelError,
     analyze_result_image,
+    draft_krea2_caption,
     expand_sourcing_queries,
     list_local_models,
     organize_slots,
@@ -42,6 +44,8 @@ from prompt_hub.local_visual import LocalVisualEncoder, LocalVisualIndexService
 from prompt_hub.lora_projects import LoraProjectStore
 from prompt_hub.lora_routes import create_lora_router
 from prompt_hub.media import resolve_media_path
+from prompt_hub.model_connections import CONNECTION_ID_PATTERN, ModelConnectionStore
+from prompt_hub.model_routes import create_model_router
 from prompt_hub.oc_manager import archive_import, parse_oc_manager_json
 from prompt_hub.project_journey import ProjectJourneyServices, create_project_journey_router
 from prompt_hub.remote_nodes import RemoteNodeStore
@@ -154,11 +158,35 @@ class TagLocaleInput(BaseModel):
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or Settings.from_environment()
+    model_connections = ModelConnectionStore(active_settings)
+
+    def krea2_captioner(
+        image_path: Path,
+        model: str,
+        existing_caption: str,
+    ) -> dict[str, Any]:
+        if not CONNECTION_ID_PATTERN.fullmatch(model):
+            return DatasetCurationStore._default_krea2_captioner(  # noqa: SLF001
+                image_path,
+                model,
+                existing_caption,
+            )
+        return draft_krea2_caption(
+            image_path=image_path,
+            model=model,
+            existing_caption=existing_caption,
+            connections=model_connections,
+        )
+
     database = PromptDatabase(active_settings.database_path)
     creative_store = CreativeStore(active_settings.database_path)
     job_store = BackgroundJobStore(active_settings.database_path)
     workspace_store = DatasetWorkspaceStore(active_settings)
-    curation_store = DatasetCurationStore(active_settings, workspace_store)
+    curation_store = DatasetCurationStore(
+        active_settings,
+        workspace_store,
+        krea2_captioner=krea2_captioner,
+    )
     lora_store = LoraProjectStore(active_settings.lora_projects_root)
     comfy_store = ComfyResultStore(active_settings.comfy_results_root)
     embedding_store = EmbeddingIndexStore(active_settings.embedding_index_root)
@@ -194,6 +222,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         active_settings.ensure_directories()
+        model_connections.initialize()
         database.initialize()
         creative_store.initialize()
         job_store.initialize()
@@ -233,6 +262,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(create_embedding_router(embedding_store, workspace_store))
     application.include_router(create_search_router(hybrid_search))
     application.include_router(create_remote_router(remote_store))
+    application.include_router(create_model_router(model_connections))
     application.include_router(create_source_router(source_sync, job_runner, web_capture))
     application.include_router(create_visual_router(local_visual, embedding_store, job_runner))
     application.include_router(
@@ -436,7 +466,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if path is None:
             raise HTTPException(status_code=404, detail="Result image file not found")
         try:
-            return analyze_result_image(image_path=path, project=project, model=payload.model)
+            return analyze_result_image(
+                image_path=path,
+                project=project,
+                model=payload.model,
+                connections=model_connections,
+            )
         except LocalModelError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
 
@@ -509,6 +544,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 locks=payload.slot_locks,
                 model=payload.model,
                 target_profile=payload.target_profile,
+                connections=model_connections,
             )
         except LocalModelError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
@@ -535,6 +571,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 slots=payload.slots,
                 locks=payload.slot_locks,
                 model=payload.model,
+                connections=model_connections,
             )
         except LocalModelError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error

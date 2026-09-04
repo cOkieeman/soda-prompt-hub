@@ -7,6 +7,7 @@ LORA_STYLES = r"""
   .lora-hero-copy h1 { margin: 18px 0; font-size: clamp(48px, 7vw, 88px); }
   .lora-hero-copy p { max-width: 720px; color: #55564f; line-height: 1.7; }
   .lora-flow { padding: 30px; background: var(--ink); color: var(--paper); }
+  .lora-flow .section-label { color: #b9ae9f; }
   .lora-flow ol { margin: 24px 0 0; padding: 0; list-style: none; counter-reset: steps; }
   .lora-flow li { counter-increment: steps; display: grid; grid-template-columns: 38px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(236,232,220,.2); font-size: 12px; line-height: 1.5; }
   .lora-flow li::before { content: "0" counter(steps); color: var(--acid); font: 800 16px/1 monospace; }
@@ -56,7 +57,7 @@ LORA_STYLES = r"""
   .lora-matrix-row { display: grid; grid-template-columns: 86px 1fr; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
   .lora-matrix-row > strong { color: var(--signal); font: 800 10px/1.4 monospace; }
   .lora-matrix-items { display: flex; flex-wrap: wrap; gap: 5px; }
-  .lora-matrix-item { padding: 6px 8px; background: #cac4b5; color: #55564f; font-size: 9px; }
+  .lora-matrix-item { padding: 6px 8px; background: #cac4b5; color: #494a44; font-size: 9px; }
   .lora-matrix-item.complete { background: var(--acid); color: var(--ink); }
   .lora-warning { padding: 10px; border-left: 4px solid var(--signal); background: #f1e4d7; color: #6e392d; font-size: 10px; line-height: 1.5; }
   .lora-coverage-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }

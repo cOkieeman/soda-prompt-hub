@@ -197,6 +197,7 @@ WORKSPACE_STYLES = r"""
   .dataset-journey button small { overflow: hidden; color: var(--muted); font: 8px/1.35 monospace; text-overflow: ellipsis; white-space: nowrap; }
   .dataset-journey button.complete::after { background: #52735d; }
   .dataset-journey button.current { background: var(--ink); color: var(--paper); }
+  .dataset-journey button.current span { color: var(--acid); }
   .dataset-journey button.current::after { background: var(--acid); }
   .dataset-journey button.current small { color: #c6c0b4; }
   .dataset-journey button.blocked::after { background: var(--signal); }

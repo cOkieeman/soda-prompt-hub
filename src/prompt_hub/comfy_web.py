@@ -21,9 +21,11 @@ COMFY_STYLES = r"""
   .comfy-button.secondary { background: transparent; color: var(--ink); }
   .comfy-button.signal { border-color: var(--signal); background: var(--signal); }
   .comfy-button:disabled { opacity: .45; cursor: not-allowed; }
-  .comfy-status { min-height: 42px; margin: 0 0 14px; border-left: 5px solid var(--acid); background: rgba(215,228,85,.19); padding: 12px 15px; font: 800 10px/1.6 monospace; }
-  .comfy-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 28px 0 12px; }
+  .comfy-status { min-height: 42px; margin: 0 0 14px; border-left: 5px solid var(--acid); background: #30351f; padding: 12px 15px; color: #f4eddf; font: 800 10px/1.6 monospace; }
+  .comfy-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 28px 0 12px; color: var(--paper); }
   .comfy-head h2 { margin: 0; font: 900 30px Georgia, serif; }
+  .comfy-head .section-label, .comfy-head label { color: #b9ae9f; }
+  .comfy-head select { min-height: 36px; border: 1px solid rgba(244,237,223,.38); background: #f7f1e5; padding: 7px 9px; color: var(--ink); }
   .comfy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .comfy-card { display: grid; grid-template-rows: 250px auto; min-width: 0; border: 1px solid var(--line); background: var(--paper); box-shadow: 6px 8px 0 rgba(23,24,21,.09); }
   .comfy-card-image { position: relative; display: block; width: 100%; min-width: 0; overflow: hidden; border-bottom: 1px solid var(--line); background: #1e1f1c; }

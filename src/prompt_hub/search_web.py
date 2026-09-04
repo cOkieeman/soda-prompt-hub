@@ -8,6 +8,7 @@ SEARCH_STYLES = r"""
   .discovery-copy h1 { margin: 18px 0 13px; font: 800 clamp(52px,7vw,96px)/.84 "Iowan Old Style",serif; letter-spacing: -.055em; }
   .discovery-copy p { max-width: 690px; color: var(--muted); line-height: 1.7; }
   .discovery-index { display: flex; flex-direction: column; justify-content: center; padding: 34px; background: var(--ink); color: var(--paper); }
+  .discovery-index .section-label { color: #b9ae9f; }
   .discovery-index strong { display: block; margin: 12px 0 8px; color: var(--acid); font: 800 21px/1.2 "Iowan Old Style",serif; }
   .discovery-index p { color: #aaa99f; font-size: 11px; line-height: 1.6; }
   .discovery-index-list { display: grid; gap: 6px; margin-top: 12px; }

@@ -1,5 +1,29 @@
 # 发现与决策
 
+## 2026-09-05 PR #2 外部模型 API 审查
+
+- PR #2 基于 `91fce13`，比当前 `main` 落后 3 个 commit，并与 `creative_web.py`、`creative_web_layout.py` 冲突。
+- PR 误删绘图页底部核心函数和事件绑定，导致新建、取材、结果图复盘、数据集导出与 5060 Ti 投递等按钮失效；不能直接合并或 cherry-pick。
+- `GET /api/models/config` 返回完整模型配置和明文 API Key；配置路径在个人库无文件时回退到仓库内 tracked `models.json`，存在误提交密钥风险。
+- 前端模型保存硬编码 `provider: custom`，却展示 Anthropic/Gemini 等原生端点；后端实际主要走 OpenAI-compatible 协议，产品声明与实现不符。
+- 保存按钮会收集全部 `.api-add-btn`，而不是仅收集用户点过“＋”的模型；单选会变成全量添加。
+- `_resolve_endpoint()` 没有解析真实 `model_name`，友好配置 ID 可能被错误发送给上游 API。
+- PR 分支质量门：98 项测试执行通过但 coverage 78.45% 未达 80%；Ruff format 失败、Ruff lint 294 项、ty 1 项。当前 `main` 为 146/146、coverage 80.74%，格式/lint/ty 全通过。
+- 阶段 41 决策：不修补 PR 分支，改为在最新 `main` 上按本地优先架构重做；首版只承诺 LM Studio 与 OpenAI-compatible。
+
+## 2026-09-05 阶段 41 现有架构接入点
+
+- `local_model.py` 当前有四条推理路径：槽位整理、检索词扩展使用 LM Studio 的 OpenAI-compatible `/chat/completions`；结果图分析、Krea 2 caption 使用 LM Studio 原生 `/api/v1/chat`。
+- `create_app()` 已持有明确的 `active_settings`，适合构造单一 `ModelConnectionStore`；API 调用可显式传入该 store，避免依赖全局缓存或重新读取环境变量。
+- `DatasetCurationStore` 已支持注入 `krea2_captioner`，因此可用闭包把同一个模型 store 传给后台 Krea 2 caption，不需要改动其任务协议。
+- 新增独立 `model_connections.py` 与 `model_routes.py`，可以避免继续膨胀 `api.py`，并保持 `/api/local-models` 兼容现有测试和外部调用。
+- 新的统一 `/api/models` 只负责合并本地 LM Studio 模型和已保存的外部模型；现有 `/api/local-models` 保留不变。
+- 配置文件固定为 `library_root/private/model-connections.json`，不允许回退仓库目录；写入后收紧为用户读写权限。公开响应只返回 `has_api_key`，永不包含 `api_key`。
+- 首版 URL 边界为远程必须 HTTPS、HTTP 仅允许 loopback；协议固定标记为 `openai_compatible`。模型列表由后端访问 `/models`，失败时仍允许手工填写模型名称。
+- 前端只在现有“本地模型辅助”区域增加折叠式可选管理，不新增第二套失效的模型选择器；`#lmModel` 与 `#visionModel` 继续作为真实任务选择入口。
+- 外部推理不能复用 `urlopen()` 的默认重定向策略，否则带 Bearer Key 的请求可能跟随到非预期地址；外部文本和视觉调用统一禁用重定向并限制响应体，LM Studio 本机调用继续保持原行为。
+- `external-<16 hex>` 是保留连接 ID。若对应配置已删除，必须在模型解析处立即报错，不能把这个 ID 当作 LM Studio 的真实模型名继续请求。
+
 ## 2026-09-03 LoRA Manager 接入探测
 
 - Windows 在线且 SMB/ComfyUI 端口 TCP 可达，但 Mac 当前没有 SMB volume；Finder 需要用户本人重新完成凭据确认。

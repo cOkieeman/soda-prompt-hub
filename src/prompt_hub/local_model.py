@@ -3,22 +3,41 @@ from __future__ import annotations
 import base64
 import json
 from io import BytesIO
-from typing import TYPE_CHECKING, Any
+from typing import IO, TYPE_CHECKING, Any, override
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from PIL import Image, ImageOps
 
 from prompt_hub.creative import SLOT_LABELS, SLOT_ORDER
+from prompt_hub.model_connections import CONNECTION_ID_PATTERN
 
 if TYPE_CHECKING:
+    from http.client import HTTPMessage
     from pathlib import Path
 
+    from prompt_hub.model_connections import ModelConnection, ModelConnectionStore
+
 DEFAULT_LM_STUDIO_URL = "http://127.0.0.1:1234/v1"
+MAX_MODEL_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
 class LocalModelError(RuntimeError):
     pass
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    @override
+    def redirect_request(
+        self,
+        req: Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+        newurl: str,
+    ) -> None:
+        return None
 
 
 def list_local_models(base_url: str = DEFAULT_LM_STUDIO_URL) -> list[dict[str, Any]]:
@@ -46,6 +65,7 @@ def organize_slots(
     model: str,
     target_profile: str,
     base_url: str = DEFAULT_LM_STUDIO_URL,
+    connections: ModelConnectionStore | None = None,
 ) -> dict[str, Any]:
     editable = [slot for slot in SLOT_ORDER if not locks.get(slot, False)]
     locked = {slot: slots.get(slot, "") for slot in SLOT_ORDER if locks.get(slot, False)}
@@ -65,8 +85,11 @@ def organize_slots(
         "锁定槽位_不可修改": locked,
         "槽位中文名": SLOT_LABELS,
     }
+    external = _resolve_external_model(model, connections)
+    request_model = external.model_name if external else model
+    request_base_url = external.base_url if external else base_url
     payload = {
-        "model": model,
+        "model": request_model,
         "messages": [
             {"role": "system", "content": instruction},
             {
@@ -79,10 +102,14 @@ def organize_slots(
         "stream": False,
     }
     response = _request_json(
-        f"{base_url.rstrip('/')}/chat/completions",
+        f"{request_base_url.rstrip('/')}/chat/completions",
         method="POST",
         payload=payload,
         timeout=90,
+        api_key=external.api_key if external else "",
+        allow_redirects=external is None,
+        response_limit=MAX_MODEL_RESPONSE_BYTES if external else None,
+        service_name="外部模型服务" if external else "LM Studio",
     )
     try:
         content = response["choices"][0]["message"]["content"]
@@ -110,6 +137,7 @@ def expand_sourcing_queries(
     locks: dict[str, bool],
     model: str,
     base_url: str = DEFAULT_LM_STUDIO_URL,
+    connections: ModelConnectionStore | None = None,
 ) -> dict[str, Any]:
     editable = [slot for slot in SLOT_ORDER if not locks.get(slot, False)]
     instruction = (
@@ -121,8 +149,11 @@ def expand_sourcing_queries(
         "只提取用户明确表达或合理同义转换的概念，不增加新角色、新服装或新场景。"
         f"锁定槽位必须返回空数组；可检索槽位为：{', '.join(editable)}。"
     )
+    external = _resolve_external_model(model, connections)
+    request_model = external.model_name if external else model
+    request_base_url = external.base_url if external else base_url
     payload = {
-        "model": model,
+        "model": request_model,
         "messages": [
             {"role": "system", "content": instruction},
             {
@@ -139,10 +170,14 @@ def expand_sourcing_queries(
         "stream": False,
     }
     response = _request_json(
-        f"{base_url.rstrip('/')}/chat/completions",
+        f"{request_base_url.rstrip('/')}/chat/completions",
         method="POST",
         payload=payload,
         timeout=90,
+        api_key=external.api_key if external else "",
+        allow_redirects=external is None,
+        response_limit=MAX_MODEL_RESPONSE_BYTES if external else None,
+        service_name="外部模型服务" if external else "LM Studio",
     )
     try:
         content = response["choices"][0]["message"]["content"]
@@ -166,6 +201,7 @@ def analyze_result_image(
     project: dict[str, Any],
     model: str,
     base_url: str = DEFAULT_LM_STUDIO_URL,
+    connections: ModelConnectionStore | None = None,
 ) -> dict[str, Any]:
     instruction = (
         "你是 AI 绘图结果复盘助手。只输出一个 JSON 对象，不要 Markdown，不要解释。"
@@ -187,11 +223,12 @@ def analyze_result_image(
         "项目分级": project.get("safety_mode", "sfw"),
         "目标Profile": project.get("target_profile", "anima"),
     }
+    image_data_url = _image_data_url(image_path)
     payload = {
         "model": model,
         "system_prompt": instruction,
         "input": [
-            {"type": "image", "data_url": _image_data_url(image_path)},
+            {"type": "image", "data_url": image_data_url},
             {
                 "type": "text",
                 "content": "请复盘这张本地生成结果图。项目上下文："
@@ -204,22 +241,37 @@ def analyze_result_image(
         "stream": False,
         "store": False,
     }
-    server_root = base_url.rstrip("/").removesuffix("/v1")
-    response = _request_json(
-        f"{server_root}/api/v1/chat",
-        method="POST",
-        payload=payload,
-        timeout=180,
-    )
-    try:
-        content = "\n".join(
-            str(item.get("content", ""))
-            for item in response["output"]
-            if isinstance(item, dict) and item.get("type") == "message"
+    external = _resolve_external_model(model, connections)
+    if external:
+        content = _external_vision_completion(
+            connection=external,
+            system_prompt=instruction,
+            text_prompt="请复盘这张本地生成结果图。项目上下文："
+            + json.dumps(context, ensure_ascii=False),
+            image_data_url=image_data_url,
+            temperature=0.1,
+            max_tokens=900,
         )
+    else:
+        server_root = base_url.rstrip("/").removesuffix("/v1")
+        response = _request_json(
+            f"{server_root}/api/v1/chat",
+            method="POST",
+            payload=payload,
+            timeout=180,
+        )
+        try:
+            content = "\n".join(
+                str(item.get("content", ""))
+                for item in response["output"]
+                if isinstance(item, dict) and item.get("type") == "message"
+            )
+        except (KeyError, TypeError) as error:
+            raise LocalModelError("本地视觉模型没有返回可识别的复盘 JSON") from error
+    try:
         raw = _extract_json_object(str(content))
-    except (KeyError, TypeError, json.JSONDecodeError) as error:
-        raise LocalModelError("本地视觉模型没有返回可识别的复盘 JSON") from error
+    except json.JSONDecodeError as error:
+        raise LocalModelError("视觉模型没有返回可识别的复盘 JSON") from error
     raw_slots = raw.get("observed_slots", {})
     slots = raw_slots if isinstance(raw_slots, dict) else {}
     raw_prompts = raw.get("reconstructed_prompts", {})
@@ -245,6 +297,7 @@ def draft_krea2_caption(
     model: str,
     existing_caption: str = "",
     base_url: str = DEFAULT_LM_STUDIO_URL,
+    connections: ModelConnectionStore | None = None,
 ) -> dict[str, Any]:
     instruction = (
         "You write concise English natural-language training captions for Krea 2 image datasets. "
@@ -265,11 +318,12 @@ def draft_krea2_caption(
         if existing_caption.strip()
         else "There is no existing reviewed caption."
     )
+    image_data_url = _image_data_url(image_path)
     payload = {
         "model": model,
         "system_prompt": instruction,
         "input": [
-            {"type": "image", "data_url": _image_data_url(image_path)},
+            {"type": "image", "data_url": image_data_url},
             {
                 "type": "text",
                 "content": f"Draft a Krea 2 caption for this local dataset image. {context}",
@@ -281,22 +335,36 @@ def draft_krea2_caption(
         "stream": False,
         "store": False,
     }
-    server_root = base_url.rstrip("/").removesuffix("/v1")
-    response = _request_json(
-        f"{server_root}/api/v1/chat",
-        method="POST",
-        payload=payload,
-        timeout=180,
-    )
-    try:
-        content = "\n".join(
-            str(item.get("content", ""))
-            for item in response["output"]
-            if isinstance(item, dict) and item.get("type") == "message"
+    external = _resolve_external_model(model, connections)
+    if external:
+        content = _external_vision_completion(
+            connection=external,
+            system_prompt=instruction,
+            text_prompt=f"Draft a Krea 2 caption for this local dataset image. {context}",
+            image_data_url=image_data_url,
+            temperature=0.15,
+            max_tokens=650,
         )
+    else:
+        server_root = base_url.rstrip("/").removesuffix("/v1")
+        response = _request_json(
+            f"{server_root}/api/v1/chat",
+            method="POST",
+            payload=payload,
+            timeout=180,
+        )
+        try:
+            content = "\n".join(
+                str(item.get("content", ""))
+                for item in response["output"]
+                if isinstance(item, dict) and item.get("type") == "message"
+            )
+        except (KeyError, TypeError) as error:
+            raise LocalModelError("本地视觉模型没有返回可识别的 Krea 2 草稿 JSON") from error
+    try:
         raw = _extract_json_object(content)
-    except (KeyError, TypeError, json.JSONDecodeError) as error:
-        raise LocalModelError("本地视觉模型没有返回可识别的 Krea 2 草稿 JSON") from error
+    except json.JSONDecodeError as error:
+        raise LocalModelError("视觉模型没有返回可识别的 Krea 2 草稿 JSON") from error
     caption = " ".join(str(raw.get("caption", "")).split())
     if not caption:
         raise LocalModelError("本地视觉模型返回了空的 Krea 2 草稿")
@@ -322,12 +390,29 @@ def _request_json(
     method: str = "GET",
     payload: dict[str, Any] | None = None,
     timeout: float = 4,
+    api_key: str = "",
+    allow_redirects: bool = True,
+    response_limit: int | None = None,
+    service_name: str = "LM Studio",
 ) -> Any:
     data = json.dumps(payload).encode() if payload is not None else None
-    request = Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    request = Request(url, data=data, method=method, headers=headers)
     try:
-        with urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read())
+        response_context = (
+            urlopen(request, timeout=timeout)
+            if allow_redirects
+            else build_opener(_NoRedirect).open(request, timeout=timeout)
+        )
+        with response_context as response:
+            body = (
+                response.read(response_limit + 1) if response_limit is not None else response.read()
+            )
+        if response_limit is not None and len(body) > response_limit:
+            raise LocalModelError(f"{service_name}响应超过安全上限")
+        return json.loads(body)
     except HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace").strip()[:800]
         try:
@@ -335,12 +420,65 @@ def _request_json(
             detail = str(parsed_detail.get("error", {}).get("message") or detail)
         except (AttributeError, json.JSONDecodeError):
             pass
-        message = f"LM Studio 返回 HTTP {error.code}"
+        message = f"{service_name}返回 HTTP {error.code}"
         if detail:
             message += f"：{detail}"
         raise LocalModelError(message) from error
     except (URLError, TimeoutError, json.JSONDecodeError) as error:
-        raise LocalModelError(f"无法连接本机 LM Studio：{error}") from error
+        raise LocalModelError(f"无法连接{service_name}：{error}") from error
+
+
+def _resolve_external_model(
+    model: str,
+    connections: ModelConnectionStore | None,
+) -> ModelConnection | None:
+    connection = connections.resolve(model) if connections else None
+    if connection is None and CONNECTION_ID_PATTERN.fullmatch(model):
+        raise LocalModelError("外部模型连接不存在或已删除，请重新选择模型")
+    return connection
+
+
+def _external_vision_completion(
+    *,
+    connection: ModelConnection,
+    system_prompt: str,
+    text_prompt: str,
+    image_data_url: str,
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    if not connection.supports_vision:
+        raise LocalModelError("当前外部模型没有标记为视觉模型")
+    payload = {
+        "model": connection.model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_data_url}},
+                    {"type": "text", "text": text_prompt},
+                ],
+            },
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": False,
+    }
+    response = _request_json(
+        f"{connection.base_url}/chat/completions",
+        method="POST",
+        payload=payload,
+        timeout=180,
+        api_key=connection.api_key,
+        allow_redirects=False,
+        response_limit=MAX_MODEL_RESPONSE_BYTES,
+        service_name="外部模型服务",
+    )
+    try:
+        return str(response["choices"][0]["message"]["content"])
+    except (KeyError, IndexError, TypeError) as error:
+        raise LocalModelError("外部视觉模型返回格式错误") from error
 
 
 def _image_data_url(path: Path) -> str:
