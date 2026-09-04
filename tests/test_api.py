@@ -104,6 +104,11 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
                 "导出精选数据集 ZIP",
                 "数据集工作台",
                 "datasetImportForm",
+                ".dataset-workspace-list { min-width: 0;",
+                (
+                    ".dataset-workspace-item { width: 100%; min-width: 0; "
+                    "max-width: 100%; overflow: hidden;"
+                ),
                 "datasetJourney",
                 'data-dataset-step="1"',
                 'data-dataset-step="5"',

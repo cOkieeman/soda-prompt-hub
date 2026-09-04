@@ -163,8 +163,8 @@ WORKSPACE_STYLES = r"""
   .dataset-primary { border: 1px solid var(--signal); background: var(--signal); color: white; padding: 10px 12px; text-align: left; font: 800 9px monospace; text-transform: uppercase; }
   .dataset-hint { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
   .dataset-sidebar-head { display: flex; justify-content: space-between; margin: 18px 0 8px; font: 800 9px monospace; text-transform: uppercase; }
-  .dataset-workspace-list { display: grid; gap: 7px; }
-  .dataset-workspace-item { width: 100%; border: 1px solid rgba(31,29,25,.25); background: #eee7da; padding: 10px; text-align: left; }
+  .dataset-workspace-list { min-width: 0; display: grid; gap: 7px; }
+  .dataset-workspace-item { width: 100%; min-width: 0; max-width: 100%; overflow: hidden; border: 1px solid rgba(31,29,25,.25); background: #eee7da; padding: 10px; text-align: left; }
   .dataset-workspace-item.active { border-color: var(--signal); box-shadow: inset 4px 0 var(--acid); }
   .dataset-workspace-item strong, .dataset-workspace-item span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dataset-workspace-item strong { font-size: 11px; }
