@@ -47,6 +47,16 @@ CREATIVE_STYLES = r"""
   .iteration-panel-actions p { margin: 0; color: var(--muted); font-size: 10px; }
   .rail-section { margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(31,29,25,.24); }
   .lm-status { margin: 8px 0; font-size: 11px; color: var(--muted); }
+  .model-label { display: block; margin-bottom: 5px; color: var(--muted); font: 800 9px monospace; text-transform: uppercase; letter-spacing: .08em; }
+  .model-select { width: 100%; border: 1px solid rgba(31,29,25,.22); background: rgba(255,255,255,.5); color: var(--ink); padding: 8px; font: 11px "Avenir Next", sans-serif; }
+
+  .managed-model-list { display: grid; gap: 5px; margin-top: 8px; max-height: 240px; overflow-y: auto; }
+  .managed-model-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border: 1px solid rgba(31,29,25,.2); background: rgba(255,255,255,.4); font-size: 11px; color: var(--ink); }
+  .managed-model-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .managed-model-item .mm-type { display: inline-block; margin-left: 6px; padding: 1px 5px; font: 8px monospace; border: 1px solid rgba(31,29,25,.25); color: var(--muted); }
+  .managed-model-del { flex: 0 0 auto; width: 20px; height: 20px; border: 1px solid rgba(216,75,42,.5); background: transparent; color: var(--signal); font-size: 12px; line-height: 1; cursor: pointer; border-radius: 3px; transition: all .15s; }
+  .managed-model-del:hover { background: var(--signal); color: #fff; }
+  .managed-model-empty { color: var(--muted); font-size: 10px; padding: 6px 2px; }
   .project-head { display: grid; grid-template-columns: 1fr 180px; gap: 14px; margin-bottom: 18px; }
   .creative-field label, .slot-head label, .generation-grid label { display: block; margin-bottom: 6px; color: var(--muted); font: 800 9px monospace; text-transform: uppercase; letter-spacing: .08em; }
   .creative-field input, .creative-field textarea, .creative-field select, .slot-card textarea, .generation-grid input, .generation-grid textarea, .assist-select { width: 100%; border: 1px solid var(--line); background: rgba(248,244,235,.94); color: var(--ink); padding: 10px; font: 13px/1.5 "Avenir Next", sans-serif; }
@@ -208,14 +218,124 @@ CREATIVE_STYLES = r"""
   .recipe-name { width: 100%; margin-top: 12px; border: 1px solid rgba(244,237,223,.35); background: rgba(255,255,255,.06); color: #f4eddf; padding: 9px; }
   @media (max-width: 1180px) { .creative-layout { grid-template-columns: 220px minmax(0, 1fr); } .output-rail { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); } }
   @media (max-width: 760px) { .creative-heading { display: block; background: #ece5d5; } .creative-heading p { margin-top: 12px; } .creative-layout { display: block; } .project-rail { border-right: 0; border-bottom: 1px solid var(--line); } .slot-grid, .project-head, .result-review-tools, .review-slot-grid, .review-findings, .review-actions, .iteration-change, .iteration-panel-actions, .dataset-export-panel, .wd14-toolbar { grid-template-columns: 1fr; } .slot-card:first-child { grid-column: auto; } .reference-list, .sourcing-candidates, .result-gallery { grid-template-columns: 1fr; } .generation-grid { grid-template-columns: 1fr 1fr; } }
+
+/* API Configuration Section */
+.api-config-section { margin-top: 24px; padding: 16px; border: 1px solid rgba(244,241,234,0.15); border-radius: 6px; background: rgba(31,36,33,0.4); }
+.api-config-head { margin-bottom: 12px; }
+.api-config-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: #f4f1ea; }
+.api-config-label { display: block; margin-bottom: 12px; font-size: 12px; color: #b9ae9f; }
+
+  /* Combobox 样式 */
+  .combobox-wrapper { position: relative; display: flex; }
+  .combobox-input { 
+  flex: 1; 
+  padding: 10px 40px 10px 12px; 
+  border: 1px solid var(--line); 
+  border-radius: 6px; 
+  font: 14px "Inter", sans-serif; 
+  color: var(--ink); 
+  background: #E8E8E8 !important;
+  transition: all 0.2s;
+  }
+  .combobox-input:focus { 
+  outline: none; 
+  border-color: #C4612F; 
+  box-shadow: 0 0 0 3px rgba(196, 97, 47, 0.1);
+  }
+  .combobox-trigger {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: all 0.2s;
+  border-radius: 4px;
+  }
+  .combobox-trigger:hover { background: rgba(0,0,0,0.05); color: var(--ink); }
+  .combobox-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #2A2F2E;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transition: opacity 0.2s, transform 0.2s;
+  }
+  .combobox-dropdown.is-open {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  }
+  .combobox-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(231,225,215,0.4);
+  transition: background 0.15s;
+  position: relative;
+  }
+  .combobox-option:last-child { border-bottom: none; }
+  .combobox-option:hover { background: var(--surface); }
+  .combobox-option.is-selected::before {
+  content: "✓";
+  position: absolute;
+  left: -4px;
+  color: #3B82F6;
+  font-weight: 600;
+  font-size: 16px;
+  }
+  .combobox-option.is-selected .option-name { color: #3B82F6; font-weight: 500; }
+  .option-name { 
+  font: 14px "Inter", sans-serif; 
+  font-weight: 400;
+  color: var(--ink);
+  margin-left: 20px;
+  }
+  .option-url { 
+  font: 12px "SF Mono", Consolas, monospace; 
+  color: var(--muted);
+  text-align: right;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  }
+  .combobox-option-custom .option-url { font-family: "Inter", sans-serif; font-style: italic; }
+
+  .api-vision-toggle { padding: 4px 8px; border: 1px solid rgba(244,241,234,0.25); background: transparent; color: #b9ae9f; font-size: 11px; cursor: pointer; border-radius: 3px; transition: all .15s; }
+  .api-vision-toggle:hover { border-color: rgba(196,97,47,0.5); color: #f4f1ea; }
+  .api-vision-toggle.is-vision { background: rgba(215,228,85,0.15); border-color: var(--acid); color: var(--acid); }
 </style>
 """
 
 CREATIVE_SCRIPT = r"""
 <script>
-(() => {
+(function() {
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => [...document.querySelectorAll(sel)];
+
   const slotsMeta = {
-    character: ['角色', '人物身份、外观、发色、瞳色与稳定特征'], outfit: ['服装', '衣物、材质、配饰与穿着方式'],
+    character: ['角色', '人物名、瞳色与稳定特征'], outfit: ['服装', '衣物、材质、配饰与穿着方式'],
     action: ['动作', '姿态、手部动作、表情与互动'], composition: ['构图', '景别、机位、视角与主体位置'],
     scene: ['场景', '地点、环境物件、天气与时间'], lighting: ['灯光', '光向、色温、明暗与氛围'], style: ['画风', '媒介、审美、质感、LoRA 与风格词']
   };
@@ -345,11 +465,11 @@ CREATIVE_SCRIPT = r"""
 
   function updateVisionHint() {
     const select = $('#visionModel'); const option = select.options[select.selectedIndex];
-    if (!creativeState.visionAvailable || !option) { $('#resultModelHint').textContent = 'LM Studio 中暂未发现可用的视觉模型。'; return; }
+    if (!creativeState.visionAvailable || !option) { $('#resultModelHint').textContent = '暂无可用视觉模型，请先在上方 External API 配置中拉取并保存视觉模型。'; return; }
     const loaded = option.textContent.trim().startsWith('●');
     $('#resultModelHint').textContent = loaded
       ? '● 当前视觉模型已加载，可以直接复盘。'
-      : '○ 当前模型尚未加载。24GB Mac 请先在 LM Studio 卸载文字模型，再只加载这一只视觉模型。';
+      : '○ 当前视觉模型已选择，可直接用于复盘。';
   }
 
   function renderReviewProposal() {
@@ -470,259 +590,326 @@ CREATIVE_SCRIPT = r"""
 
   async function loadCreativeMeta() {
     const [projects, recipes, models, workflowProfiles] = await Promise.all([creativeJson('/api/creative/projects'), creativeJson('/api/creative/recipes'), creativeJson('/api/local-models'), creativeJson('/api/workflow-profiles')]);
+      // Load unified model list
+      const unifiedModels = await creativeJson('/api/models/list').catch(() => ({success:false,models:[],text_models:[],vision_models:[]}));
     creativeState.projects = projects; creativeState.recipes = recipes; renderCreativeProjects(); renderCreativeRecipes();
-    creativeState.workflowProfiles = workflowProfiles; renderWorkflowProfiles();
-    const select = $('#lmModel'); select.innerHTML = models.models.map(model => `<option value="${escapeHtml(model.id)}">${model.loaded ? '● ' : ''}${escapeHtml(model.name || model.id)}${model.params ? ` · ${escapeHtml(model.params)}` : ''}</option>`).join('');
-    const loaded = models.models.find(model => model.loaded);
-    const quickFallback = models.models.find(model => model.id.includes('qwen3.5-9b'));
-    const preferred = loaded || quickFallback || models.models[0];
-    if (preferred) select.value = preferred.id;
-    const visionModels = models.models.filter(model => model.vision); const visionSelect = $('#visionModel');
-    visionSelect.innerHTML = visionModels.map(model => `<option value="${escapeHtml(model.id)}">${model.loaded ? '● ' : ''}${escapeHtml(model.name || model.id)}${model.params ? ` · ${escapeHtml(model.params)}` : ''}</option>`).join('');
-    const loadedVision = visionModels.find(model => model.loaded); const visionFallback = visionModels.find(model => model.id.includes('qwen3.5-9b')); const preferredVision = visionFallback || loadedVision || visionModels[0];
-    if (preferredVision) visionSelect.value = preferredVision.id;
-    creativeState.visionAvailable = Boolean(models.available && visionModels.length); visionSelect.disabled = !creativeState.visionAvailable;
-    updateVisionHint();
-    $('#lmStatus').textContent = models.available ? `${models.models.length} 个文本模型可用；● 表示已加载，默认优先避免换模。` : 'LM Studio 当前未启动，手动编辑与双格式输出仍可使用。';
-    $('#assistCreative').disabled = !models.available || !models.models.length;
-    creativeState.loadedMeta = true;
+      // Populate unified model selectors
+      if (unifiedModels.success && unifiedModels.models.length > 0) {
+        const textSelect = $('#textModelSelect');
+        const visionSelect = $('#visionModelSelect');
+        if (unifiedModels.text_models.length) {
+          textSelect.innerHTML = unifiedModels.text_models.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.id)}${m.provider ? ' · ' + escapeHtml(m.provider) : ''}</option>`).join('');
+        } else {
+          textSelect.innerHTML = `<option value="" disabled selected>还未添加模型</option>`;
+        }
+        if (unifiedModels.vision_models.length) {
+          visionSelect.innerHTML = unifiedModels.vision_models.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.id)}${m.provider ? ' · ' + escapeHtml(m.provider) : ''}</option>`).join('');
+        } else {
+          visionSelect.innerHTML = `<option value="" disabled selected>还未添加模型</option>`;
+        }
+        // Set defaults
+        const defaultText = unifiedModels.text_models.find(m => m.id.includes('lm-studio')) || unifiedModels.text_models[0];
+        const defaultVision = unifiedModels.vision_models.find(m => m.id.includes('lm-studio')) || unifiedModels.vision_models[0];
+        if (defaultText) textSelect.value = defaultText.id;
+        if (defaultVision) visionSelect.value = defaultVision.id;
+      }
+    creativeState.workflowProfiles = workflowProfiles; renderWorkflowProfiles(); renderManagedModelList(unifiedModels);
+    // 本地辅助下拉框：使用统一模型（含外接），文本模型
+    const assistSelect = $('#lmModel');
+    const assistModels = unifiedModels.success && unifiedModels.text_models.length ? unifiedModels.text_models : (models.models || []);
+    if (assistModels.length) {
+      assistSelect.innerHTML = assistModels.map(model => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.name || model.id)}${model.provider ? ` · ${escapeHtml(model.provider)}` : ''}</option>`).join('');
+      assistSelect.value = assistModels[0].id;
+      $('#lmStatus').textContent = `已加载 ${assistModels.length} 个文本模型`;
+    } else {
+      assistSelect.innerHTML = `<option value="" disabled selected>还未添加模型</option>`;
+      assistSelect.disabled = true;
+      $('#lmStatus').textContent = '还未添加文本模型，请先在下方 External API 配置中添加';
+    }
+
+    // 结果图复盘视觉模型下拉框：使用统一模型（含外接），视觉模型
+    const visionModelSelect = $('#visionModel');
+    const unifiedVision = unifiedModels.success && unifiedModels.vision_models.length ? unifiedModels.vision_models : [];
+    if (unifiedVision.length) {
+      visionModelSelect.innerHTML = unifiedVision.map(model => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.name || model.id)}${model.provider ? ` · ${escapeHtml(model.provider)}` : ''}</option>`).join('');
+      visionModelSelect.value = unifiedVision[0].id;
+    } else {
+      visionModelSelect.innerHTML = `<option value="" disabled selected>还未添加模型</option>`;
+    }
+    creativeState.visionAvailable = Boolean(unifiedModels.success && unifiedVision.length);
+    visionModelSelect.disabled = !creativeState.visionAvailable;
+    $('#resultModelHint').textContent = creativeState.visionAvailable ? `已加载 ${unifiedVision.length} 个视觉模型` : '暂无可用视觉模型，请先在上方配置并保存视觉模型';
   }
 
-  async function ensureCreativeProject() {
-    if (!creativeState.loadedMeta) await loadCreativeMeta();
-    if (!creativeState.project) creativeState.project = creativeState.projects[0] || await createCreativeProject();
-    renderCreativeProject();
-  }
-  window.ensureCreativeProject = ensureCreativeProject;
+  // API Configuration Management
+  let fetchedModels = [];
+  let existingModelIds = new Set();
+  let pendingAdditions = new Map(); // modelId -> {url, key, vision}
 
-  async function addEntryToCreative(item, slot) {
-    await ensureCreativeProject();
-    const project = collectCreative(); const current = project.slots[slot] || ''; const addition = item.content || item.title || '';
-    if (addition && !current.includes(addition)) project.slots[slot] = [current, addition].filter(Boolean).join(', ');
-    const key = `${item.source_id}:${item.external_id}:${slot}`;
-    if (!project.references.some(ref => ref.key === key)) project.references.push({key, slot, source_id:item.source_id, external_id:item.external_id, title:item.title, kind:item.kind, safety:item.safety, source_url:item.source_url || '', visuals:item.visuals || []});
-    creativeState.project = project; renderCreativeProject(); await saveCreative(); await setView('creative');
-  }
-
-  function sourcingPayload(queryHints = {}) {
-    const project = collectCreative();
-    return {brief:project.brief_zh, slots:project.slots, slot_locks:project.slot_locks, safety_mode:project.safety_mode, query_hints:queryHints, limit_per_slot:6};
+  // Load existing models
+  async function loadExistingModels() {
+    try {
+      const response = await fetch('/api/models/config');
+      if (response.ok) {
+        const config = await response.json();
+        existingModelIds = new Set((config.models || []).map(m => m.id));
+      }
+    } catch (error) {
+      console.warn('Failed to load existing models:', error);
+    }
   }
 
-  function setSourcingStatus(message) {
-    $('#sourcingStatus').textContent = message;
-    $('#sourcingRailStatus').textContent = message;
-  }
+  // Handle preset selection
+  
 
-  async function expandCreativeSourcing(runId, payload) {
-    const model = $('#lmModel').value;
-    if (!model || $('#assistCreative').disabled) {
-      setSourcingStatus(`本地快速检索完成：${creativeState.sourcing?.candidate_count || 0} 条真实资料。LM Studio 未连接，本轮不做检索词扩展。`);
+  // Fetch models from API
+  $('#fetchModelsBtn').addEventListener('click', async () => {
+    const baseUrl = $('#apiBaseUrl').value.trim();
+    const apiKey = $('#apiKey').value.trim();
+    
+    if (!baseUrl) {
+      alert('请先填写 Base URL');
       return;
     }
+    if (!apiKey) {
+      alert('请先填写 API Key');
+      return;
+    }
+
+    $('#fetchModelsBtn').textContent = '拉取中...';
+    $('#fetchModelsBtn').disabled = true;
+
     try {
-      const expanded = await creativeJson('/api/creative/source/expand', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({brief:payload.brief, slots:payload.slots, slot_locks:payload.slot_locks, model})});
-      if (runId !== creativeState.sourcingRun) return;
-      setSourcingStatus(`本地结果已可用；${expanded.model || '本地模型'} 已扩展检索词，正在补充候选…`);
-      const enriched = await creativeJson('/api/creative/source', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, query_hints:expanded.queries})});
-      if (runId !== creativeState.sourcingRun) return;
-      creativeState.sourcing = enriched; renderSourcing();
-      setSourcingStatus(`智能取材完成：${enriched.candidate_count} 条真实本地资料；检索词由 ${expanded.model || '本地模型'} 扩展。`);
+      const response = await fetch(`${baseUrl}/models`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      fetchedModels = data.data || data.models || [];
+      
+      if (fetchedModels.length === 0) {
+        $('#apiFetchedModelList').innerHTML = '<p class="api-empty-hint">未获取到任何模型</p>';
+      } else {
+        renderFetchedModels();
+      }
     } catch (error) {
-      if (runId !== creativeState.sourcingRun) return;
-      setSourcingStatus(`本地候选仍可使用；模型扩展未完成：${error.message}`);
-    }
-  }
-
-  async function runCreativeSourcing() {
-    await ensureCreativeProject();
-    const payload = sourcingPayload();
-    if (!payload.brief) throw new Error('请先写一段中文创作想法');
-    const runId = ++creativeState.sourcingRun;
-    const button = $('#sourceCreative'); button.disabled = true; button.textContent = '正在检索本地资料…';
-    creativeState.sourcingProjectId = creativeState.project.project_id; $('#sourcingPanel').hidden = false; setSourcingStatus('正在按七个槽位检索本机资料库…');
-    try {
-      const result = await creativeJson('/api/creative/source', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-      if (runId !== creativeState.sourcingRun) return;
-      creativeState.sourcing = result; renderSourcing();
-      setSourcingStatus(`本地快速检索完成：${result.candidate_count} 条真实资料。正在由已加载模型扩展检索词…`);
-      expandCreativeSourcing(runId, payload);
+      alert(`拉取失败: ${error.message}`);
+      $('#apiFetchedModelList').innerHTML = '<p class="api-empty-hint" style="color:#c4612f;">拉取失败，请检查 URL 和 Key</p>';
     } finally {
-      if (runId === creativeState.sourcingRun) { button.disabled = false; button.textContent = '从本地库智能取材'; }
+      $('#fetchModelsBtn').textContent = '拉取模型列表';
+      $('#fetchModelsBtn').disabled = false;
+    }
+  });
+
+  function renderFetchedModels() {
+    const container = $('#apiFetchedModelList');
+    const baseUrl = $('#apiBaseUrl').value.trim();
+    const apiKey = $('#apiKey').value.trim();
+
+    container.innerHTML = fetchedModels.map(model => {
+      const modelId = model.id || model.name;
+      const isAdded = existingModelIds.has(modelId);
+      const isPending = pendingAdditions.has(modelId);
+
+      if (isAdded) {
+        return `
+          <div class="api-fetched-model">
+            <span class="api-model-name-text">${escapeHtml(modelId)}</span>
+            <span class="api-added-label">已添加</span>
+          </div>`;
+      }
+
+      return `
+        <div class="api-fetched-model" data-model-id="${escapeHtml(modelId)}">
+          <span class="api-model-name-text">${escapeHtml(modelId)}</span>
+          <div class="api-model-actions">
+            <button type="button" class="api-vision-toggle" data-vision="0" data-model-id="${escapeHtml(modelId)}">设为视觉</button>
+            <button class="api-add-btn" data-model-id="${escapeHtml(modelId)}">+</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Bind vision toggle buttons
+    container.querySelectorAll('.api-vision-toggle').forEach(toggle => {
+      toggle.addEventListener('click', () => {
+        const isVision = toggle.dataset.vision === '1';
+        toggle.dataset.vision = isVision ? '0' : '1';
+        toggle.textContent = isVision ? '设为视觉' : '视觉模型 ✓';
+        toggle.classList.toggle('is-vision', !isVision);
+      });
+    });
+
+    // Bind add buttons
+    container.querySelectorAll('.api-add-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const modelId = btn.dataset.modelId;
+        const row = btn.closest('.api-fetched-model');
+        const visionCheckbox = row ? row.querySelector('.vision-checkbox') : null;
+        const supportsVision = visionCheckbox ? visionCheckbox.checked : false;
+
+        pendingAdditions.set(modelId, {
+          id: modelId,
+          model_name: modelId,
+          base_url: baseUrl,
+          api_key: apiKey,
+          supports_vision: supportsVision,
+          provider: 'custom'
+        });
+
+        // Update button to show pending
+        btn.textContent = '待保存';
+        btn.style.background = 'rgba(185,174,159,0.3)';
+        btn.style.color = '#7a7267';
+        btn.disabled = true;
+      });
+    });
+  }
+
+  // Save configuration
+  $('#saveApiConfigBtn').addEventListener('click', async () => {
+    // 收集所有待保存（已点 + 的）按钮对应的模型，不依赖 pendingAdditions
+    const pendingBtns = [...document.querySelectorAll('#apiFetchedModelList .api-add-btn')];
+    const newModels = pendingBtns.map(btn => {
+      const mid = btn.dataset.modelId;
+      const row = btn.closest('.api-fetched-model');
+      const visionToggle = row ? row.querySelector('.api-vision-toggle') : null;
+      return {
+        id: mid,
+        model_name: mid,
+        base_url: $('#apiBaseUrl').value.trim(),
+        api_key: $('#apiKey').value.trim(),
+        supports_vision: visionToggle ? visionToggle.dataset.vision === '1' : false,
+        provider: 'custom'
+      };
+    });
+
+    if (newModels.length === 0) {
+      alert('请先点击模型右侧的 + 按钮添加');
+      return;
+    }
+
+    $('#saveApiConfigBtn').textContent = '保存中...';
+    $('#saveApiConfigBtn').disabled = true;
+
+    try {
+      // Load existing config
+      const response = await fetch('/api/models/config');
+      let config = { models: [] };
+      if (response.ok) {
+        config = await response.json();
+      }
+      config.models = [...(config.models || []), ...newModels];
+
+      // Save
+      const saveResponse = await fetch('/api/models/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error('保存失败');
+      }
+
+      alert(`成功添加 ${newModels.length} 个模型`);
+      
+      // Clear pending and refresh
+      pendingAdditions.clear();
+      await loadExistingModels();
+      renderFetchedModels();
+
+      // Reload model dropdowns
+      await loadCreativeMeta();
+
+    } catch (error) {
+      alert(`保存失败: ${error.message}`);
+    } finally {
+      $('#saveApiConfigBtn').textContent = '保存配置';
+      $('#saveApiConfigBtn').disabled = false;
+    }
+  });
+
+  // Initialize
+  loadExistingModels();
+  loadCreativeMeta();
+
+
+  function renderManagedModelList(unifiedModels) {
+    const container = $('#managedModelList');
+    if (!container) return;
+    const all = (unifiedModels && unifiedModels.models) || [];
+    if (!all.length) {
+      container.innerHTML = '<div class="managed-model-empty">还未添加模型</div>';
+      return;
+    }
+    container.innerHTML = all.map(m => `
+      <div class="managed-model-item" data-model-id="${escapeHtml(m.id)}">
+        <span>${escapeHtml(m.name || m.id)}<span class="mm-type">${escapeHtml(m.provider || '')}</span></span>
+        <button class="managed-model-del" data-del-model="${escapeHtml(m.id)}" title="删除此模型">×</button>
+      </div>`).join('');
+
+    container.querySelectorAll('.managed-model-del').forEach(btn => {
+      btn.addEventListener('click', () => deleteManagedModel(btn.dataset.delModel));
+    });
+  }
+
+  async function deleteManagedModel(modelId) {
+    if (!modelId) return;
+    if (!confirm(`确定删除模型 ${modelId} 吗？此操作会从已管理模型中移除。`)) return;
+    try {
+      const response = await fetch('/api/models/config/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: modelId })
+      });
+      const result = await response.json();
+      if (result.success) {
+        await loadCreativeMeta();
+      } else {
+        alert(`删除失败: ${result.error || '未知错误'}`);
+      }
+    } catch (error) {
+      alert(`删除失败: ${error.message}`);
     }
   }
 
-  async function uploadResultImage() {
-    await ensureCreativeProject(); const file = $('#resultImageFile').files?.[0];
-    if (!file) throw new Error('请先选择一张 PNG、JPEG 或 WebP 结果图');
-    if (file.size > 25 * 1024 * 1024) throw new Error('结果图不能超过 25 MiB');
-    await saveCreative(); const button = $('#uploadResultImage'); button.disabled = true; button.textContent = '正在导入…'; $('#resultReviewStatus').textContent = '正在校验图片并生成本地缩略图…';
-    try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results?filename=${encodeURIComponent(file.name)}`, {method:'POST', headers:{'Content-Type':file.type || 'application/octet-stream'}, body:file});
-      creativeState.project = response.project; const index = creativeState.projects.findIndex(project => project.project_id === response.project.project_id); if (index >= 0) creativeState.projects[index] = response.project;
-      $('#resultImageFile').value = ''; renderCreativeProject(); $('#resultReviewStatus').textContent = `已导入 ${response.asset.filename}；图片只保存在本机。`;
-    } finally { button.disabled = false; button.textContent = '导入结果图'; }
+  function initCombobox() {
+    const comboboxInput = document.getElementById('apiBaseUrl');
+    const comboboxTrigger = document.getElementById('comboboxTrigger');
+    const comboboxDropdown = document.getElementById('comboboxDropdown');
+    if (!comboboxInput || !comboboxTrigger || !comboboxDropdown) return;
+    const comboboxOptions = comboboxDropdown.querySelectorAll('.combobox-option');
+    let currentSelectedUrl = '';
+    function updateSelection(url) {
+      currentSelectedUrl = url;
+      comboboxOptions.forEach(opt => opt.classList.toggle('is-selected', opt.dataset.url === url));
+    }
+    comboboxTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      comboboxDropdown.classList.toggle('is-open');
+    });
+    comboboxOptions.forEach(option => {
+      option.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = option.dataset.url;
+        const name = option.dataset.name;
+        if (name === '自定义') { comboboxInput.value = ''; comboboxInput.focus(); }
+        else { comboboxInput.value = url; updateSelection(url); }
+        comboboxDropdown.classList.remove('is-open');
+      });
+    });
+    comboboxInput.addEventListener('input', () => updateSelection(comboboxInput.value));
+    document.addEventListener('click', () => comboboxDropdown.classList.remove('is-open'));
+    comboboxInput.addEventListener('click', (e) => e.stopPropagation());
+    setTimeout(() => { if (comboboxInput.value) updateSelection(comboboxInput.value); }, 100);
   }
+  if (document.readyState !== 'loading') initCombobox();
+  else document.addEventListener('DOMContentLoaded', initCombobox);
 
-  async function updateDatasetAsset(assetId, values, message) {
-    await saveCreative();
-    const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/dataset`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({profile_id:creativeState.datasetProfile, ...values})});
-    creativeState.project = response.project; const index = creativeState.projects.findIndex(project => project.project_id === response.project.project_id); if (index >= 0) creativeState.projects[index] = response.project;
-    creativeState.datasetMessageProjectId = response.project.project_id; creativeState.datasetMessage = message; renderResultGallery(); renderCreativeProjects();
-  }
-
-  async function toggleDatasetAsset(assetId) {
-    const asset = (creativeState.project?.generation?.result_assets || []).find(item => item.asset_id === assetId); if (!asset) return;
-    const selected = asset.dataset_selected !== true;
-    await updateDatasetAsset(assetId, {selected}, selected ? '已加入精选；导出时会包含原图与 caption。' : '已移出精选；原始结果图仍保留在项目中。');
-  }
-
-  async function saveDatasetCaption(assetId) {
-    const input = document.querySelector(`[data-dataset-caption="${CSS.escape(assetId)}"]`); if (!input) return;
-    const hasCaption = Boolean(input.value.trim());
-    await updateDatasetAsset(assetId, {caption_override:input.value}, hasCaption ? '已保存这张图的 Profile 专属 caption。' : '已清除单图覆盖；导出时使用项目 Profile 输出。');
-  }
-
-  function wd14Payload() {
-    const general = Number($('#wd14GeneralThreshold').value); const character = Number($('#wd14CharacterThreshold').value);
-    if (!Number.isFinite(general) || general < 0 || general > 1 || !Number.isFinite(character) || character < 0 || character > 1) throw new Error('WD14 阈值必须在 0 到 1 之间');
-    return {general_threshold:general, character_threshold:character, limit:80};
-  }
-
-  function applyDatasetProject(project, message) {
-    creativeState.project = project; const index = creativeState.projects.findIndex(item => item.project_id === project.project_id); if (index >= 0) creativeState.projects[index] = project;
-    creativeState.datasetMessageProjectId = project.project_id; creativeState.datasetMessage = message; renderResultGallery(); renderCreativeProjects();
-  }
-
-  async function tagResultAsset(assetId) {
-    await saveCreative(); const button = document.querySelector(`[data-wd14-tag="${CSS.escape(assetId)}"]`); if (button) { button.disabled = true; button.textContent = 'WD14 打标中…'; }
-    creativeState.datasetMessageProjectId = creativeState.project.project_id; creativeState.datasetMessage = '正在本机使用 WD14 分析图片…'; $('#datasetExportStatus').textContent = creativeState.datasetMessage;
-    try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/tag`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(wd14Payload())});
-      applyDatasetProject(response.project, `WD14 已生成 ${response.asset.wd14_tagging?.general?.length || 0} 个 general 标签；请审核后确认。`);
-    } finally { if (button) { button.disabled = false; button.textContent = 'WD14 自动打标'; } }
-  }
-
-  async function tagSelectedDataset() {
-    await saveCreative(); const button = $('#tagSelectedDataset'); button.disabled = true; button.textContent = '精选图片打标中…';
-    creativeState.datasetMessageProjectId = creativeState.project.project_id; creativeState.datasetMessage = '正在逐张处理精选图片，请保持页面打开…'; $('#datasetExportStatus').textContent = creativeState.datasetMessage;
-    try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-tag`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(wd14Payload())});
-      const suffix = response.failed_count ? `；${response.failed_count} 张失败，可单独重试` : '';
-      applyDatasetProject(response.project, `WD14 已完成 ${response.tagged_count}/${response.selected_count} 张${suffix}。`);
-    } finally { button.textContent = '打标全部精选'; renderResultGallery(); }
-  }
-
-  async function saveWd14Review(assetId, confirmAnima) {
-    const input = document.querySelector(`[data-wd14-draft="${CSS.escape(assetId)}"]`); if (!input) return;
-    await saveCreative(); const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/tag-review`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({draft_tags:input.value, confirm_anima:confirmAnima})});
-    applyDatasetProject(response.project, confirmAnima ? '已确认写入此图的 Anima caption；Krea 2 caption 没有变化。' : '已保存 WD14 审核草稿，尚未改变导出 caption。');
-  }
-
-  async function exportDataset() {
-    await saveCreative(); const button = $('#exportDataset'); button.disabled = true; button.textContent = '正在打包…';
-    try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-export`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({profile_id:creativeState.datasetProfile})});
-      creativeState.datasetMessageProjectId = creativeState.project.project_id; creativeState.datasetMessage = `已导出 ${response.item_count} 张，文件保存在本机 exports/datasets。`; renderResultGallery();
-      const link = document.createElement('a'); link.href = response.download_url; link.download = response.filename; document.body.appendChild(link); link.click(); link.remove();
-    } finally { button.textContent = '导出精选数据集 ZIP'; renderResultGallery(); }
-  }
-
-  async function analyzeResultAsset(assetId) {
-    const model = $('#visionModel').value; if (!model) throw new Error('没有可用的本地视觉模型');
-    const buttons = [...document.querySelectorAll('[data-review-asset]')]; buttons.forEach(button => { button.disabled = true; });
-    $('#resultReviewStatus').textContent = `正在由 ${model} 分析图片；本机视觉复盘通常需要约 1–3 分钟…`;
-    try {
-      creativeState.review = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/analyze`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model})});
-      creativeState.reviewAssetId = assetId; creativeState.reviewProjectId = creativeState.project.project_id; renderReviewProposal(); $('#resultReviewStatus').textContent = '复盘已返回，当前只是预览；请确认是否写回。';
-    } finally { buttons.forEach(button => { button.disabled = false; }); }
-  }
-
-  async function applyResultReview(fillEmptySlots) {
-    if (!creativeState.review || !creativeState.reviewAssetId) return;
-    const updated = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(creativeState.reviewAssetId)}/apply`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({analysis:creativeState.review, fill_empty_slots:fillEmptySlots})});
-    creativeState.project = updated; const index = creativeState.projects.findIndex(project => project.project_id === updated.project_id); if (index >= 0) creativeState.projects[index] = updated; renderCreativeProject(); $('#resultReviewStatus').textContent = fillEmptySlots ? '已补充空且未锁定槽位，并写入实测备注。' : '已把复盘写入实测备注；槽位没有变化。';
-  }
-
-  async function branchResultReview() {
-    if (!creativeState.review || !creativeState.reviewAssetId || !creativeState.project) return;
-    await saveCreative(); const parentProjectId = creativeState.project.project_id;
-    $('#resultReviewStatus').textContent = '正在创建下一版项目；旧项目不会改变…';
-    const nextProject = await creativeJson(`/api/creative/projects/${encodeURIComponent(parentProjectId)}/results/${encodeURIComponent(creativeState.reviewAssetId)}/branch`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({analysis:creativeState.review})});
-    creativeState.projects.unshift(nextProject); creativeState.project = nextProject; creativeState.review = null; creativeState.reviewAssetId = ''; creativeState.reviewProjectId = ''; creativeState.sourcing = null; creativeState.sourcingProjectId = ''; renderCreativeProject(); $('#resultReviewStatus').textContent = `已创建 V${iterationOf(nextProject)}；旧结果图没有复制，请根据迭代说明开始修改。`;
-  }
-
-  async function applyIterationSuggestions() {
-    if (!creativeState.project?.project_id) return;
-    await saveCreative(); const button = $('#applyIterationSuggestions'); button.disabled = true; button.textContent = '正在填入…';
-    const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/iteration/apply`, {method:'POST'});
-    creativeState.project = response.project; creativeState.iteration = response.iteration; creativeState.iterationProjectId = response.project.project_id; creativeState.iterationMessageProjectId = response.project.project_id; creativeState.iterationMessage = response.applied_slots.length ? `已填入：${response.applied_slots.map(slot => slotsMeta[slot]?.[0] || slot).join('、')}。` : '没有可填入的槽位；锁定和已有内容均保持不变。';
-    const index = creativeState.projects.findIndex(project => project.project_id === response.project.project_id); if (index >= 0) creativeState.projects[index] = response.project;
-    renderCreativeProject();
-  }
-
-  async function startFromCharacter(item) {
-    const detail = await creativeJson('/api/oc-manager/characters/' + encodeURIComponent(item.character_id)); await ensureCreativeProject();
-    const traits = [detail.name, detail.gender, detail.age ? `${detail.age} years old` : '', detail.race, detail.identity].filter(Boolean);
-    const project = collectCreative(); project.title = `${detail.name} · 绘图项目`; project.character_id = detail.character_id; project.slots.character = traits.join(', ');
-    if (detail.prompts?.length) project.slots.style = [project.slots.style, detail.prompts.map(p => p.text).join(', ')].filter(Boolean).join(', ');
-    const gallery = Array.isArray(detail.profile?.gallery) ? detail.profile.gallery : [];
-    project.references.push({key:`oc:${detail.character_id}`, slot:'character', source_id:'oc-manager', external_id:detail.character_id, title:detail.name, kind:'character', visuals:gallery.filter(v => v && (v.thumbnail_url || v.url)).map(v => ({thumbnail_url:v.thumbnail_url || v.url, original_url:v.original_url || v.url}))});
-    creativeState.project = project; renderCreativeProject(); await saveCreative(); await setView('creative');
-  }
-
-  function showCreativeError(error) { $('#creativeSaveState').textContent = `操作失败：${error.message}`; console.error(error); }
-  function showResultReviewError(error) { $('#resultReviewStatus').textContent = `结果图操作失败：${error.message}`; $('#datasetExportStatus').textContent = `操作失败：${error.message}`; showCreativeError(error); }
-
-  $('#creativeSlots').innerHTML = slotTemplate();
-  $('#newCreativeProject').addEventListener('click', () => createCreativeProject().catch(showCreativeError));
-  ['creativeTitle','creativeBrief','creativeSafety','creativeNotes','genSteps','genCfg','genSeed','genResults'].forEach(id => $('#' + id).addEventListener('input', queueCreativeSave));
-  $('#creativeSlots').addEventListener('input', queueCreativeSave);
-  $('#creativeSlots').addEventListener('click', event => { const button = event.target.closest('[data-lock-slot]'); if (!button || !creativeState.project) return; creativeState.project = collectCreative(); const key = button.dataset.lockSlot; creativeState.project.slot_locks[key] = !creativeState.project.slot_locks[key]; renderCreativeProject(); queueCreativeSave(); });
-  $('#creativeReferences').addEventListener('click', event => { const button = event.target.closest('[data-remove-reference]'); if (!button) return; creativeState.project.references.splice(Number(button.dataset.removeReference), 1); renderCreativeReferences(); queueCreativeSave(); });
-  $('#creativeProjectList').addEventListener('click', async event => { const button = event.target.closest('[data-project-id]'); if (!button || button.dataset.projectId === creativeState.project?.project_id) return; try { clearTimeout(creativeState.saveTimer); await saveCreative(); creativeState.project = creativeState.projects.find(p => p.project_id === button.dataset.projectId); creativeState.review = null; creativeState.reviewProjectId = ''; renderCreativeProject(); } catch(error) { showCreativeError(error); } });
-  $('#sourceCreative').addEventListener('click', () => runCreativeSourcing().catch(showCreativeError));
-  $('#closeSourcing').addEventListener('click', () => { $('#sourcingPanel').hidden = true; });
-  $('#sourcingGroups').addEventListener('click', async event => { const button = event.target.closest('[data-source-slot]'); if (!button || !creativeState.sourcing) return; const group = creativeState.sourcing.slots?.[button.dataset.sourceSlot]; const item = group?.candidates?.[Number(button.dataset.sourceIndex)]; if (!item) return; try { await addEntryToCreative(item, button.dataset.sourceSlot); renderSourcing(); } catch(error) { showCreativeError(error); } });
-  $('#creativeBrief').addEventListener('input', () => { if (creativeState.sourcing) $('#sourcingRailStatus').textContent = '创作想法已变化，请重新取材。'; });
-  $('#visionModel').addEventListener('change', updateVisionHint);
-  $('#uploadResultImage').addEventListener('click', () => uploadResultImage().catch(showResultReviewError));
-  $('#datasetProfile').addEventListener('change', event => { creativeState.datasetProfile = event.target.value; creativeState.datasetMessage = ''; renderResultGallery(); });
-  $('#tagSelectedDataset').addEventListener('click', () => tagSelectedDataset().catch(showResultReviewError));
-  $('#exportDataset').addEventListener('click', () => exportDataset().catch(showResultReviewError));
-  $('#resultGallery').addEventListener('input', event => { const input = event.target.closest('[data-wd14-draft]'); if (!input) return; const asset = (creativeState.project?.generation?.result_assets || []).find(item => item.asset_id === input.dataset.wd14Draft); if (asset?.wd14_tagging) asset.wd14_tagging.draft_tags = input.value; });
-  $('#resultGallery').addEventListener('click', event => {
-    const language = event.target.closest('[data-toggle-tag-language]'); if (language) { window.toggleTagDisplayLanguage?.(); return; }
-    const chip = event.target.closest('[data-wd14-chip]'); if (chip) { toggleWd14Chip(chip.dataset.wd14Chip, chip.dataset.tagValue); return; }
-    const toggle = event.target.closest('[data-dataset-toggle]'); if (toggle) { toggleDatasetAsset(toggle.dataset.datasetToggle).catch(showResultReviewError); return; }
-    const tag = event.target.closest('[data-wd14-tag]'); if (tag) { tagResultAsset(tag.dataset.wd14Tag).catch(showResultReviewError); return; }
-    const saveTags = event.target.closest('[data-save-wd14]'); if (saveTags) { saveWd14Review(saveTags.dataset.saveWd14, false).catch(showResultReviewError); return; }
-    const confirmTags = event.target.closest('[data-confirm-wd14]'); if (confirmTags) { saveWd14Review(confirmTags.dataset.confirmWd14, true).catch(showResultReviewError); return; }
-    const saveCaption = event.target.closest('[data-save-caption]'); if (saveCaption) { saveDatasetCaption(saveCaption.dataset.saveCaption).catch(showResultReviewError); return; }
-    const review = event.target.closest('[data-review-asset]'); if (review) analyzeResultAsset(review.dataset.reviewAsset).catch(showResultReviewError);
-  });
-  window.addEventListener('tag-language-change', renderResultGallery);
-  $('#applyReviewSlots').addEventListener('click', () => applyResultReview(true).catch(showResultReviewError));
-  $('#applyReviewNotes').addEventListener('click', () => applyResultReview(false).catch(showResultReviewError));
-  $('#branchReview').addEventListener('click', () => branchResultReview().catch(showResultReviewError));
-  $('#applyIterationSuggestions').addEventListener('click', () => applyIterationSuggestions().catch(showCreativeError));
-  $('#closeReview').addEventListener('click', () => { creativeState.review = null; $('#reviewProposal').hidden = true; });
-  document.querySelectorAll('[data-profile]').forEach(button => button.addEventListener('click', () => { creativeState.profile = button.dataset.profile; creativeState.project.target_profile = creativeState.profile; document.querySelectorAll('[data-profile]').forEach(b => b.classList.toggle('active', b === button)); renderOutput(); renderWorkflowProfiles(); queueCreativeSave(); }));
-  $('#workflowProfile').addEventListener('change', renderWorkflowProfiles);
-  $('#workflowLowCost').addEventListener('change', renderWorkflowProfiles);
-  $('#sendWorkflow').addEventListener('click', () => sendWorkflowProfile().catch(showCreativeError));
-  document.querySelectorAll('[data-copy-output]').forEach(button => button.addEventListener('click', async () => { const text = creativeState.outputs[creativeState.profile]?.[button.dataset.copyOutput] || ''; await navigator.clipboard.writeText(text); button.textContent = 'COPIED'; setTimeout(() => {button.textContent = 'COPY';}, 1200); }));
-  $('#saveRecipe').addEventListener('click', async () => { try { await saveCreative(); const recipe = await creativeJson('/api/creative/recipes', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id:creativeState.project.project_id, name:$('#recipeName').value.trim()})}); creativeState.recipes.unshift(recipe); renderCreativeRecipes(); $('#recipeName').value=''; $('#creativeSaveState').textContent='配方已保存'; } catch (error) { showCreativeError(error); } });
-  $('#creativeRecipeList').addEventListener('click', event => { const button = event.target.closest('[data-recipe-id]'); if (!button) return; const recipe = creativeState.recipes.find(r => r.recipe_id === button.dataset.recipeId); if (!recipe?.snapshot?.project) return; const keep = {project_id:creativeState.project.project_id, created_at:creativeState.project.created_at}; creativeState.project = {...recipe.snapshot.project, ...keep}; renderCreativeProject(); queueCreativeSave(); });
-  $('#exportCreative').addEventListener('click', async () => { try { await saveCreative(); const data = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/export`); const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const link = document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=(creativeState.project.title || 'creative-project').replace(/[\\/:*?"<>|]/g,'-') + '.json'; link.click(); URL.revokeObjectURL(link.href); $('#creativeSaveState').textContent='双格式 JSON 已导出'; } catch(error) { showCreativeError(error); } });
-  $('#assistCreative').addEventListener('click', async () => { try { const payload=collectCreative(); if (!payload.brief_zh) throw new Error('请先写一段中文创作想法'); $('#assistCreative').disabled=true; $('#assistCreative').textContent='本地模型整理中…'; creativeState.suggestion=await creativeJson('/api/creative/assist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({brief:payload.brief_zh,slots:payload.slots,slot_locks:payload.slot_locks,model:$('#lmModel').value,target_profile:creativeState.profile})}); $('#assistPreview').textContent=JSON.stringify(creativeState.suggestion.suggested_slots,null,2); $('#assistProposal').hidden=false; } catch(error) { showCreativeError(error); } finally { $('#assistCreative').disabled=false; $('#assistCreative').textContent='整理未锁定槽位'; } });
-  $('#applyAssist').addEventListener('click', () => { if (!creativeState.suggestion) return; creativeState.project.slots=creativeState.suggestion.suggested_slots; creativeState.suggestion=null; $('#assistProposal').hidden=true; renderCreativeProject(); queueCreativeSave(); });
-  $('#cancelAssist').addEventListener('click', () => { creativeState.suggestion=null; $('#assistProposal').hidden=true; });
-
-  $('#results').addEventListener('click', event => {
-    const add = event.target.closest('[data-creative-add]'); if (add) { const card=add.closest('[data-result-index]'); const item=currentResults[Number(card.dataset.resultIndex)]; const slot=card.querySelector('[data-creative-slot]').value; addEntryToCreative(item,slot).catch(showCreativeError); return; }
-    const fromOc = event.target.closest('[data-character-create]'); if (fromOc) { const card=fromOc.closest('[data-character-index]'); startFromCharacter(currentCharacters[Number(card.dataset.characterIndex)]).catch(showCreativeError); }
-  });
 })();
 </script>
 """

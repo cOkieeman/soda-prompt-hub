@@ -17,6 +17,21 @@ if TYPE_CHECKING:
 DEFAULT_LM_STUDIO_URL = "http://127.0.0.1:1234/v1"
 
 
+def _resolve_endpoint(model_id: str) -> tuple[str, str, str]:
+    """根据模型 ID 解析 base_url / api_key / provider。
+    若模型在统一配置里，返回其 base_url 和 api_key；否则回退 LM Studio。
+    """
+    try:
+        from prompt_hub.model_adapter import get_model_configs
+        configs = get_model_configs()
+        conf = configs.get(model_id)
+        if conf is not None:
+            return conf.base_url, conf.api_key, conf.provider
+    except Exception:
+        pass
+    return DEFAULT_LM_STUDIO_URL, "", "lm_studio"
+
+
 class LocalModelError(RuntimeError):
     pass
 
@@ -49,6 +64,8 @@ def organize_slots(
 ) -> dict[str, Any]:
     editable = [slot for slot in SLOT_ORDER if not locks.get(slot, False)]
     locked = {slot: slots.get(slot, "") for slot in SLOT_ORDER if locks.get(slot, False)}
+    resolved_base_url, resolved_api_key, _ = _resolve_endpoint(model)
+    base_url = resolved_base_url or base_url
     instruction = (
         "你是 AI 绘图提示词整理助手。不要展示推理过程，把用户创作意图整理为七槽位 JSON。"
         "只输出一个 JSON 对象，不要 Markdown，不要解释。键必须是："
@@ -83,6 +100,7 @@ def organize_slots(
         method="POST",
         payload=payload,
         timeout=90,
+        api_key=resolved_api_key,
     )
     try:
         content = response["choices"][0]["message"]["content"]
@@ -112,6 +130,8 @@ def expand_sourcing_queries(
     base_url: str = DEFAULT_LM_STUDIO_URL,
 ) -> dict[str, Any]:
     editable = [slot for slot in SLOT_ORDER if not locks.get(slot, False)]
+    resolved_base_url, resolved_api_key, _ = _resolve_endpoint(model)
+    base_url = resolved_base_url or base_url
     instruction = (
         "你是本地 AI 绘图资料库的检索规划器。"
         "只输出 JSON 对象，不要解释，不要生成最终 Prompt。"
@@ -143,6 +163,7 @@ def expand_sourcing_queries(
         method="POST",
         payload=payload,
         timeout=90,
+        api_key=resolved_api_key,
     )
     try:
         content = response["choices"][0]["message"]["content"]
@@ -204,19 +225,51 @@ def analyze_result_image(
         "stream": False,
         "store": False,
     }
-    server_root = base_url.rstrip("/").removesuffix("/v1")
-    response = _request_json(
-        f"{server_root}/api/v1/chat",
-        method="POST",
-        payload=payload,
-        timeout=180,
-    )
-    try:
+    resolved_base_url, resolved_api_key, provider = _resolve_endpoint(model)
+    base_url = resolved_base_url or base_url
+    image_data_url = _image_data_url(image_path)
+    
+    if provider and provider != "lm_studio":
+        # 外接模型：OpenAI Vision 格式
+        vision_payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": instruction},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": image_data_url}},
+                        {"type": "text", "text": "请复盘这张本地生成结果图。项目上下文：" + json.dumps(context, ensure_ascii=False)},
+                    ],
+                },
+            ],
+            "temperature": 0.1,
+            "max_tokens": 900,
+            "stream": False,
+        }
+        response = _request_json(
+            f"{base_url.rstrip('/')}/chat/completions",
+            method="POST",
+            payload=vision_payload,
+            timeout=180,
+            api_key=resolved_api_key,
+        )
+        content = str(response.get("choices", [{}])[0].get("message", {}).get("content", ""))
+    else:
+        # LM Studio 原生格式
+        server_root = base_url.rstrip("/").removesuffix("/v1")
+        response = _request_json(
+            f"{server_root}/api/v1/chat",
+            method="POST",
+            payload=payload,
+            timeout=180,
+        )
         content = "\n".join(
             str(item.get("content", ""))
             for item in response["output"]
             if isinstance(item, dict) and item.get("type") == "message"
         )
+    try:
         raw = _extract_json_object(str(content))
     except (KeyError, TypeError, json.JSONDecodeError) as error:
         raise LocalModelError("本地视觉模型没有返回可识别的复盘 JSON") from error
@@ -322,9 +375,13 @@ def _request_json(
     method: str = "GET",
     payload: dict[str, Any] | None = None,
     timeout: float = 4,
+    api_key: str = "",
 ) -> Any:
     data = json.dumps(payload).encode() if payload is not None else None
-    request = Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    request = Request(url, data=data, method=method, headers=headers)
     try:
         with urlopen(request, timeout=timeout) as response:
             return json.loads(response.read())

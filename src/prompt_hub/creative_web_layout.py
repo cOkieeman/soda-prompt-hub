@@ -19,13 +19,23 @@ CREATIVE_HTML = r"""
       </section>
       <section class="rail-section">
         <p class="section-label">Local model / 本地辅助</p>
-        <p class="lm-status" id="lmStatus">正在检查 LM Studio…</p>
+        <p class="lm-status" id="lmStatus">正在加载可用模型…</p>
         <select class="assist-select" id="lmModel"></select>
         <button class="rail-button" id="assistCreative" style="margin-top:7px">整理未锁定槽位</button>
         <div class="assist-proposal" id="assistProposal" hidden>
           <strong>建议预览（尚未写入）</strong><pre id="assistPreview"></pre>
           <div class="assist-proposal-actions"><button class="rail-button primary" id="applyAssist">确认应用</button><button class="rail-button" id="cancelAssist">取消</button></div>
         </div>
+      </section>
+      <section class="rail-section">
+        <p class="section-label">Model selection / 模型选择</p>
+        <p class="lm-status">文本与视觉任务可使用不同模型</p>
+        <label class="model-label">文本模型</label>
+        <select class="model-select" id="textModelSelect"></select>
+        <label class="model-label" style="margin-top:8px">视觉模型</label>
+        <select class="model-select" id="visionModelSelect"></select>
+        <p class="lm-status" style="margin-top:14px">已管理的模型 / Managed models</p>
+        <div class="managed-model-list" id="managedModelList"></div>
       </section>
       <section class="rail-section">
         <p class="section-label">Saved recipes / 配方</p>
@@ -67,7 +77,7 @@ CREATIVE_HTML = r"""
           <button id="uploadResultImage">导入结果图</button>
         </div>
         <p class="result-review-status" id="resultReviewStatus">导入 PNG、JPEG 或 WebP 后，可选择一张进行反推与问题诊断。</p>
-        <p class="result-review-status" id="resultModelHint">正在读取 LM Studio 的视觉模型状态…</p>
+        <p class="result-review-status" id="resultModelHint">正在加载视觉模型…</p>
         <div class="result-gallery" id="resultGallery"></div>
         <div class="wd14-toolbar">
           <div><strong>WD14 · ANIMA 自动打标</strong><p>只处理已精选图片；rating 仅供审核，不写入 caption。同步批量最多 24 张。</p></div>
@@ -119,7 +129,77 @@ CREATIVE_HTML = r"""
       <input class="recipe-name" id="recipeName" maxlength="160" placeholder="配方名称（可选）">
       <div class="output-actions"><button class="creative-action primary" id="saveRecipe">保存为配方</button><button class="creative-action" id="exportCreative">导出 Anima + Krea 2 JSON</button><button class="creative-action" data-view="prompts">继续找参考资料</button></div>
       <p class="save-state" id="creativeSaveState">尚未建立项目</p>
-    </aside>
+      <section class="api-config-section">
+        <div class="api-config-head"><h3>外部 API 配置</h3></div>
+        
+        <label class="api-config-label">BASE URL
+          <div class="combobox-wrapper">
+            <input id="apiBaseUrl" type="text" class="combobox-input" placeholder="输入 API 服务的基础 URL">
+            <button type="button" class="combobox-trigger" id="comboboxTrigger">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <path d="M2 4l4 4 4-4z"/>
+              </svg>
+            </button>
+            <div class="combobox-dropdown" id="comboboxDropdown">
+              <div class="combobox-option" data-url="https://api.openai.com/v1" data-name="OpenAI">
+                <span class="option-name">OpenAI</span>
+                <span class="option-url">https://api.openai.com/v1</span>
+              </div>
+              <div class="combobox-option" data-url="https://api.anthropic.com/v1" data-name="Anthropic">
+                <span class="option-name">Anthropic</span>
+                <span class="option-url">https://api.anthropic.com/v1</span>
+              </div>
+              <div class="combobox-option" data-url="https://generativelanguage.googleapis.com/v1beta" data-name="Google Gemini">
+                <span class="option-name">Google Gemini</span>
+                <span class="option-url">https://generativelanguage.googleapis.com/v1beta</span>
+              </div>
+              <div class="combobox-option" data-url="https://api.x.ai/v1" data-name="xAI Grok">
+                <span class="option-name">xAI Grok</span>
+                <span class="option-url">https://api.x.ai/v1</span>
+              </div>
+              <div class="combobox-option" data-url="https://api.deepseek.com" data-name="DeepSeek">
+                <span class="option-name">DeepSeek</span>
+                <span class="option-url">https://api.deepseek.com</span>
+              </div>
+              <div class="combobox-option" data-url="https://open.bigmodel.cn/api/paas/v4" data-name="GLM">
+                <span class="option-name">GLM</span>
+                <span class="option-url">https://open.bigmodel.cn/api/paas/v4</span>
+              </div>
+              <div class="combobox-option" data-url="https://api.moonshot.cn/v1" data-name="Kimi">
+                <span class="option-name">Kimi</span>
+                <span class="option-url">https://api.moonshot.cn/v1</span>
+              </div>
+              <div class="combobox-option" data-url="https://api.minimax.chat/v1" data-name="MiniMax">
+                <span class="option-name">MiniMax</span>
+                <span class="option-url">https://api.minimax.chat/v1</span>
+              </div>
+              <div class="combobox-option" data-url="https://dashscope.aliyuncs.com/compatible-mode/v1" data-name="Qwen">
+                <span class="option-name">Qwen</span>
+                <span class="option-url">https://dashscope.aliyuncs.com/compatible-mode/v1</span>
+              </div>
+              <div class="combobox-option combobox-option-custom" data-url="" data-name="自定义">
+                <span class="option-name">自定义</span>
+                <span class="option-url">输入自定义 Base URL</span>
+              </div>
+            </div>
+          </div>
+        </label>
+        
+        <label class="api-config-label">API Key
+          <input id="apiKey" type="password" class="api-config-input" placeholder="sk-...">
+        </label>
+        
+        <div class="api-fetch-row">
+          <label class="api-config-label">可用模型</label>
+          <button class="api-fetch-models" id="fetchModelsBtn">拉取模型列表</button>
+        </div>
+        
+        <div class="api-model-list" id="apiFetchedModelList">
+          <p class="api-empty-hint">点击"拉取模型列表"获取可用模型</p>
+        </div>
+        
+        <button class="api-save-config" id="saveApiConfigBtn">保存配置</button>
+      </section>    </aside>
   </div>
 </section>
 """

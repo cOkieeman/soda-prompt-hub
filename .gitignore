@@ -68,3 +68,6 @@ worker-config.json
 deploy/windows-worker/diagnostics/
 deploy/windows-worker/output/
 deploy/windows-worker/worker-status.json
+
+# Local runtime data directory (contains API keys and DB)
+data/

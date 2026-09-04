@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal
@@ -459,6 +461,108 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return {"available": True, "models": list_local_models()}
         except LocalModelError as error:
             return {"available": False, "models": [], "message": str(error)}
+
+    @application.get("/api/models/list")
+    def list_unified_models() -> dict[str, Any]:
+        """List all configured unified models (text and vision)"""
+        try:
+            from prompt_hub.model_adapter import list_available_models
+            models = list_available_models()
+            return {
+                "success": True,
+                "models": models,
+                "text_models": [m for m in models if not m.get("supports_vision")],
+                "vision_models": [m for m in models if m.get("supports_vision")],
+            }
+        except Exception as error:
+            return {
+                "success": False,
+                "models": [],
+                "text_models": [],
+                "vision_models": [],
+                "error": str(error),
+            }
+
+
+    @application.get("/api/models/config")
+    def get_models_config() -> dict[str, Any]:
+        """Get current API configuration"""
+        try:
+            from prompt_hub.model_adapter import get_config_path
+            config_path = get_config_path()
+            
+            if not config_path.exists():
+                return {"base_url": "", "api_key": "", "models": []}
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return {
+                    "base_url": config.get("base_url", ""),
+                    "api_key": config.get("api_key", ""),
+                    "models": config.get("models", [])
+                }
+        except Exception as error:
+            return {"base_url": "", "api_key": "", "models": [], "error": str(error)}
+
+    @application.post("/api/models/config")
+    def save_models_config(payload: dict[str, Any]) -> dict[str, Any]:
+        """Save API configuration to models.json"""
+        try:
+            from prompt_hub.model_adapter import get_config_path
+            config_path = get_config_path()
+            
+            # Ensure directory exists
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Load existing config or create new
+            if config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            else:
+                config = {"models": []}
+            
+            # Update config
+            config["base_url"] = payload.get("base_url", "")
+            config["api_key"] = payload.get("api_key", "")
+            config["models"] = payload.get("models", [])
+            
+            # Save
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            
+            # 清除 model_adapter 缓存，让 /api/models/list 重新读取
+            import prompt_hub.model_adapter as _ma
+            _ma._model_configs = None
+            
+            return {"success": True}
+        except Exception as error:
+            return {"success": False, "error": str(error)}
+    @application.post("/api/models/config/delete")
+    def delete_model_config(payload: dict[str, Any]) -> dict[str, Any]:
+        """Delete a model from models.json by its id"""
+        try:
+            from prompt_hub.model_adapter import get_config_path
+            config_path = get_config_path()
+            
+            if not config_path.exists():
+                return {"success": False, "error": "配置文件不存在"}
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            model_id = payload.get("id", "")
+            config["models"] = [m for m in config.get("models", []) if m.get("id") != model_id]
+            
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            
+            # 清除缓存
+            import prompt_hub.model_adapter as _ma
+            _ma._model_configs = None
+            
+            return {"success": True, "deleted": model_id}
+        except Exception as error:
+            return {"success": False, "error": str(error)}
 
     @application.post("/api/creative/assist")
     def assist_creative_project(payload: LocalAssistInput) -> dict[str, Any]:
