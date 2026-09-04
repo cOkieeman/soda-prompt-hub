@@ -14,6 +14,7 @@ import prompt_hub.windows_worker as worker_module
 from prompt_hub.remote_nodes import RemoteNodeStore
 from prompt_hub.windows_worker import (
     LoraRootConfig,
+    ModelRootConfig,
     WindowsWorker,
     WorkerConfig,
     WorkerError,
@@ -323,12 +324,117 @@ def test_worker_lora_catalog_snapshot_and_mac_import(tmp_path) -> None:
         )
         worker = WindowsWorker(config)
         self_test = worker.self_test()
-        assert self_test["capabilities"] == ["comfyui_generate", "lora_catalog_snapshot"]
+        assert self_test["capabilities"] == [
+            "comfyui_generate",
+            "lora_catalog_snapshot",
+            "model_catalog_snapshot",
+        ]
         assert self_test["lora_roots"][0]["model_count"] == 1
         submitted = store.submit_lora_catalog_snapshot("compute-5060ti")
         assert worker.run_once() is True
 
     _assert_lora_catalog_import(store, bridge, submitted["task_id"], tmp_path)
+
+
+def test_worker_model_catalog_snapshot_and_mac_import(tmp_path) -> None:
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    bridge = mount / "prompt-hub"
+    checkpoints = tmp_path / "models" / "checkpoints"
+    diffusion = tmp_path / "models" / "diffusion_models"
+    checkpoint = checkpoints / "Anima" / "anima-base.safetensors"
+    unet = diffusion / "Krea2" / "krea2-dev.safetensors"
+    checkpoint.parent.mkdir(parents=True)
+    unet.parent.mkdir(parents=True)
+    checkpoint.write_bytes(b"checkpoint-weight-content-must-not-be-read")
+    checkpoint.with_suffix(".png").write_bytes(b"\x89PNG\r\n\x1a\ncheckpoint-preview")
+    checkpoint.with_name(f"{checkpoint.stem}.civitai.info").write_text(
+        json.dumps({"id": 3200001, "modelId": 2800001, "baseModel": "Anima"}),
+        encoding="utf-8",
+    )
+    unet.write_bytes(b"diffusion-weight-content-must-not-be-read")
+    (diffusion / "ignore.txt").write_text("not a model", encoding="utf-8")
+    store = RemoteNodeStore(tmp_path / "remote-state")
+    store.initialize()
+    store.save_node(
+        "compute-5060ti",
+        {
+            "role": "compute_5060ti",
+            "host": "192.168.1.10",
+            "smb_mount": str(mount),
+            "enabled": True,
+            "capabilities": ["model_catalog_snapshot"],
+        },
+    )
+    store.prepare_bridge("compute-5060ti")
+
+    with comfy_server() as (url, _state):
+        config = WorkerConfig(
+            bridge_root=bridge,
+            comfyui_url=url,
+            worker_id="compute-5060ti-worker",
+            model_roots=(
+                ModelRootConfig(
+                    root_id="comfyui-checkpoints",
+                    asset_type="checkpoint",
+                    path=checkpoints,
+                    model_family="anima",
+                ),
+                ModelRootConfig(
+                    root_id="comfyui-diffusion-models",
+                    asset_type="diffusion_model",
+                    path=diffusion,
+                    model_family="krea2",
+                ),
+            ),
+        )
+        worker = WindowsWorker(config)
+        self_test = worker.self_test()
+        assert self_test["worker_build_sha256"] == worker_module.WORKER_BUILD_SHA256
+        assert self_test["model_roots"][0]["model_count"] == 1
+        assert self_test["model_roots"][1]["model_family"] == "krea2"
+        submitted = store.submit_model_catalog_snapshot("compute-5060ti")
+        assert worker.run_once() is True
+
+    task_id = submitted["task_id"]
+    verified = store.verify_returned_task("compute-5060ti", task_id)
+    assert verified["verified"] is True
+    assert verified["output_count"] == 2
+    result = json.loads((bridge / "inbox" / f"{task_id}.json").read_text())
+    assert result["worker_build_sha256"] == worker_module.WORKER_BUILD_SHA256
+    catalog_output = next(item for item in result["outputs"] if item["kind"] == "model_catalog")
+    catalog_raw = (bridge / catalog_output["relative_path"]).read_bytes()
+    catalog = json.loads(catalog_raw)
+    assert catalog["format"] == "soda-windows-model-catalog-v1"
+    assert [item["asset_type"] for item in catalog["items"]] == [
+        "checkpoint",
+        "diffusion_model",
+    ]
+    assert catalog["items"][0]["relative_path"] == "Anima/anima-base.safetensors"
+    assert catalog["items"][0]["preview_relative_path"] == "Anima/anima-base.png"
+    assert catalog["items"][0]["source_url"] == (
+        "https://civitai.com/models/2800001?modelVersionId=3200001"
+    )
+    assert catalog["items"][0]["metadata"]["civitai_model_id"] == 2800001
+    assert catalog["items"][0]["metadata"]["civitai_version_id"] == 3200001
+    assert catalog["items"][1]["model_family"] == "krea2"
+    assert b"checkpoint-weight-content" not in catalog_raw
+    assert b"diffusion-weight-content" not in catalog_raw
+
+    _assert_model_catalog_import(store, task_id, tmp_path)
+
+
+def _assert_model_catalog_import(store, task_id: str, tmp_path) -> None:
+    imported = store.import_returned_model_catalog("compute-5060ti", task_id)
+    assert imported["count"] == 2
+    assert imported["type_counts"] == {"checkpoint": 1, "diffusion_model": 1}
+    assert imported["preview_count"] == 1
+    assert imported["with_preview_count"] == 1
+    anima = store.search_models("anima", model_family="anima")[0]
+    assert len(anima["preview_urls"]) == 1
+    assert store.search_models("krea2", model_family="krea2")[0]["name"] == "krea2-dev"
+    model_catalog_root = tmp_path / "remote-state" / "model-catalog"
+    assert not list(model_catalog_root.rglob("*.safetensors"))
 
 
 def test_lora_preview_matching_does_not_cross_similar_model_names(tmp_path) -> None:
@@ -343,6 +449,43 @@ def test_lora_preview_matching_does_not_cross_similar_model_names(tmp_path) -> N
     previews = worker_module._find_lora_previews(lora_root, model, {})  # noqa: SLF001
 
     assert previews == ["model-v1.jpeg", "model-v1.civitai_bak.png"]
+
+
+def test_model_preview_matching_supports_common_sidecar_names(tmp_path) -> None:
+    model_root = tmp_path / "checkpoints"
+    model = model_root / "anima-base.safetensors"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"weight-bytes-must-not-be-read")
+    model.with_suffix(".jpeg").write_bytes(b"\xff\xd8\xff\xdbprimary-preview")
+    model.with_name(f"{model.stem}.preview.png").write_bytes(b"\x89PNG\r\n\x1a\npreview")
+    model.with_name("anima-base-v2.jpeg").write_bytes(b"\xff\xd8\xff\xdbother-model")
+
+    previews = worker_module._find_model_previews(model_root, model)  # noqa: SLF001
+
+    assert previews == ["anima-base.jpeg", "anima-base.preview.png"]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "file:///F:/ComfyUI/models/checkpoints/anima.safetensors",
+        "https://example.com/models/2800001?modelVersionId=3200001",
+        "https://civitai.red/api/download/models/3200001",
+    ],
+)
+def test_worker_rejects_non_civitai_model_page_links(value: str) -> None:
+    assert worker_module._civitai_source_url({"url": value}) == ""  # noqa: SLF001
+
+
+def test_model_family_prefers_directory_and_does_not_match_name_fragments() -> None:
+    family = worker_module._model_family  # noqa: SLF001
+
+    assert family("Anima/anima-base.safetensors", "") == "anima"
+    assert family("Krea2/model.safetensors", "") == "krea2"
+    assert family("SDXL/animagineXLV31_v31.safetensors", "") == "sdxl"
+    assert family("Flux1_Dev/fluxKreaDevNsfwFp8_v10.safetensors", "") == "flux"
+    assert family("misc/model.safetensors", "Krea 2") == "krea2"
+    assert family("misc/animagineXL.safetensors", "") == "unknown"
 
 
 def test_lora_preview_copy_reports_oversize_skip_reason(tmp_path, monkeypatch) -> None:
@@ -401,6 +544,7 @@ def _assert_lora_catalog_import(
     assert item["metadata"]["comfyui_visible"] is True
     assert item["metadata"]["civitai_model_id"] == 2885952
     assert item["metadata"]["civitai_version_id"] == 3262276
+    assert item["source_url"] == ("https://civitai.com/models/2885952?modelVersionId=3262276")
     assert item["sha256"] == "b" * 64
     assert "weight_bytes" not in item
 
@@ -410,6 +554,9 @@ def _assert_lora_catalog_import(
     assert imported["with_preview_count"] == 1
     imported_item = store.search_loras("linhuieroc")[0]
     assert imported_item["name"] == "林悔儿 Anima v01"
+    assert imported_item["source_url"] == (
+        "https://civitai.com/models/2885952?modelVersionId=3262276"
+    )
     assert len(imported_item["preview_urls"]) == 2
     assert not list((tmp_path / "remote-state" / "lora-previews").rglob("*.safetensors"))
 

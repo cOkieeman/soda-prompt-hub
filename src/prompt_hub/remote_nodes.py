@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import urllib.parse
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -18,11 +19,22 @@ NODE_ROLES = {"compute_5060ti"}
 BRIDGE_DIRECTORIES = ("outbox", "inbox", "processing", "completed", "failed")
 SAFE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
+CIVITAI_MODEL_PATH_RE = re.compile(r"^/models/(?P<model_id>[1-9]\d*)(?:/[^/?#]+)?/?$")
+CIVITAI_HOSTS = {"civitai.com", "www.civitai.com", "civitai.red", "www.civitai.red"}
 RESULT_FORMAT = "soda-compute-result-v1"
 LORA_PREVIEW_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+MODEL_ASSET_TYPES = {
+    "checkpoint",
+    "controlnet",
+    "diffusion_model",
+    "text_encoder",
+    "upscaler",
+    "vae",
+}
 MAX_LORA_PREVIEW_BYTES = 32 * 1024 * 1024
 MAX_LORA_PREVIEW_COUNT = 1024
 MAX_LORA_PREVIEW_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+MAX_CIVITAI_URL_LENGTH = 2000
 TASK_LOCATION_STATUS = {
     "outbox": "queued",
     "processing": "running",
@@ -62,14 +74,18 @@ class RemoteNodeStore:
         self.root = root
         self.nodes_path = root / "nodes.json"
         self.catalog_root = root / "lora-catalog"
+        self.model_catalog_root = root / "model-catalog"
         self.preview_root = root / "lora-previews"
+        self.model_preview_root = root / "model-previews"
         self.task_records_root = root / "tasks"
         self._lock = Lock()
 
     def initialize(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         self.catalog_root.mkdir(parents=True, exist_ok=True)
+        self.model_catalog_root.mkdir(parents=True, exist_ok=True)
         self.preview_root.mkdir(parents=True, exist_ok=True)
+        self.model_preview_root.mkdir(parents=True, exist_ok=True)
         self.task_records_root.mkdir(parents=True, exist_ok=True)
 
     def list_nodes(self) -> list[dict[str, Any]]:
@@ -192,8 +208,19 @@ class RemoteNodeStore:
             raise RemoteNodeError("任务类型不在 compute contract 中")
         if task_spec.get("target_role") != node.get("role"):
             raise RemoteNodeError("任务类型与设备角色不匹配")
-        if task_type not in node.get("capabilities", []):
-            raise RemoteNodeError("设备未声明此任务 capability")
+        declared_capabilities = node.get("capabilities", [])
+        if not isinstance(declared_capabilities, list):
+            declared_capabilities = []
+        if task_type not in declared_capabilities:
+            diagnostic = self.diagnostics(node_id)
+            worker_status = diagnostic.get("worker_status", {})
+            runtime_capabilities = (
+                worker_status.get("capabilities", [])
+                if diagnostic.get("worker_ready") and isinstance(worker_status, dict)
+                else []
+            )
+            if not isinstance(runtime_capabilities, list) or task_type not in runtime_capabilities:
+                raise RemoteNodeError("设备与已自检 Worker 均未声明此任务 capability")
         _reject_task_credentials(payload)
         required = task_spec.get("payload_required", [])
         missing = [str(key) for key in required if not _present(payload.get(str(key)))]
@@ -621,13 +648,20 @@ class RemoteNodeStore:
             "metadata_only": True,
             "preview_count": sum(len(item.get("preview_files", [])) for item in prepared),
             "with_preview_count": sum(bool(item.get("preview_files")) for item in prepared),
+            "with_source_count": sum(bool(_catalog_source_url(item)) for item in prepared),
         }
 
     def lora_catalog_status(self) -> dict[str, Any]:
         current = _read_json(self.catalog_root / "current.json", {})
         snapshot_id = str(current.get("snapshot_id", ""))
         if not snapshot_id:
-            return {"available": False, "count": 0, "snapshot_id": "", "metadata_only": True}
+            return {
+                "available": False,
+                "count": 0,
+                "snapshot_id": "",
+                "metadata_only": True,
+                "with_source_count": 0,
+            }
         snapshot = _read_json(self.catalog_root / f"{snapshot_id}.json", {})
         items = snapshot.get("items", [])
         prepared_items = items if isinstance(items, list) else []
@@ -641,6 +675,7 @@ class RemoteNodeStore:
             "metadata_only": True,
             "preview_count": sum(len(item.get("preview_files", [])) for item in prepared_items),
             "with_preview_count": sum(bool(item.get("preview_files")) for item in prepared_items),
+            "with_source_count": sum(bool(_catalog_source_url(item)) for item in prepared_items),
         }
 
     def search_loras(self, query: str = "", *, limit: int = 100) -> list[dict[str, Any]]:
@@ -652,6 +687,8 @@ class RemoteNodeStore:
         needle = query.strip().casefold()
         matched = []
         for item in items if isinstance(items, list) else []:
+            metadata = item.get("metadata", {})
+            metadata = metadata if isinstance(metadata, dict) else {}
             search_text = " ".join(
                 str(value)
                 for value in (
@@ -660,10 +697,14 @@ class RemoteNodeStore:
                     item.get("model_family", ""),
                     " ".join(item.get("trigger_words", [])),
                     " ".join(item.get("tags", [])),
+                    item.get("source_url", ""),
+                    metadata.get("civitai_model_id", ""),
+                    metadata.get("civitai_version_id", ""),
                 )
             ).casefold()
             if not needle or needle in search_text:
                 result = dict(item)
+                result["source_url"] = _catalog_source_url(item)
                 preview_files = item.get("preview_files", [])
                 if not isinstance(preview_files, list):
                     preview_files = []
@@ -679,6 +720,316 @@ class RemoteNodeStore:
             if len(matched) >= max(1, min(limit, 500)):
                 break
         return matched
+
+    def get_lora(self, lora_id: str) -> dict[str, Any]:
+        clean_id = _safe_id(lora_id, "lora_id")
+        status = self.lora_catalog_status()
+        if not status["available"]:
+            raise RemoteNodeError("Windows LoRA 清单尚未同步")
+        snapshot = _read_json(self.catalog_root / f"{status['snapshot_id']}.json", {})
+        items = snapshot.get("items", [])
+        item = next(
+            (
+                value
+                for value in items
+                if isinstance(items, list)
+                and isinstance(value, dict)
+                and value.get("lora_id") == clean_id
+            ),
+            None,
+        )
+        if item is None:
+            raise RemoteNodeError("Windows LoRA 不存在或清单已更新")
+        result = dict(item)
+        result["source_url"] = _catalog_source_url(item)
+        return result
+
+    def submit_model_catalog_snapshot(self, node_id: str) -> dict[str, Any]:
+        diagnostic = self.diagnostics(node_id)
+        worker_status = diagnostic.get("worker_status", {})
+        if not isinstance(worker_status, dict):
+            worker_status = {}
+        capabilities = worker_status.get("capabilities", [])
+        if not isinstance(capabilities, list) or "model_catalog_snapshot" not in capabilities:
+            raise RemoteNodeError("Windows Worker 尚未启用模型清单能力，请先更新并自检")
+        raw_roots = worker_status.get("model_roots", [])
+        root_ids = [
+            str(item.get("root_id", ""))
+            for item in raw_roots
+            if isinstance(item, dict)
+            and item.get("exists") is True
+            and _present(item.get("root_id"))
+        ]
+        if not root_ids:
+            raise RemoteNodeError("Windows Worker 没有可用的模型根目录")
+        return self.submit_task(
+            node_id,
+            {
+                "task_type": "model_catalog_snapshot",
+                "payload": {
+                    "source_manager": "ComfyUI model folders",
+                    "model_roots": root_ids,
+                },
+                "manifest": [],
+                "priority": 10,
+            },
+        )
+
+    def import_returned_model_catalog(self, node_id: str, task_id: str) -> dict[str, Any]:
+        clean_task = _safe_id(task_id, "task_id")
+        task = self.get_task(node_id, clean_task)
+        if task["local_task"].get("task_type") != "model_catalog_snapshot":
+            raise RemoteNodeError("该任务不是模型清单快照")
+        verified = self.verify_returned_task(node_id, clean_task)
+        if not verified["verified"]:
+            raise RemoteNodeError("模型清单回传完整性校验失败")
+        output = next(
+            (item for item in verified["outputs"] if item.get("kind") == "model_catalog"),
+            None,
+        )
+        if output is None:
+            raise RemoteNodeError("模型清单任务没有 catalog 输出")
+        bridge_root = self._ready_bridge(node_id)
+        catalog = _read_required_json(bridge_root / str(output["relative_path"]))
+        if catalog.get("format") != "soda-windows-model-catalog-v1":
+            raise RemoteNodeError("模型 catalog format 不匹配")
+        result = _read_required_json(bridge_root / "inbox" / f"{clean_task}.json")
+        if catalog.get("worker_id") != result.get("worker_id"):
+            raise RemoteNodeError("模型 catalog worker_id 与任务回传不匹配")
+        items = catalog.get("items")
+        if not isinstance(items, list):
+            raise RemoteNodeError("模型 catalog items 不是列表")
+        catalog_items = [item for item in items if isinstance(item, dict)]
+        preview_outputs = [
+            item for item in verified["outputs"] if item.get("kind") == "model_preview"
+        ]
+        preview_files = self._import_model_previews(
+            snapshot_id=str(catalog.get("snapshot_id", "")),
+            items=catalog_items,
+            outputs=preview_outputs,
+            bridge_root=bridge_root,
+        )
+        for item in catalog_items:
+            item["preview_files"] = preview_files.get(str(item.get("asset_id", "")), [])
+        imported = self.import_model_catalog(
+            snapshot_id=str(catalog.get("snapshot_id", "")),
+            worker_id=str(catalog.get("worker_id", "")),
+            source_manager=str(catalog.get("source_manager", "")),
+            items=catalog_items,
+        )
+        return {**imported, "task_id": clean_task, "integrity_verified": True}
+
+    def _import_model_previews(
+        self,
+        *,
+        snapshot_id: str,
+        items: list[dict[str, Any]],
+        outputs: list[dict[str, Any]],
+        bridge_root: Path,
+    ) -> dict[str, list[dict[str, Any]]]:
+        clean_snapshot = _safe_id(snapshot_id, "snapshot_id")
+        if len(outputs) > MAX_LORA_PREVIEW_COUNT:
+            raise RemoteNodeError("模型预览图数量超过安全上限")
+        total_bytes = sum(int(item.get("size_bytes", 0)) for item in outputs)
+        if total_bytes > MAX_LORA_PREVIEW_TOTAL_BYTES:
+            raise RemoteNodeError("模型预览图总容量超过安全上限")
+        known_ids = {_safe_id(str(item.get("asset_id", "")), "asset_id") for item in items}
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        ordered = sorted(
+            outputs,
+            key=lambda item: (str(item.get("asset_id", "")), int(item.get("preview_index", 0))),
+        )
+        for output in ordered:
+            asset_id = _safe_id(str(output.get("asset_id", "")), "asset_id")
+            if asset_id not in known_ids:
+                raise RemoteNodeError("模型预览图引用了清单外的 asset_id")
+            size = int(output.get("size_bytes", 0))
+            if not 0 < size <= MAX_LORA_PREVIEW_BYTES:
+                raise RemoteNodeError("模型预览图大小超过安全上限")
+            source = bridge_root / Path(*PurePosixPath(str(output["relative_path"])).parts)
+            suffix = source.suffix.casefold()
+            if suffix not in LORA_PREVIEW_SUFFIXES:
+                raise RemoteNodeError("模型预览图扩展名不受支持")
+            filename = f"{int(output.get('preview_index', 0)):03d}{suffix}"
+            target = self.model_preview_root / clean_snapshot / asset_id / filename
+            _copy_verified_file(source, target, str(output["sha256"]))
+            grouped.setdefault(asset_id, []).append(
+                {
+                    "filename": filename,
+                    "sha256": str(output["sha256"]),
+                    "size_bytes": size,
+                    "media_type": str(output.get("media_type", "")),
+                    "source_relative_path": str(output.get("source_relative_path", "")),
+                }
+            )
+        return grouped
+
+    def import_model_catalog(
+        self,
+        *,
+        snapshot_id: str,
+        worker_id: str,
+        source_manager: str,
+        items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        clean_snapshot = _safe_id(snapshot_id, "snapshot_id")
+        clean_worker = _safe_id(worker_id, "worker_id")
+        prepared = [_normalize_model_item(item) for item in items]
+        if not prepared:
+            raise RemoteNodeError("模型清单不能为空")
+        payload = {
+            "format": "soda-windows-model-catalog-v1",
+            "snapshot_id": clean_snapshot,
+            "worker_id": clean_worker,
+            "source_manager": source_manager.strip()[:200],
+            "created_at": _now(),
+            "items": prepared,
+        }
+        snapshot_path = self.model_catalog_root / f"{clean_snapshot}.json"
+        with self._lock:
+            if snapshot_path.exists():
+                existing = _read_json(snapshot_path, {})
+                comparable_existing = {**existing, "created_at": ""}
+                comparable_payload = {**payload, "created_at": ""}
+                if comparable_existing != comparable_payload:
+                    raise RemoteNodeError("同名模型 snapshot 已存在且内容不同")
+                payload = existing
+            else:
+                _write_json(snapshot_path, payload)
+            _write_json(
+                self.model_catalog_root / "current.json",
+                {"snapshot_id": clean_snapshot, "updated_at": _now()},
+            )
+        return {
+            "snapshot_id": clean_snapshot,
+            "worker_id": clean_worker,
+            "source_manager": payload["source_manager"],
+            "count": len(prepared),
+            "type_counts": _model_type_counts(prepared),
+            "preview_count": sum(len(item.get("preview_files", [])) for item in prepared),
+            "with_preview_count": sum(bool(item.get("preview_files")) for item in prepared),
+            "with_source_count": sum(bool(_catalog_source_url(item)) for item in prepared),
+            "metadata_only": True,
+            "weights_read": False,
+        }
+
+    def model_catalog_status(self) -> dict[str, Any]:
+        current = _read_json(self.model_catalog_root / "current.json", {})
+        snapshot_id = str(current.get("snapshot_id", ""))
+        if not snapshot_id:
+            return {
+                "available": False,
+                "count": 0,
+                "snapshot_id": "",
+                "type_counts": {},
+                "preview_count": 0,
+                "with_preview_count": 0,
+                "with_source_count": 0,
+                "metadata_only": True,
+                "weights_read": False,
+            }
+        snapshot = _read_json(self.model_catalog_root / f"{snapshot_id}.json", {})
+        items = snapshot.get("items", [])
+        prepared = items if isinstance(items, list) else []
+        return {
+            "available": True,
+            "count": len(prepared),
+            "snapshot_id": snapshot_id,
+            "worker_id": snapshot.get("worker_id", ""),
+            "source_manager": snapshot.get("source_manager", ""),
+            "created_at": snapshot.get("created_at", ""),
+            "type_counts": _model_type_counts(prepared),
+            "preview_count": sum(len(item.get("preview_files", [])) for item in prepared),
+            "with_preview_count": sum(bool(item.get("preview_files")) for item in prepared),
+            "with_source_count": sum(bool(_catalog_source_url(item)) for item in prepared),
+            "metadata_only": True,
+            "weights_read": False,
+        }
+
+    def search_models(
+        self,
+        query: str = "",
+        *,
+        asset_type: str = "",
+        model_family: str = "",
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        status = self.model_catalog_status()
+        if not status["available"]:
+            return []
+        if asset_type and asset_type not in MODEL_ASSET_TYPES:
+            raise RemoteNodeError("模型类型无效")
+        snapshot = _read_json(self.model_catalog_root / f"{status['snapshot_id']}.json", {})
+        items = snapshot.get("items", [])
+        needle = query.strip().casefold()
+        family = model_family.strip().casefold()
+        matched = []
+        for item in items if isinstance(items, list) else []:
+            if asset_type and item.get("asset_type") != asset_type:
+                continue
+            if family and str(item.get("model_family", "")).casefold() != family:
+                continue
+            metadata = item.get("metadata", {})
+            metadata = metadata if isinstance(metadata, dict) else {}
+            search_text = " ".join(
+                str(value)
+                for value in (
+                    *(
+                        item.get(key, "")
+                        for key in (
+                            "name",
+                            "relative_path",
+                            "root_id",
+                            "asset_type",
+                            "model_family",
+                            "source_url",
+                        )
+                    ),
+                    metadata.get("civitai_model_id", ""),
+                    metadata.get("civitai_version_id", ""),
+                )
+            ).casefold()
+            if not needle or needle in search_text:
+                result = dict(item)
+                result["source_url"] = _catalog_source_url(item)
+                preview_files = item.get("preview_files", [])
+                if not isinstance(preview_files, list):
+                    preview_files = []
+                result["preview_urls"] = [
+                    "/api/windows-models/previews/"
+                    f"{status['snapshot_id']}/{item.get('asset_id', '')}/"
+                    f"{preview.get('filename', '')}"
+                    for preview in preview_files
+                    if isinstance(preview, dict) and preview.get("filename")
+                ]
+                result["preview_count"] = len(result["preview_urls"])
+                matched.append(result)
+            if len(matched) >= max(1, min(limit, 2000)):
+                break
+        return matched
+
+    def get_model(self, asset_id: str) -> dict[str, Any]:
+        clean_id = _safe_id(asset_id, "asset_id")
+        status = self.model_catalog_status()
+        if not status["available"]:
+            raise RemoteNodeError("Windows 模型清单尚未同步")
+        snapshot = _read_json(self.model_catalog_root / f"{status['snapshot_id']}.json", {})
+        items = snapshot.get("items", [])
+        item = next(
+            (
+                value
+                for value in items
+                if isinstance(items, list)
+                and isinstance(value, dict)
+                and value.get("asset_id") == clean_id
+            ),
+            None,
+        )
+        if item is None:
+            raise RemoteNodeError("Windows 模型不存在或清单已更新")
+        result = dict(item)
+        result["source_url"] = _catalog_source_url(item)
+        return result
 
     def resolve_lora_preview(
         self,
@@ -721,6 +1072,49 @@ class RemoteNodeStore:
             raise RemoteNodeError("LoRA 预览图路径无效") from error
         if not path.is_file() or _sha256(path) != preview.get("sha256"):
             raise RemoteNodeError("LoRA 预览图文件缺失或校验失败")
+        return path, _lora_preview_media_type(path)
+
+    def resolve_model_preview(
+        self,
+        snapshot_id: str,
+        asset_id: str,
+        filename: str,
+    ) -> tuple[Path, str]:
+        clean_snapshot = _safe_id(snapshot_id, "snapshot_id")
+        clean_asset = _safe_id(asset_id, "asset_id")
+        clean_filename = _safe_id(filename, "filename")
+        snapshot = _read_json(self.model_catalog_root / f"{clean_snapshot}.json", {})
+        items = snapshot.get("items", [])
+        item = next(
+            (
+                value
+                for value in items
+                if isinstance(items, list) and isinstance(value, dict)
+                if value.get("asset_id") == clean_asset
+            ),
+            None,
+        )
+        if item is None:
+            raise RemoteNodeError("模型预览图不存在")
+        previews = item.get("preview_files", [])
+        preview = next(
+            (
+                value
+                for value in previews
+                if isinstance(previews, list) and isinstance(value, dict)
+                if value.get("filename") == clean_filename
+            ),
+            None,
+        )
+        if preview is None:
+            raise RemoteNodeError("模型预览图不存在")
+        path = (self.model_preview_root / clean_snapshot / clean_asset / clean_filename).resolve()
+        try:
+            path.relative_to(self.model_preview_root.resolve())
+        except ValueError as error:
+            raise RemoteNodeError("模型预览图路径无效") from error
+        if not path.is_file() or _sha256(path) != preview.get("sha256"):
+            raise RemoteNodeError("模型预览图文件缺失或校验失败")
         return path, _lora_preview_media_type(path)
 
 
@@ -785,20 +1179,28 @@ def _verify_result_output(
         "sha256": actual_hash,
         "size_bytes": actual_size,
     }
-    if kind == "lora_preview":
+    if kind in {"lora_preview", "model_preview"}:
         if actual_size > MAX_LORA_PREVIEW_BYTES:
-            raise RemoteNodeError(f"LoRA 预览图超过安全上限: {relative.as_posix()}")
-        result.update(
-            {
-                "lora_id": _safe_id(str(value.get("lora_id", "")), "lora_id"),
-                "preview_index": max(0, min(int(value.get("preview_index", 0)), 9999)),
-                "source_relative_path": _safe_relative_value(
-                    str(value.get("source_relative_path", "")),
-                    "LoRA preview source_relative_path",
-                ),
-                "media_type": _lora_preview_media_type(path),
-            }
-        )
+            raise RemoteNodeError(f"预览图超过安全上限: {relative.as_posix()}")
+        preview_fields = {
+            "preview_index": max(0, min(int(value.get("preview_index", 0)), 9999)),
+            "source_relative_path": _safe_relative_value(
+                str(value.get("source_relative_path", "")),
+                "preview source_relative_path",
+            ),
+            "media_type": _lora_preview_media_type(path),
+        }
+        if kind == "model_preview":
+            preview_fields["asset_id"] = _safe_id(
+                str(value.get("asset_id", "")),
+                "asset_id",
+            )
+        else:
+            preview_fields["lora_id"] = _safe_id(
+                str(value.get("lora_id", "")),
+                "lora_id",
+            )
+        result.update(preview_fields)
     return result
 
 
@@ -806,13 +1208,13 @@ def _copy_verified_file(source: Path, target: Path, expected_hash: str) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.is_file():
         if _sha256(target) != expected_hash:
-            raise RemoteNodeError("同名 LoRA 预览缓存已存在且内容不同")
+            raise RemoteNodeError("同名预览缓存已存在且内容不同")
         return
     temporary = target.with_name(f".{target.name}.{uuid4().hex}.tmp")
     try:
         shutil.copyfile(source, temporary)
         if _sha256(temporary) != expected_hash:
-            raise RemoteNodeError("LoRA 预览图复制后 SHA-256 不匹配")
+            raise RemoteNodeError("预览图复制后 SHA-256 不匹配")
         temporary.replace(target)
     finally:
         with suppress(FileNotFoundError):
@@ -903,6 +1305,53 @@ def _optional_safe_id(value: str, label: str) -> str:
     return _safe_id(value, label) if value.strip() else ""
 
 
+def _positive_civitai_id(value: object) -> int | None:
+    text = str(value).strip() if isinstance(value, (str, int, float)) else ""
+    if not text.isdigit():
+        return None
+    parsed = int(text)
+    return parsed if parsed > 0 else None
+
+
+def _metadata_civitai_ids(metadata: object) -> tuple[int | None, int | None]:
+    if not isinstance(metadata, dict):
+        return None, None
+    model_id = _positive_civitai_id(metadata.get("civitai_model_id", metadata.get("modelId")))
+    version_id = _positive_civitai_id(
+        metadata.get("civitai_version_id", metadata.get("modelVersionId"))
+    )
+    return model_id, version_id
+
+
+def _safe_civitai_source_url(value: object, metadata: object) -> str:
+    model_id, version_id = _metadata_civitai_ids(metadata)
+    if isinstance(value, str) and len(value) <= MAX_CIVITAI_URL_LENGTH:
+        with suppress(ValueError):
+            parsed = urllib.parse.urlsplit(value.strip())
+            host = (parsed.hostname or "").casefold()
+            matched = CIVITAI_MODEL_PATH_RE.fullmatch(parsed.path)
+            if parsed.scheme in {"http", "https"} and host in CIVITAI_HOSTS and matched:
+                source_model_id = int(matched.group("model_id"))
+                query = urllib.parse.parse_qs(parsed.query)
+                source_version_id = _positive_civitai_id((query.get("modelVersionId") or [""])[0])
+                chosen_version = source_version_id or version_id
+                base = f"https://{host}/models/{source_model_id}"
+                return f"{base}?modelVersionId={chosen_version}" if chosen_version else base
+    if model_id is None:
+        return ""
+    base = f"https://civitai.com/models/{model_id}"
+    return f"{base}?modelVersionId={version_id}" if version_id else base
+
+
+def _catalog_source_url(item: object) -> str:
+    if not isinstance(item, dict):
+        return ""
+    return _safe_civitai_source_url(
+        item.get("source_url", ""),
+        item.get("metadata", {}),
+    )
+
+
 def _new_task_id() -> str:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return f"task-{stamp}-{uuid4().hex[:12]}"
@@ -925,6 +1374,7 @@ def _normalize_lora_item(item: dict[str, Any]) -> dict[str, Any]:
     for value in preview_relative_paths:
         _safe_relative_value(value, "LoRA preview_relative_paths")
     preview_files = _normalize_lora_preview_files(item.get("preview_files", []))
+    metadata = item.get("metadata", {}) if isinstance(item.get("metadata"), dict) else {}
     return {
         "lora_id": lora_id,
         "name": str(item.get("name", "")).strip()[:300] or relative.stem,
@@ -933,14 +1383,60 @@ def _normalize_lora_item(item: dict[str, Any]) -> dict[str, Any]:
         "size_bytes": max(0, int(item.get("size_bytes", 0))),
         "base_model": str(item.get("base_model", "")).strip()[:300],
         "model_family": str(item.get("model_family", "")).strip()[:160],
+        "source_url": _safe_civitai_source_url(item.get("source_url", ""), metadata),
         "trigger_words": _string_list(item.get("trigger_words", []), 100),
         "tags": _string_list(item.get("tags", []), 300),
         "preview_relative_path": preview,
         "preview_relative_paths": preview_relative_paths,
         "preview_files": preview_files,
         "notes": str(item.get("notes", "")).strip()[:2000],
-        "metadata": item.get("metadata", {}) if isinstance(item.get("metadata"), dict) else {},
+        "metadata": metadata,
     }
+
+
+def _normalize_model_item(item: dict[str, Any]) -> dict[str, Any]:
+    asset_id = _safe_id(str(item.get("asset_id", "")), "asset_id")
+    asset_type = str(item.get("asset_type", "")).strip()
+    if asset_type not in MODEL_ASSET_TYPES:
+        raise RemoteNodeError("模型 asset_type 无效")
+    root_id = _safe_id(str(item.get("root_id", "")), "root_id")
+    relative_value = _safe_relative_value(
+        str(item.get("relative_path", "")),
+        "模型 relative_path",
+    )
+    relative = PurePosixPath(relative_value)
+    preview = str(item.get("preview_relative_path", "")).strip()
+    if preview:
+        _safe_relative_value(preview, "模型 preview_relative_path")
+    preview_relative_paths = _string_list(item.get("preview_relative_paths", []), 100)
+    for value in preview_relative_paths:
+        _safe_relative_value(value, "模型 preview_relative_paths")
+    preview_files = _normalize_lora_preview_files(item.get("preview_files", []))
+    metadata = item.get("metadata", {}) if isinstance(item.get("metadata"), dict) else {}
+    return {
+        "asset_id": asset_id,
+        "asset_type": asset_type,
+        "root_id": root_id,
+        "name": str(item.get("name", "")).strip()[:300] or relative.stem,
+        "relative_path": relative.as_posix(),
+        "size_bytes": max(0, int(item.get("size_bytes", 0))),
+        "modified_at": str(item.get("modified_at", "")).strip()[:80],
+        "model_family": str(item.get("model_family", "")).strip()[:160],
+        "source_url": _safe_civitai_source_url(item.get("source_url", ""), metadata),
+        "preview_relative_path": preview,
+        "preview_relative_paths": preview_relative_paths,
+        "preview_files": preview_files,
+        "metadata": metadata,
+    }
+
+
+def _model_type_counts(items: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        asset_type = str(item.get("asset_type", ""))
+        if asset_type in MODEL_ASSET_TYPES:
+            counts[asset_type] = counts.get(asset_type, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _normalize_lora_preview_files(value: object) -> list[dict[str, Any]]:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from io import BytesIO
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from prompt_hub.api import create_app
+from prompt_hub.remote_nodes import RemoteNodeStore
 from prompt_hub.workflow_profiles import WorkflowProfileError, WorkflowProfileStore
 
 
@@ -19,26 +21,51 @@ def _node(class_type: str, **inputs: object) -> dict[str, object]:
 
 def _krea_workflow() -> dict[str, dict[str, object]]:
     return {
-        "1": _node("CheckpointLoader", ckpt_name="Krea2\\model.safetensors"),
+        "65": _node("VAELoader", vae_name="qwen_image_vae.safetensors"),
+        "66": _node(
+            "CLIPLoader",
+            clip_name="qwen3-vl-4b-heretic_int8.safetensors",
+            type="krea2",
+        ),
+        "86": _node(
+            "ToBasicPipe",
+            model=["142", 0],
+            clip=["142", 1],
+            vae=["65", 0],
+            positive=["141", 0],
+            negative=["121", 0],
+        ),
         "87": _node(
             "ImpactKSamplerBasicPipe",
-            basic_pipe=["141", 0],
+            basic_pipe=["86", 0],
             latent_image=["129", 0],
             seed=1,
             steps=20,
             cfg=4.0,
         ),
-        "121": _node("CLIPTextEncode", clip=["1", 0], text="old negative"),
+        "121": _node("CLIPTextEncode", clip=["66", 0], text="old negative"),
+        "123": _node(
+            "UNETLoader",
+            unet_name="Krea2\\model.safetensors",
+            weight_dtype="default",
+        ),
         "129": _node("EmptyLatentImage", width=1024, height=1024, batch_size=1),
-        "132": _node("VAEDecode", samples=["87", 0], vae=["121", 0]),
+        "132": _node("VAEDecode", samples=["87", 0], vae=["65", 0]),
         "133": _node("SaveImage", images=["999", 0], filename_prefix="old"),
         "141": _node(
             "ImpactWildcardEncode",
-            model=["1", 0],
-            clip=["1", 0],
+            model=["142", 0],
+            clip=["142", 1],
             wildcard_text="old positive",
             populated_text="old positive",
             seed=1,
+        ),
+        "142": _node(
+            "Lora Loader (LoraManager)",
+            text="",
+            loras={"__value__": []},
+            model=["123", 0],
+            clip=["66", 0],
         ),
         "999": _node("SeedVR2Upscaler", images=["132", 0]),
     }
@@ -49,7 +76,8 @@ def _anima_workflow() -> dict[str, dict[str, object]]:
         "75": _node("String Literal", string="old negative"),
         "77": _node(
             "Lora Loader (LoraManager)",
-            model=["150", 0],
+            model=["135:107", 0],
+            clip=["135:107", 1],
             loras={"__value__": [{"name": "mansui-anima_v1.1", "active": True}]},
         ),
         "81": _node(
@@ -75,10 +103,39 @@ def _anima_workflow() -> dict[str, dict[str, object]]:
         ),
         "135:103": _node("Int Literal", int=20, source=["184", 0]),
         "135:104": _node("Cfg Literal", float=4.0, source=["84", 0]),
+        "135:65": _node("VAELoader", vae_name="qwen_image_vae.safetensors"),
+        "135:66": _node(
+            "CLIPLoader",
+            clip_name="qwen_3_06b_base.safetensors",
+            type="stable_diffusion",
+        ),
+        "135:107": _node(
+            "LoraLoader",
+            lora_name="Anima\\Utility\\anima-turbo-lora-v0.2.safetensors",
+            strength_model=0.7,
+            strength_clip=0.7,
+            model=["135:111", 0],
+            clip=["135:66", 0],
+        ),
+        "135:111": _node(
+            "UNet loader with Name (Image Saver)",
+            unet_name="Anima\\anima-base-v1.0.safetensors",
+            weight_dtype="default",
+        ),
+        "148:146": _node(
+            "ImpactKSamplerBasicPipe",
+            seed=["84", 0],
+            steps=["135:103", 0],
+            cfg=["135:104", 0],
+            sampler_name="er_sde",
+            scheduler="sgm_uniform",
+            basic_pipe=["77", 0],
+            latent_image=["150", 0],
+        ),
         "148:139": _node(
             "VAEDecode",
-            samples=["135:103", 0],
-            vae=["135:104", 0],
+            samples=["148:146", 0],
+            vae=["135:65", 0],
             negative=["75", 0],
             resolution=["150", 0],
         ),
@@ -109,13 +166,47 @@ def test_profile_import_rejects_ui_wrong_nodes_and_credentials(tmp_path) -> None
             filename="wrong.json",
         )
     credential = _krea_workflow()
-    credential["1"]["inputs"] = {"api_key": "must-not-be-saved"}
+    credential["66"]["inputs"] = {"api_key": "must-not-be-saved"}
     with pytest.raises(WorkflowProfileError, match="凭据"):
         store.import_bytes(
             "krea2-ares-ocmanager",
             _raw(credential),
             label="Krea",
             filename="secret.json",
+        )
+
+
+@pytest.mark.parametrize(
+    ("profile_id", "workflow_factory", "node_id"),
+    [
+        ("anima-mansui", _anima_workflow, "135:111"),
+        ("anima-mansui", _anima_workflow, "135:65"),
+        ("anima-mansui", _anima_workflow, "135:66"),
+        ("anima-mansui", _anima_workflow, "77"),
+        ("anima-mansui", _anima_workflow, "148:146"),
+        ("krea2-ares-ocmanager", _krea_workflow, "123"),
+        ("krea2-ares-ocmanager", _krea_workflow, "65"),
+        ("krea2-ares-ocmanager", _krea_workflow, "66"),
+        ("krea2-ares-ocmanager", _krea_workflow, "142"),
+        ("krea2-ares-ocmanager", _krea_workflow, "87"),
+    ],
+)
+def test_profile_import_rejects_missing_control_nodes(
+    tmp_path,
+    profile_id,
+    workflow_factory,
+    node_id,
+) -> None:
+    workflow = workflow_factory()
+    workflow.pop(node_id)
+    store = WorkflowProfileStore(tmp_path / "profiles")
+
+    with pytest.raises(WorkflowProfileError, match=rf"缺少节点 {re.escape(node_id)}"):
+        store.import_bytes(
+            profile_id,
+            _raw(workflow),
+            label="Missing controlled node",
+            filename="missing-control.json",
         )
 
 
@@ -197,6 +288,52 @@ def test_anima_profile_preserves_lora_and_rejects_source_tampering(tmp_path) -> 
         store.compile_package("anima-mansui", run_id="run-after-tamper")
 
 
+def test_profile_applies_only_declared_models_loras_and_sampler(tmp_path) -> None:
+    store = WorkflowProfileStore(tmp_path / "profiles")
+    profile = store.import_bytes(
+        "anima-mansui",
+        _raw(_anima_workflow()),
+        label="Anima / 满穗",
+        filename="anima.json",
+    )
+    assert {item["asset_type"] for item in profile["controls"]["model_inputs"]} == {
+        "diffusion_model",
+        "text_encoder",
+        "vae",
+    }
+    package = store.compile_package(
+        "anima-mansui",
+        run_id="run-controlled",
+        model_overrides={
+            "diffusion_model": "Anima/new-base.safetensors",
+            "vae": "new-vae.safetensors",
+        },
+        additional_loras=[{"name": "linhuier-anima_v01", "strength": 0.8, "clip_strength": 0.7}],
+        sampler="euler_ancestral",
+        scheduler="normal",
+    )
+    prompt = package["api_prompt"]
+    assert prompt["135:111"]["inputs"]["unet_name"] == "Anima\\new-base.safetensors"
+    assert prompt["135:65"]["inputs"]["vae_name"] == "new-vae.safetensors"
+    assert prompt["148:146"]["inputs"]["sampler_name"] == "euler_ancestral"
+    added = prompt["77"]["inputs"]["loras"]["__value__"][-1]
+    assert added | {"name": "linhuier-anima_v01", "strength": 0.8} == added
+    assert package["controls"]["additional_loras"][0]["clip_strength"] == 0.7
+
+    with pytest.raises(WorkflowProfileError, match="checkpoint"):
+        store.compile_package(
+            "anima-mansui",
+            run_id="run-invalid-model-role",
+            model_overrides={"checkpoint": "other.safetensors"},
+        )
+    with pytest.raises(WorkflowProfileError, match="Sampler"):
+        store.compile_package(
+            "anima-mansui",
+            run_id="run-invalid-sampler",
+            sampler="untrusted_sampler",
+        )
+
+
 def test_random_seed_uses_rgthree_safe_range(tmp_path, monkeypatch) -> None:
     store = WorkflowProfileStore(tmp_path / "profiles")
     store.import_bytes(
@@ -238,6 +375,44 @@ def test_anima_saver_metadata_matches_effective_sampler_defaults(tmp_path) -> No
 def test_workflow_api_archives_and_submits_identical_package(settings, tmp_path) -> None:
     mount = tmp_path / "mounted-share"
     mount.mkdir()
+    remote_facts = RemoteNodeStore(settings.remote_nodes_root)
+    remote_facts.initialize()
+    remote_facts.import_model_catalog(
+        snapshot_id="models-workflow-test",
+        worker_id="compute-5060ti-worker",
+        source_manager="ComfyUI model folders",
+        items=[
+            {
+                "asset_id": "asset-krea-base",
+                "asset_type": "diffusion_model",
+                "root_id": "comfyui-diffusion-models",
+                "name": "krea2-alt",
+                "relative_path": "Krea2/krea2-alt.safetensors",
+                "size_bytes": 1024,
+                "modified_at": "2026-09-03T00:00:00+00:00",
+                "model_family": "krea2",
+            }
+        ],
+    )
+    remote_facts.import_lora_catalog(
+        snapshot_id="loras-workflow-test",
+        worker_id="compute-5060ti-worker",
+        source_manager="ComfyUI LoRA Manager",
+        items=[
+            {
+                "lora_id": "lora-krea-style",
+                "name": "Krea style",
+                "relative_path": "Krea2/style/krea-style.safetensors",
+                "model_family": "krea2",
+            },
+            {
+                "lora_id": "lora-anima-character",
+                "name": "Anima character",
+                "relative_path": "Anima/Character/anima-character.safetensors",
+                "model_family": "anima",
+            },
+        ],
+    )
     with TestClient(create_app(settings)) as client:
         client.put(
             "/api/remote-nodes/compute-5060ti",
@@ -262,7 +437,25 @@ def test_workflow_api_archives_and_submits_identical_package(settings, tmp_path)
                 "title": "Krea test",
                 "target_profile": "krea2",
                 "slots": {"character": "an adult woman", "lighting": "soft rim light"},
-                "generation": {"steps": 7, "cfg": 1.2, "seed": 123},
+                "generation": {
+                    "steps": 7,
+                    "cfg": 1.2,
+                    "seed": 123,
+                    "workflow_controls": {
+                        "krea2-ares-ocmanager": {
+                            "models": {"diffusion_model": "asset-krea-base"},
+                            "loras": [
+                                {
+                                    "lora_id": "lora-krea-style",
+                                    "strength": 0.65,
+                                    "clip_strength": 0.55,
+                                }
+                            ],
+                            "sampler": "euler",
+                            "scheduler": "karras",
+                        }
+                    },
+                },
             },
         ).json()
         submitted = client.post(
@@ -279,6 +472,11 @@ def test_workflow_api_archives_and_submits_identical_package(settings, tmp_path)
         assert task_file.is_file()
         package = json.loads(local.read_text(encoding="utf-8"))
         assert package["api_prompt"]["87"]["inputs"]["steps"] == 7
+        assert package["api_prompt"]["123"]["inputs"]["unet_name"] == "Krea2\\krea2-alt.safetensors"
+        assert package["api_prompt"]["87"]["inputs"]["sampler_name"] == "euler"
+        assert package["api_prompt"]["87"]["inputs"]["scheduler"] == "karras"
+        added_lora = package["api_prompt"]["142"]["inputs"]["loras"]["__value__"][0]
+        assert added_lora | {"name": "krea-style", "strength": 0.65} == added_lora
         assert (
             package["api_prompt"]["129"]["inputs"]
             | {
@@ -331,3 +529,49 @@ def test_workflow_api_archives_and_submits_identical_package(settings, tmp_path)
             json={"node_id": "compute-5060ti"},
         ).json()
         assert repeated["duplicates"] == 1
+
+
+def test_workflow_api_rejects_cross_family_lora(settings) -> None:
+    remote_facts = RemoteNodeStore(settings.remote_nodes_root)
+    remote_facts.initialize()
+    remote_facts.import_lora_catalog(
+        snapshot_id="loras-family-test",
+        worker_id="compute-5060ti-worker",
+        source_manager="ComfyUI LoRA Manager",
+        items=[
+            {
+                "lora_id": "lora-anima-character",
+                "name": "Anima character",
+                "relative_path": "Anima/Character/anima-character.safetensors",
+                "model_family": "anima",
+            }
+        ],
+    )
+    with TestClient(create_app(settings)) as client:
+        imported = client.post(
+            "/api/workflow-profiles/krea2-ares-ocmanager/import",
+            params={"label": "Krea 2 / Ares", "filename": "krea.json"},
+            content=_raw(_krea_workflow()),
+        )
+        assert imported.status_code == 201
+        project = client.post(
+            "/api/creative/projects",
+            json={
+                "title": "Wrong family",
+                "target_profile": "krea2",
+                "slots": {"character": "an adult woman"},
+                "generation": {
+                    "workflow_controls": {
+                        "krea2-ares-ocmanager": {
+                            "loras": [{"lora_id": "lora-anima-character", "strength": 0.8}]
+                        }
+                    }
+                },
+            },
+        ).json()
+        rejected = client.post(
+            "/api/workflow-profiles/krea2-ares-ocmanager/tasks",
+            json={"project_id": project["project_id"], "low_cost": True},
+        )
+        assert rejected.status_code == 422
+        assert "不兼容" in rejected.json()["detail"]

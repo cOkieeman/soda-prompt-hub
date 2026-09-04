@@ -12,5 +12,37 @@
       "root_id": "comfyui-main",
       "path": "D:\\ComfyUI\\models\\loras"
     }
+  ],
+  "model_roots": [
+    {
+      "root_id": "comfyui-checkpoints",
+      "asset_type": "checkpoint",
+      "path": "D:\\ComfyUI\\models\\checkpoints"
+    },
+    {
+      "root_id": "comfyui-diffusion-models",
+      "asset_type": "diffusion_model",
+      "path": "D:\\ComfyUI\\models\\diffusion_models"
+    },
+    {
+      "root_id": "comfyui-vae",
+      "asset_type": "vae",
+      "path": "D:\\ComfyUI\\models\\vae"
+    },
+    {
+      "root_id": "comfyui-text-encoders",
+      "asset_type": "text_encoder",
+      "path": "D:\\ComfyUI\\models\\text_encoders"
+    },
+    {
+      "root_id": "comfyui-upscalers",
+      "asset_type": "upscaler",
+      "path": "D:\\ComfyUI\\models\\upscale_models"
+    },
+    {
+      "root_id": "comfyui-controlnet",
+      "asset_type": "controlnet",
+      "path": "D:\\ComfyUI\\models\\controlnet"
+    }
   ]
 }

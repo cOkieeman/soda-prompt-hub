@@ -188,6 +188,10 @@
 
 ## 需求
 
+- 阶段 31 新需求：LoRA 与底模条目需要同步可靠的 Civitai 来源链接，方便用户返回模型页查看推荐提示词；不能根据名称猜链接，也不能把 Windows 本地路径暴露为外链。
+- 当前真实 LoRA 快照已经保留 `civitai_model_id` 与 `civitai_version_id`，例如 `linhuier=2885952/3262276`；因此 LoRA 可以无网络、无重新读取权重地构造稳定模型页链接。
+- 当前模型资产快照只保留文件后缀，没有读取模型旁的 JSON/Civitai sidecar；Checkpoint / Diffusion Model 需要新增受限 sidecar 解析。常见候选为同 stem 的 `.metadata.json`、`.civitai.info` 与 `.info.json`，必须设置大小上限并只接受 JSON 对象。
+
 - Mac 上的 Prompt Hub 是本地提示词、视觉参考、OC 和创作项目中枢。
 - Windows 设备负责 ComfyUI 生成与测试，Mac 先完成创作准备。
 - 用户喜欢当前 Prompt Hub 的档案馆视觉风格，但第一次打开不知道从哪里开始。
@@ -401,12 +405,120 @@
 - Worker 最终信封为 completed，共 387 个输出（1 catalog + 386 preview）；记录 `weights_read=false`，10 个候选因 `unsupported_format` 跳过，预览总字节 442,815,681。
 - API 返回 256 个 LoRA、221 个带图条目、386 个唯一预览 URL；`linhuier` 唯一对应 `Anima/Character/linhuier-anima_v01.safetensors` 并有 2 张图。正式库、两个历史备份库与 embedding 库的 SQLite `integrity_check` 均为 `ok`。
 
+## 2026-09-03：模型资产真机复验
+
+- 新 Worker 任务 `task-20260903T095310Z-418e3862fe8f` 首次回传 `worker_build_sha256=11f78bd64957e7f88c7e791e3c351e09f4a74a4fb9c8abaa0c8da831c645fb55`，与 Mac 和 SMB 上两份脚本一致，证明实际接任务的常驻进程已换版。
+- 新模型快照 `models-20260903T095311Z-7c0adb88d329` 含 140 个模型；六类计数为 checkpoint 58、diffusion model 38、VAE 14、text encoder 9、upscaler 6、ControlNet 15；回传 SHA-256 完整性通过，明确 `metadata_only=true`、`weights_read=false`。
+- 两个真实误分类样本已修正：`SDXL/animagineXLV31_v31.safetensors` 为 `sdxl`；`Flux1_Dev/fluxKreaDevNsfwFp8_v10*.safetensors` 为 `flux`。真正的 Anima/Krea 2 diffusion model 候选分别为 12/10。
+- 浏览器设备页已显示最新 140 个模型、六类树状导航及正确分类卡片；整页刷新后，创作台 Anima 底模候选显示 12 个真实 Anima diffusion model，已知 Flux/SDXL 不进入 Anima 候选。
+- 模型同步后未整页刷新时，创作台仍持有页面启动时的旧清单，曾短暂显示两个 `fluxKreaDev` 候选；源码过滤本身正确，刷新后两项消失，因此没有误改过滤规则。后续可考虑让导入动作广播状态更新，但不属于数据正确性问题。
+- 低成本 Anima smoke test 使用 512×768、4 steps、CFG 1.0、seed 123456；Windows 约 7 秒完成并回传图片、workflow 和日志，三项 SHA-256 全部通过。结果图为银发成年女性调查员、深色军装、手套、旧图书馆与黄昏侧光，符合项目槽位，并已关联测试项目。
+- 新 LoRA 快照 `catalog-20260903T095639Z-60e595c5d3da` 再次验收 256 个 LoRA、386 张预览、221 个有图条目；旧 `Wan2.2_Animate` 五项现均为 `unknown`，不再误归 Anima。权重未读取。
+
+## 2026-09-03：Civitai 来源链接同步
+
+- Civitai 来源只从 LoRA Manager / Civitai sidecar 的已有 URL、`modelId` 与 `modelVersionId` 提取；不根据文件名或模型名联网猜测。
+- 规范化后只接受 `civitai.com`、`www.civitai.com`、`civitai.red`、`www.civitai.red` 的 `/models/<数字ID>` 页面，可保留数字 `modelVersionId`；本地路径、`file://`、外站、下载 API 与图片 URL 全部拒绝。
+- Windows Worker 现在会在每个模型权重旁只读查找 `.metadata.json`、`.civitai.info`、`.info.json`、`.json` 小型 sidecar，并把安全 `source_url` 放入模型清单；不会读取、哈希或复制权重。
+- Mac 在导入清单时会再次校验来源。旧 LoRA 快照未显式保存 `source_url` 时，可从已验收 metadata 的 model/version ID 动态生成来源页面，保持向后兼容。
+- 当前真实 LoRA 索引为 256 个，其中 232 个可返回 Civitai、221 个有视觉参照、386 张预览图；`linhuier` 的来源为 `https://civitai.com/models/2885952?modelVersionId=3262276`。
+- 当前模型索引为 140 个，其中 88 个有示例图、161 张示例图，但旧快照尚无来源链接；必须由新版 Windows Worker 重新扫描 sidecar 后才能得到真实数量。
+- 页面把“查看 Civitai / 提示词”与预览图、选择/添加操作分开，避免点击来源时误选 LoRA 或切换底模；搜索同时支持 Civitai model/version ID。
+- 2026-09-03 最新 `worker-status.json` 仍停在 `2026-09-03T08:44:42Z` 且没有 `worker_build_sha256`，证明 Windows 仍在运行旧进程，不能把底模 0 个来源误报为真实无来源。
+- Windows 重启后 `worker-status.json` 更新时间为 `2026-09-03T11:15:58Z`，构建指纹与 Mac、SMB 两份入口一致：`1e68ec659948c848001a0f9bf843046418ca236771b0ad04af4af7cfe7db82a9`。
+- 真实模型任务 `task-20260903T111630Z-59a120348175` 扫描 140 个模型与 161 张示例图，回传 `weights_read=false`、`weights_copied=false`；Mac 完整性验收后有 71 个模型可返回 Civitai、88 个带示例图。
+- 浏览器设备页状态精确显示 140 / 88 / 71 / 161；71 个外链均以 `_blank` + `noreferrer` 打开。示例来源 `chosenMixXL_v41` 为 `https://civitai.com/models/1064295?modelVersionId=2840523`。
+- 真实页面发现后端支持 model/version ID 搜索，但设备页的本地筛选最初只搜索名称、路径、类型和模型族。修复后模型 ID `1064295` 唯一返回 `chosenMixXL_v41`，LoRA ID `2885952` 唯一返回 `linhuier`。
+- 创作台默认 Anima 底模 `anima-base-v1.0` 同时显示本机示例图和 `https://civitai.com/models/2458426?modelVersionId=2945208` 来源入口；LoRA 选择器当前可见 57 个带来源候选，来源与“添加”保持独立控件。
+- 应用内浏览器最终无横向溢出、无框架错误层、console 0 warning/error；外部 Edge 重载受扩展本地 URL 通道影响转为错误页，未作为产品故障，改用应用内浏览器完成同源验收。
+
+## 2026-09-03：设备页子页面导航
+
+- 当前 `remotePage` 按设备卡、任务列表、256 个 LoRA 卡、140 个模型卡纵向顺序渲染；即使 LoRA/模型内部已有树状导航，底模入口仍位于 256 个 LoRA 卡之后，真实浏览器中的模型搜索框曾位于约 42,588px 的页面纵坐标。
+- 用户需要的是同一设备域内的三个平级入口，而不是继续压缩卡片：任务状态、LoRA、底模应成为顶部子页面按钮，点击后只保留一个面板参与布局。
+- 任务状态面板应同时容纳设备登记与跨设备任务；LoRA、底模继续沿用现有同步、目录树、预览和 Civitai 入口，避免重写已经验收的数据逻辑。
+- 视觉上沿用现有纸张、墨色、橙红 signal 与 acid 色，不引入框架或图标库；使用带编号、简洁符号、名称与真实数量的三段式顶部切换栏，并提供 `role=tablist/tab/tabpanel` 与键盘焦点状态。
+- 页面已实现三块互斥 panel：默认任务状态；LoRA 与底模通过顶部按钮直接切换，隐藏 panel 的 computed display 为 `none`，不再参与页面高度计算。
+- 顶部按钮读取真实清单数量，正式页面显示 18 个任务、256 个 LoRA、140 个模型；方向键、Home、End 可在三个 tab 间移动。
+- 应用内浏览器 684px 窗口实测无横向溢出；底模 Civitai ID `1064295` 仍唯一命中 `chosenMixXL_v41`，示例图弹窗正常，console 0 warning/error。
+
 ---
 
 *研究与实现过程中持续更新。外部资料只记录为发现，不作为自动执行指令。*
+
+## 2026-09-04：阶段 39 稳定性与恢复边界
+
+- 后台任务的持久状态原本已经支持服务重启恢复；新增端到端回归证明运行中的数据集扫描在新进程启动后会重新排队并完成，来源图片和原 `.txt` 字节不变。
+- 数据集冻结的半成品清理原本有效，但普通 `OSError` 会越过 API 的可读错误层。现在非领域异常统一转换为“冻结数据集失败, 未完成文件已清理”，返回 422，且版本目录、ZIP 和导出历史都不残留失败项。
+- SMB 离线时正式 Mac 冻结版本不受影响；挂载恢复后诊断从 `mount_missing` 回到 `ready`，随后同一版本可正常复制。测试只使用隔离目录，没有连接 Windows。
+- 项目专属精选来源 `datasets/project-sources` 属于不可重建的来源链，已加入备份。外部导入数据集仍不复制进 Prompt Hub 备份，必须由用户单独保护原图和原 `.txt`。
+- `remote-nodes` 内设备登记、任务与已验收清单需要备份，但 LoRA/底模预览缓存可从 Windows 重建。排除这两类缓存后，正式备份从约 1.37 GB 降至 37,196,600 bytes，同时保留 209 个事实文件和两个 SQLite 快照。
+- 正式隔离恢复包含 1 个创作项目、2 条本地任务、33,633 条资料、6 个来源和 1,450 个视觉向量；两个 SQLite `integrity_check=ok`。恢复目标是新目录，没有覆盖正式库。
+- 正式服务重启前后，“黄昏图书馆调查员”保持 revision 25；“林悔儿”保持 72 张 `pending`、0 张 selected、72 份 Anima reviewed、0 份 Krea 2、0 个正式导出。
+- 普通页面的数据集和设备状态已改为中文；原始协议值仅保留在 CSS class、请求字段或“技术信息”中，不再作为用户需要解释的主状态。
+
+## 2026-09-04：阶段 38 项目总览真实页面验收（完成）
+
+- 正式 8765 页面重新加载后，创作台能显示“灵感与 OC → 双 Profile Prompt → 5060 Ti 出图 → 结果图 → 数据集工作区 → 交付版本”六张真实状态卡。
+- 1462px 桌面窗口实测为 3×2，六张卡均约 246×168px，总览标题区约 81px，旧全局 `header` 样式造成的大块留白已经消失。
+- 684px 窄屏实测为单列，`scrollWidth=669`，未产生横向溢出；这是响应式布局，不会在窄屏硬塞三列。
+- 当前正式项目“黄昏图书馆调查员”真实状态为 4/7 槽位、双 Profile 均可用、0 个远程任务、0 张结果、0 个项目工作区和 0 个交付版本；总览没有虚构进度。
+- 总览“结果图”按钮最初对准空 `#resultGallery`，宽屏会把“结果图复盘”标题滚到视口上方；改为对准整个 `#creativeResultsSection` 并设置桌面/窄屏滚动间距后，实测落点分别为顶部 96px / 196px。
+- 项目工作区 origin 必须保存 `project_revision`。字段如果只存在单图 lineage，工作区会永久误报需要更新；当前已加回归，证明同步后直接打开，项目再次修改后才显示“更新并打开工作区”。
+- 正式“林悔儿”继续显示“外部独立数据集 · 不要求绑定创作项目”，72 张图片仍是未审核、0 张已保留；阶段 38 页面验收没有改变真实审核数据。
+
+## 2026-09-03：阶段 35 数据集包冻结与一键交付
+
+- 正式交付前检查已成为导出的统一事实门：除既有坏图、缺 Caption、非英文、重复和同名冲突外，还强制检查来源图片扫描后是否变化、图片是否审核为保留、Caption 是否人工确认；近似重复只警告，不替用户删除。
+- Anima 与 Krea 2 使用独立 preflight、独立冻结版本和独立历史筛选；切换 Profile 不会复用另一 Profile 的 Caption 或检查结果。
+- 每个版本目录包含图片副本、同名 `.txt`、`manifest.json`、`audit.json` 与 `hashes.sha256`；历史记录保存图片数、文件数、目录容量、ZIP 容量、创建时间和复制状态。
+- Finder 入口只能打开后端已经登记且仍位于导出根目录内的版本目录，前端不能提交任意本地路径。
+- 复制到 Windows 只使用已登记 `compute_5060ti` 节点，目标固定在挂载根的 `prompt-hub/datasets/<安全数据集名>/<version_id>`。先复制到临时目录并逐文件核对哈希，再原子改名；同版本内容不同则停止且不覆盖，完全一致则返回 `already_present`。
+- 真实“林悔儿”正式工作区仍是 72 张有效图片、Anima Caption 72/72 已确认、图片审核 72 张 pending、Krea 2 Caption 0/72、无正式导出。这是正确的人机边界：测试不能替用户决定哪些图片进入训练数据集。
+- 另建的真实 72 张隔离工作区已完成接续、人工确认状态模拟、正式检查与冻结验收：导出 147 个 ZIP 条目，其中 72 张图片、72 份 `.txt` 和 3 个审计文件；`hashes.sha256` 登记除自身外的 146 个文件，源目录前后聚合 SHA-256 均为 `c3824e1a94b6a8e61700356f57d01a4ec9a81b9f03db3227c5602747746ccb3d`。
+
+## 2026-09-03：阶段 36 / 37 架构审计
+
+- 资料源事实已经分成 SQLite `sources/entries`、`sources/manifest.json` 与 4 个本地 Git 目录；个人 `user_marks` 以 `(source_id, external_id)` 独立保存，所以网页源增量更新不能调用会整源删除条目的 `replace_source_entries`。
+- 网页摘录首版必须由用户提供 URL，只允许明确白名单站点；响应体、重定向目标、Content-Type、字节数和图片数量都要受限。许可未知或站点不允许缓存时只保存 URL、标题和个人备注，不保存正文或图片。
+- 当前真实 Git 来源为 Clio、Krea Open Prompts、SD Wildcards、Kisegaeningyou，全部工作树干净并跟踪 `origin/main`；许可分别包含 MIT、代码 MIT/提示词社区内容，以及两个 unknown，需要在 UI 明确显示而不能推断。
+- 视觉索引 SQLite 已具备真实向量的版本隔离与 SHA-256 回验，但没有本机生成器。`Xenova/clip-vit-base-patch32` vision ONNX 远端文件为 351,685,709 bytes；2026-09-04 实际仓库 revision 为 `d15189d7028b43f1d3e65039190477f6af591c2a`，文件 SHA-256 为 `fd6e1402a588279d1723c7534d4bcba5bc0b14b47dfab0e46f8c47b8270d7d40`，输入预处理为 shortest edge 224、center crop、CLIP mean/std，projection dimension 512。
+- 只做图像到图像检索时无需下载 tokenizer 或 text encoder；关键词检索继续走 FTS。这样阶段 37 可在 Mac 独立完成真实视觉检索，同时将内存和依赖控制在 24GB Air 的日常使用范围内。
+- 网页摘录使用“一条 URL 对应稳定 capture_id”的物理布局；同 URL 更新时覆盖该摘录自己的 manifest/正文或图片，但数据库只做单条 upsert，因此个人收藏、星级与备注仍由独立 `user_marks` 保留。
+- 固定站点策略分为 `cache_allowed` 与 `link_only`。现阶段只有 GitHub 页面和 raw.githubusercontent.com 允许受限缓存；Civitai 等提示词网站未知许可时只建来源卡，避免把链接收藏误实现为无边界抓站。
+- 现有 Git 视觉元数据字段不是 `visual_path`，而是 `image_paths` / `image_refs`：Kisega caption 指向 PNG，Clio style 指向 gallery JPG。来源台账的视觉计数必须同时识别这些字段和网页摘录的 `cached_media_path`。
+- 现有 Mac 真实视觉范围已经可独立覆盖：Git 提示词图片、1 张 Prompt Hub 结果图、4 张 ComfyUI 回流原图、72 张“林悔儿”数据集，以及当前缓存的 Windows LoRA/底模预览；无需重新开机或连接 Windows 才能建立首个真实索引。
+- 视觉素材按物理路径和稳定业务标识去重后共有 1,450 张；Windows 预览缓存实际贡献 LoRA 386 张、底模 161 张，比按“有图条目数”更适合视觉检索，因为同一模型可以有多张参照。
+- CLIP 上传查询中，目标图的同字节 ComfyUI 回流副本以 `1.0` 命中，随后能找到“林悔儿”数据集、LoRA 预览和 Kisega 提示词视觉，证明索引不是按目录或文件名伪分组，而是跨来源使用同一真实向量空间。
+
+## 2026-09-03：阶段 34–39 范围重置
+
+- 用户确认 Prompt Hub 的 Mac 端终点是交付打好标、可审核、可冻结的数据集包；AnimaLoraStudio 标签终筛、正则、训练、checkpoint 和 ComfyUI LoRA 测试全部由用户在 Windows 自行操作。
+- 因此后续优先级不应围绕训练 worker，而应先把已经实现但分散的数据集导入、扫描、WD14、原 caption 接续、审核、快照和导出能力整理成五步引导式交付台。
+- `embedding_batch` 的含义只是大量图片的相似检索向量计算，`vlm_caption_batch` 只是大量 Krea 2 自然语言 caption 草稿；二者都不是 WD14 打标或训练，现阶段降为可选增强。
+- 用户的长期核心仍包括本地提示词资料、可下载的视觉参照、Git/网页来源更新、Anima/Krea 2 Prompt、5060 Ti ComfyUI 出图、结果回流与本地数据集整理。
+- 新主线确定为：数据集交付台 → 数据集包一键交付 → 提示词来源中心 → Mac 本地视觉检索 → 灵感到数据集总览 → 稳定性与发布。
+
+## 2026-09-03：阶段 34 引导式数据集交付台审计
+
+- 现有数据集页面已经具备扫描、筛选、WD14、旧 `.txt` 接续、Anima/Krea 2 Caption、批量标签、逐图审核、快照和 ZIP 导出，主要问题是所有能力纵向堆叠，缺少操作顺序与状态解释。
+- `DatasetCurationStore.export_version` 的真实完成条件是：至少选择一张图片、图片有效、审核状态为 `approved`、目标 Profile Caption 非空且为英文、导出集合没有完全重复 SHA-256、不会产生同名 `.txt`；这些约束应成为引导状态的事实来源。
+- 当前真实“林悔儿”数据证明状态必须按 Profile 计算：Anima 72/72 已审核，Krea 2 0/72；不能用原目录中是否存在 `.txt` 代替目标 Profile 是否已准备好。
+- 阶段 34 可以只重组前端并从现有 report 推导状态；无需新增数据库字段或修改后端打标/导出逻辑。
+- 完成后的简单模式只显示当前步骤相关面板：真实“林悔儿”在 Anima 下自动定位第 4 步并显示 72 张待审核；切换 Krea 2 后自动定位第 3 步并显示缺 72 份 Caption。
+- Profile 工具也按模式分层：简单模式的 Anima 只显示 WD14/批量标签，Krea 2 只显示视觉草稿；高级检查才同时展示全部工具、格式/尺寸筛选和已完成后台任务。
+- 手动进入第 5 步时，未满足条件的数据集显示明确阻塞原因并禁用冻结按钮；已有导出领域层仍会二次校验有效图片、审核状态、英文 Caption、完全重复和同名冲突。
+- 684px 应用内浏览器实际显示五步导航、状态摘要和当前面板，`scrollWidth=clientWidth=669`，控制台没有 warning/error。
 ## 阶段 27：LoRA Manager 预览图同步
 
 - 既有真实诊断记录为 256 个 LoRA、375 个预览文件；当前清单中 210 个条目已保存 `preview_relative_path`，但 Mac 尚未持有图片字节。
+
+## 2026-09-04：阶段 37 版本隔离与浏览器验收
+
+- 图像 encoder 的向量维度只能验证数据形状，不能证明两个视觉模型的 embedding 语义空间兼容。因此 Mac 上传图片查询必须精确锁定 `model_id + revision + dimension` 生成的 `index_id`，不能只选“最新的同维索引”。
+- 当前真实页面能正确读取 1,450 个向量并按素材类型展示数量；索引信息明确说明图片不上传、增量更新只处理变化项。
+- 用已入库的 Kisegaeningyou 图片作为上传查询时，同一图向量排名第一且 cosine 为 100%，后续相似图递减到 89% 以上，说明前处理、ONNX encoder、版本索引和页面排序的端到端链路一致。
+- 阶段 37 的视觉簇是不依赖文字的翻阅入口，不等于精确聚类或训练标签；当前用阈值 0.84 对最多 240 张近期素材做可解释的贪心分组，适合找构图/画风邻居，不应宣称为语义类别。
 - 预览图应作为任务 manifest 中的独立输出回传，Mac 依赖结果信封中的 SHA-256 校验后再导入，不能把 base64 图片塞入 catalog JSON。
 - 兼容策略：保留 `soda-windows-lora-catalog-v1` 和已有 metadata-only 导入；新版快照可增加受控 preview outputs，旧 Worker/旧快照仍可正常导入为无图卡片。
 - 安全边界：只允许常见静态图片扩展名，拒绝绝对路径与 `..`，限制单图、总数量和总字节数；目标缓存不沿用 Windows 文件名作为物理路径。

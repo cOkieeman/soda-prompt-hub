@@ -103,6 +103,12 @@ def create_workflow_router(
             )
             run_id = _new_run_id()
             dimensions = _dimensions(payload, generation)
+            controls = _resolve_workflow_controls(
+                remote_store,
+                generation,
+                profile_id=profile_id,
+                model_family=str(profile["model_family"]),
+            )
             package = store.compile_package(
                 profile_id,
                 run_id=run_id,
@@ -113,6 +119,10 @@ def create_workflow_router(
                 height=dimensions[1],
                 steps=_run_int(payload.steps, generation, "steps"),
                 cfg=_run_float(payload.cfg, generation, "cfg"),
+                model_overrides=controls["model_overrides"],
+                additional_loras=controls["additional_loras"],
+                sampler=controls["sampler"],
+                scheduler=controls["scheduler"],
                 low_cost=payload.low_cost,
             )
             local_path = store.save_run_package(profile_id, run_id, package)
@@ -246,6 +256,77 @@ def _dimensions(
         width = int(width or 512)
         height = int(height or 768)
     return int(width) if width is not None else None, int(height) if height is not None else None
+
+
+def _resolve_workflow_controls(
+    remote_store: RemoteNodeStore,
+    generation: Mapping[str, Any],
+    *,
+    profile_id: str,
+    model_family: str,
+) -> dict[str, Any]:
+    all_controls = generation.get("workflow_controls", {})
+    if not isinstance(all_controls, Mapping):
+        raise WorkflowProfileError("项目中的 workflow_controls 必须是对象")
+    selected = all_controls.get(profile_id, {})
+    if selected in (None, {}):
+        return {
+            "model_overrides": {},
+            "additional_loras": [],
+            "sampler": None,
+            "scheduler": None,
+        }
+    if not isinstance(selected, Mapping):
+        raise WorkflowProfileError("当前 Workflow Profile 控制参数必须是对象")
+    model_overrides = {}
+    raw_models = selected.get("models", {})
+    if not isinstance(raw_models, Mapping):
+        raise WorkflowProfileError("Workflow 模型选择必须是对象")
+    for asset_type, asset_id in raw_models.items():
+        if not str(asset_id).strip():
+            continue
+        model = remote_store.get_model(str(asset_id))
+        if model.get("asset_type") != asset_type:
+            raise WorkflowProfileError(f"{asset_type} 选择与模型资产类型不匹配")
+        _validate_model_family(str(model.get("model_family", "")), model_family, str(asset_type))
+        model_overrides[str(asset_type)] = str(model["relative_path"])
+    raw_loras = selected.get("loras", [])
+    if not isinstance(raw_loras, list):
+        raise WorkflowProfileError("Workflow LoRA 选择必须是列表")
+    additional_loras = []
+    seen_loras = set()
+    for value in raw_loras:
+        if not isinstance(value, Mapping):
+            raise WorkflowProfileError("Workflow LoRA 条目必须是对象")
+        lora_id = str(value.get("lora_id", "")).strip()
+        if not lora_id or lora_id in seen_loras:
+            raise WorkflowProfileError("Workflow LoRA ID 为空或重复")
+        lora = remote_store.get_lora(lora_id)
+        _validate_model_family(str(lora.get("model_family", "")), model_family, "LoRA")
+        additional_loras.append(
+            {
+                "name": Path(str(lora["relative_path"])).stem,
+                "strength": value.get("strength", 1),
+                "clip_strength": value.get("clip_strength", value.get("strength", 1)),
+            }
+        )
+        seen_loras.add(lora_id)
+    sampler = str(selected.get("sampler", "")).strip() or None
+    scheduler = str(selected.get("scheduler", "")).strip() or None
+    return {
+        "model_overrides": model_overrides,
+        "additional_loras": additional_loras,
+        "sampler": sampler,
+        "scheduler": scheduler,
+    }
+
+
+def _validate_model_family(actual: str, expected: str, label: str) -> None:
+    normalized = actual.strip().casefold()
+    if normalized not in {"", "unknown", expected.casefold()}:
+        raise WorkflowProfileError(
+            f"{label} 模型族为 {actual}，与当前 {expected} Workflow Profile 不兼容"
+        )
 
 
 def _run_int(

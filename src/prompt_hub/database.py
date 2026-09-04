@@ -291,6 +291,12 @@ class PromptDatabase:
             self._upsert_entry(entry, connection)
         return len(entries)
 
+    def upsert_entry(self, entry: EntryInput) -> None:
+        """Insert or refresh one entry without removing sibling entries or user marks."""
+        with self.connect() as connection:
+            self._upsert_entry(entry, connection)
+            connection.commit()
+
     def _upsert_entry(self, entry: EntryInput, connection: sqlite3.Connection) -> None:
         now = _now()
         metadata_json = json.dumps(entry.metadata or {}, ensure_ascii=False, sort_keys=True)
@@ -945,14 +951,35 @@ class PromptDatabase:
         with self.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT s.*, COUNT(e.id) AS entry_count
+                SELECT s.*, COUNT(e.id) AS entry_count,
+                       SUM(CASE
+                           WHEN json_extract(e.metadata_json, '$.visual_path') != '' THEN 1
+                           WHEN json_extract(e.metadata_json, '$.cached_media_path') != '' THEN 1
+                           WHEN json_array_length(e.metadata_json, '$.image_paths') > 0 THEN 1
+                           ELSE 0
+                       END) AS visual_count
                 FROM sources s
                 LEFT JOIN entries e ON e.source_id = s.source_id
                 GROUP BY s.source_id
                 ORDER BY s.name
                 """
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [{**dict(row), "visual_count": int(row["visual_count"] or 0)} for row in rows]
+
+    def list_visual_entries(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT e.source_id, e.external_id, e.title, e.safety, e.source_url,
+                       e.metadata_json, s.name AS source_name
+                FROM entries e
+                JOIN sources s ON s.source_id = e.source_id
+                WHERE json_array_length(e.metadata_json, '$.image_paths') > 0
+                   OR json_extract(e.metadata_json, '$.cached_media_path') != ''
+                ORDER BY e.source_id, e.external_id
+                """
+            ).fetchall()
+        return [_row_to_dict(row) for row in rows]
 
 
 def _now() -> str:

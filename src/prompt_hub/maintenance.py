@@ -27,16 +27,23 @@ PERSONAL_ROOTS = (
     "sources/api",
     "test-results",
     "datasets/workspaces",
+    "datasets/project-sources",
     "lora-projects",
     "exports",
     "remote-nodes",
     "workflow-profiles",
+)
+REBUILDABLE_CACHE_ROOTS = (
+    "remote-nodes/lora-previews",
+    "remote-nodes/model-previews",
 )
 EXCLUDED_ROOTS = (
     "sources/git (可从 Git 重建, 只记录 revision)",
     "thumbnails (可重建)",
     "normalized (可重建)",
     "models (独立管理的大模型权重)",
+    "remote-nodes/lora-previews (可从 Windows 重新同步)",
+    "remote-nodes/model-previews (可从 Windows 重新同步)",
 )
 
 
@@ -67,7 +74,11 @@ class BackupManager:
             for relative in PERSONAL_ROOTS:
                 source = self.settings.library_root / relative
                 if source.exists():
-                    _copy_tree(source, payload / relative)
+                    excluded = tuple(
+                        self.settings.library_root / cache_root
+                        for cache_root in REBUILDABLE_CACHE_ROOTS
+                    )
+                    _copy_tree(source, payload / relative, excluded_roots=excluded)
             files = _file_manifest(payload)
             manifest = {
                 "format": BACKUP_FORMAT,
@@ -211,8 +222,16 @@ def doctor(settings: Settings, *, service_url: str = "http://127.0.0.1:8765") ->
     return {"ok": all(item["ok"] for item in checks), "checked_at": _now(), "checks": checks}
 
 
-def _copy_tree(source: Path, destination: Path) -> None:
+def _copy_tree(
+    source: Path,
+    destination: Path,
+    *,
+    excluded_roots: tuple[Path, ...] = (),
+) -> None:
     if source.is_symlink():
+        return
+    resolved_exclusions = tuple(path.resolve() for path in excluded_roots)
+    if any(source.resolve().is_relative_to(path) for path in resolved_exclusions):
         return
     if source.is_file():
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -221,6 +240,9 @@ def _copy_tree(source: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     for path in sorted(source.rglob("*")):
         if path.is_symlink() or not path.is_file():
+            continue
+        resolved = path.resolve()
+        if any(resolved.is_relative_to(root) for root in resolved_exclusions):
             continue
         target = destination / path.relative_to(source)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -248,6 +270,7 @@ def _selected_size(library_root: Path) -> int:
         )
     )
     total = 0
+    excluded = tuple((library_root / relative).resolve() for relative in REBUILDABLE_CACHE_ROOTS)
     for root in selected:
         if root.is_file():
             total += root.stat().st_size
@@ -255,7 +278,9 @@ def _selected_size(library_root: Path) -> int:
             total += sum(
                 path.stat().st_size
                 for path in root.rglob("*")
-                if path.is_file() and not path.is_symlink()
+                if path.is_file()
+                and not path.is_symlink()
+                and not any(path.resolve().is_relative_to(item) for item in excluded)
             )
     return total
 

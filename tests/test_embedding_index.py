@@ -101,3 +101,38 @@ def test_embedding_index_api_imports_worker_result_and_queries(settings) -> None
             }
         ]
         assert client.post("/api/embedding-indexes/import", json=mismatched).status_code == 422
+
+
+def test_visual_clusters_group_real_vectors_and_filter_asset_types(tmp_path) -> None:
+    store = EmbeddingIndexStore(tmp_path / "embeddings")
+    store.initialize()
+    digests = {name: char * 64 for name, char in (("a", "a"), ("b", "b"), ("c", "c"))}
+    items = [
+        _item("a", digests["a"], [1.0, 0.0, 0.0]),
+        _item("b", digests["b"], [0.99, 0.1, 0.0]),
+        {
+            **_item("c", digests["c"], [0.0, 1.0, 0.0]),
+            "asset_type": "lora_preview",
+        },
+    ]
+    imported = store.import_batch(
+        model_id="test-clip",
+        model_revision="revision-1",
+        dimension=3,
+        generated_by="mac-local",
+        worker_id="macbook-air",
+        items=items,
+        expected_hashes=dict(digests),
+    )
+
+    clustered = store.clusters(imported["index_id"], threshold=0.9)
+    assert [cluster["size"] for cluster in clustered["clusters"]] == [2, 1]
+    assert {item["asset_id"] for item in clustered["clusters"][0]["items"]} == {"a", "b"}
+
+    filtered = store.clusters(
+        imported["index_id"],
+        asset_types={"lora_preview"},
+        threshold=0.9,
+    )
+    assert len(filtered["clusters"]) == 1
+    assert filtered["clusters"][0]["items"][0]["asset_id"] == "c"

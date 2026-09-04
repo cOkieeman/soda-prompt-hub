@@ -3,6 +3,11 @@ from prompt_hub.creative_web import CREATIVE_HTML, CREATIVE_SCRIPT, CREATIVE_STY
 from prompt_hub.lora_web import LORA_HTML, LORA_SCRIPT, LORA_STYLES
 from prompt_hub.remote_web import REMOTE_HTML, REMOTE_SCRIPT, REMOTE_STYLES
 from prompt_hub.search_web import SEARCH_HTML, SEARCH_SCRIPT, SEARCH_STYLES
+from prompt_hub.source_center_web import (
+    SOURCE_CENTER_HTML,
+    SOURCE_CENTER_SCRIPT,
+    SOURCE_CENTER_STYLES,
+)
 from prompt_hub.workspace_web import WORKSPACE_HTML, WORKSPACE_SCRIPT, WORKSPACE_STYLES
 
 INDEX_HTML = r"""<!doctype html>
@@ -97,7 +102,7 @@ INDEX_HTML = r"""<!doctype html>
     .home-lead, .home-guide, .home-footnote { background: var(--paper); box-shadow: var(--shadow); }
     .home-lead { min-height: 590px; padding: clamp(34px, 6vw, 78px); position: relative; overflow: hidden; }
     .home-lead::after {
-      content: "CREATE / 01";
+      content: "开始 / 01";
       position: absolute;
       right: -24px;
       bottom: 74px;
@@ -220,7 +225,7 @@ INDEX_HTML = r"""<!doctype html>
       justify-content: space-between;
     }
     .stats-panel::after {
-      content: "LOCAL / INDEX";
+      content: "本机资料";
       position: absolute;
       right: -35px;
       top: 48%;
@@ -263,6 +268,7 @@ INDEX_HTML = r"""<!doctype html>
       gap: 18px;
       align-items: start;
     }
+    #archiveWorkspace .section-label, #archiveWorkspace label, #managementPage .section-label, #managementPage .stat span, #managementPage .personal-summary { text-transform: none; }
     aside, main { background: var(--paper); box-shadow: var(--shadow); }
     aside { padding: 24px; position: sticky; top: 18px; }
     .section-label {
@@ -550,6 +556,10 @@ INDEX_HTML = r"""<!doctype html>
     .empty span { color: var(--muted); font-size: 13px; }
     @keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
     @media (max-width: 900px) {
+      .app-nav { display: block; }
+      .app-brand { width: 100%; min-height: 58px; border-right: 0; }
+      .app-nav-items { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; }
+      .app-nav-button { min-width: 0; min-height: 46px; padding: 0 8px; border-bottom: 1px solid var(--line); }
       header, .workspace, .home-page { grid-template-columns: 1fr; }
       aside { position: static; }
       .stats-panel { min-height: 220px; }
@@ -558,10 +568,8 @@ INDEX_HTML = r"""<!doctype html>
     }
     @media (max-width: 620px) {
       .shell { width: min(100% - 18px, 1480px); padding-top: 9px; }
-      .app-nav { display: block; }
-      .app-brand { width: 100%; min-height: 58px; border-right: 0; }
-      .app-nav-items { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
-      .app-nav-button { min-width: 0; min-height: 48px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+      .app-nav-items { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .app-nav-button { min-height: 48px; padding: 0 12px; }
       .home-lead, .home-guide { padding: 28px 22px; }
       .home-lead h1 { font-size: 58px; }
       .home-actions { display: grid; }
@@ -582,7 +590,7 @@ INDEX_HTML = r"""<!doctype html>
 <body>
   <div class="shell">
     <nav class="app-nav" aria-label="主导航">
-      <button class="app-brand" data-view="home">Soda Prompt Hub<span>local creative desk</span></button>
+      <button class="app-brand" data-view="home">Soda Prompt Hub<span>本地绘图与数据集</span></button>
       <div class="app-nav-items">
         <button class="app-nav-button" data-view="creative">创作台</button>
         <button class="app-nav-button" data-view="prompts">提示词库</button>
@@ -590,7 +598,7 @@ INDEX_HTML = r"""<!doctype html>
         <button class="app-nav-button" data-view="characters">角色库</button>
         <button class="app-nav-button" data-view="datasets">数据集</button>
         <button class="app-nav-button" data-view="lora">LoRA 项目</button>
-        <button class="app-nav-button" data-view="comfy">结果回流</button>
+        <button class="app-nav-button" data-view="comfy">Windows 出图</button>
         <button class="app-nav-button" data-view="management">资料管理</button>
         <button class="app-nav-button" data-view="remote">设备连接</button>
         <button class="app-nav-button tag-language-button" id="tagLanguageToggle" type="button">标签：中英</button>
@@ -599,15 +607,15 @@ INDEX_HTML = r"""<!doctype html>
 
     <section class="home-page" id="homePage">
       <div class="home-lead">
-        <div class="eyebrow">Soda / Drawing workspace</div>
+        <div class="eyebrow">本地绘图工作台</div>
         <h1>今天想画<br>什么？</h1>
         <p class="subtitle">从一个想法、一个 OC，或者一张视觉参考开始。先把创作资料找齐，再整理成适合 Anima 与 Krea 2 的不同 Prompt。</p>
         <div class="home-actions">
           <button class="home-primary" data-start="creative">新建或继续绘图项目 →</button>
           <button class="home-secondary" data-start="prompts">浏览提示词与视觉参考</button>
           <button class="home-secondary" data-start="characters">从 OC 角色开始</button>
-          <button class="home-secondary" data-start="lora">整理 LoRA 数据集</button>
-          <button class="home-secondary" data-start="comfy">导入 ComfyUI 结果</button>
+          <button class="home-secondary" data-start="lora">准备 LoRA 数据集</button>
+          <button class="home-secondary" data-start="comfy">查看 Windows 出图结果</button>
         </div>
         <button class="home-example" id="exampleButton">试一个真实示例：维多利亚军装 × 黄昏图书馆 ↗</button>
         <div class="home-targets">
@@ -617,8 +625,8 @@ INDEX_HTML = r"""<!doctype html>
         </div>
       </div>
       <aside class="home-guide">
-        <p class="section-label">Drawing flow / 绘图流程</p>
-        <h2>三步得到可用 Prompt</h2>
+        <p class="section-label">日常绘图顺序</p>
+        <h2>从想法到可用提示词</h2>
         <div class="guide-steps">
           <div class="guide-step"><span>01</span><div><strong>确定角色和想法</strong><small>可以从空白描述开始，也可以读取 OC Manager 的角色资料。</small></div></div>
           <div class="guide-step"><span>02</span><div><strong>选择提示词与视觉参考</strong><small>从本地库挑选服装、动作、构图、场景、灯光和画风。</small></div></div>
@@ -639,27 +647,27 @@ INDEX_HTML = r"""<!doctype html>
     <section class="management-page" id="managementPage" hidden>
       <header>
         <section class="masthead">
-          <div class="eyebrow">Soda / Local Knowledge System</div>
-          <h1>Library<br>Status</h1>
+          <div class="eyebrow">本地资料管理</div>
+          <h1>资料与<br>索引</h1>
           <p class="subtitle">在这里更新公共资料、查看来源与本地索引状态。创作和日常检索不需要操作这些设置。</p>
-          <div class="stamp">Private library</div>
+          <div class="stamp">只保存在本机</div>
         </section>
         <section class="stats-panel">
           <div>
-            <p class="section-label">Archive status</p>
+            <p class="section-label">资料库状态</p>
             <div class="stats-grid">
-              <div class="stat"><strong id="entryCount">—</strong><span>Entries</span></div>
-              <div class="stat"><strong id="sourceCount">—</strong><span>Sources</span></div>
-              <div class="stat"><strong id="styleCount">—</strong><span>Styles</span></div>
-              <div class="stat"><strong id="tagCount">—</strong><span>Tags</span></div>
+              <div class="stat"><strong id="entryCount">—</strong><span>资料条目</span></div>
+              <div class="stat"><strong id="sourceCount">—</strong><span>资料来源</span></div>
+              <div class="stat"><strong id="styleCount">—</strong><span>画风资料</span></div>
+              <div class="stat"><strong id="tagCount">—</strong><span>标签</span></div>
             </div>
-            <div class="personal-summary">My shelf / <strong id="favoriteCount">0</strong> saved <span class="divider">·</span> OC / <strong id="ocCount">0</strong></div>
+            <div class="personal-summary">我的收藏 <strong id="favoriteCount">0</strong> 条 <span class="divider">·</span> 已导入角色 <strong id="ocCount">0</strong> 个</div>
           </div>
           <div class="sync-actions"><button class="sync-button" id="sourceSyncButton">↻ 更新公共提示词库</button><button class="sync-button" id="importButton">仅重建本地索引</button></div>
         </section>
       </header>
       <section class="management-sources">
-        <p class="section-label">Indexed sources / 已索引来源</p>
+        <p class="section-label">已经可以检索的来源</p>
         <div class="source-list" id="sourceList"></div>
         <div class="source-sync-message" id="sourceSyncMessage">正在读取本地资料源状态…</div>
         <div class="source-sync-list" id="sourceSyncList"></div>
@@ -668,34 +676,34 @@ INDEX_HTML = r"""<!doctype html>
 
     <div class="workspace" id="archiveWorkspace" hidden>
       <aside>
-        <p class="section-label" id="searchLabel">Search the archive / 检索资料</p>
-        <div class="search-box"><input id="query" type="search" placeholder="gothic dress / rabbit ears / anime…" autofocus></div>
+        <p class="section-label" id="searchLabel">查找提示词和视觉参考</p>
+        <div class="search-box"><input id="query" type="search" aria-label="输入提示词关键词" placeholder="例如：哥特连衣裙、兔耳、逆光" autofocus></div>
         <details class="advanced-filters">
-          <summary>高级筛选 / Advanced filters</summary>
+          <summary>展开高级筛选</summary>
           <div class="filters" id="promptFilters">
-            <label>Type<select id="kind"><option value="">All types</option><option value="style">Style</option><option value="prompt">Prompt</option><option value="modifier">Modifier</option><option value="wildcard">Wildcard</option><option value="caption">Caption</option><option value="tag">Tag</option></select></label>
-            <label>Safety<select id="safety"><option value="">All levels</option><option value="sfw">SFW</option><option value="suggestive">Suggestive</option><option value="adult">Adult</option><option value="explicit-adult">Explicit adult</option></select></label>
-            <label>Source<select id="source"><option value="">All sources</option></select></label>
+            <label>资料类型<select id="kind"><option value="">全部类型</option><option value="style">画风</option><option value="prompt">完整提示词</option><option value="modifier">修饰词</option><option value="wildcard">通配词</option><option value="caption">图片说明</option><option value="tag">标签</option></select></label>
+            <label>内容分级<select id="safety"><option value="">全部分级</option><option value="sfw">普通</option><option value="suggestive">轻度成人向</option><option value="adult">成人向</option><option value="explicit-adult">明确成人向</option></select></label>
+            <label>资料来源<select id="source"><option value="">全部来源</option></select></label>
           </div>
           <div class="filters" id="ocFilters" hidden>
-            <label>World<select id="ocWorld"><option value="">All worlds</option></select></label>
+            <label>所属世界<select id="ocWorld"><option value="">全部世界</option></select></label>
           </div>
         </details>
-        <button class="search-button" id="searchButton">SEARCH / 检索</button>
-        <button class="shelf-filter" id="favoritesOnly" aria-pressed="false">☆ MY SHELF ONLY</button>
+        <button class="search-button" id="searchButton">查找提示词</button>
+        <button class="shelf-filter" id="favoritesOnly" aria-pressed="false">☆ 只看我的收藏</button>
         <section class="oc-import-panel" id="ocImportPanel" hidden>
-          <p class="section-label">OC Manager exchange</p>
+          <p class="section-label">从 OC Manager 导入</p>
           <input id="ocFile" type="file" accept="application/json,.json" hidden>
-          <label class="file-picker" for="ocFile">＋ CHOOSE OC JSON</label>
+          <label class="file-picker" for="ocFile">＋ 选择角色 JSON 文件</label>
           <p class="file-name" id="ocFileName">尚未选择文件</p>
-          <button class="oc-import-button" id="ocImportButton" disabled>IMPORT TO LOCAL INDEX</button>
+          <button class="oc-import-button" id="ocImportButton" disabled>导入到本地角色库</button>
           <p class="import-message" id="ocImportMessage"></p>
         </section>
       </aside>
 
       <main>
         <p class="archive-notice" id="archiveNotice"><strong>提示词与视觉资料库：</strong>输入服装、动作、构图、场景或画风关键词。找到合适内容后可以收藏并记录实测备注。</p>
-        <div class="results-head"><h2 id="resultsTitle">Index cards</h2><span id="status">READY</span></div>
+        <div class="results-head"><h2 id="resultsTitle">提示词结果</h2><span id="status">可以开始</span></div>
         <div class="results" id="results"></div>
       </main>
     </div>
@@ -737,6 +745,11 @@ INDEX_HTML = r"""<!doctype html>
       return item.kind === 'tag' ? [item.title, ...String(item.content || '').split(',')] : [];
     }
 
+    const kindLabels = {style:'画风',prompt:'完整提示词',modifier:'修饰词',wildcard:'通配词',caption:'图片说明',tag:'标签'};
+    const safetyLabels = {sfw:'普通',suggestive:'轻度成人向',adult:'成人向','explicit-adult':'明确成人向',unrated:'尚未分级'};
+    const modelFamilyLabels = {'danbooru-tags':'Booru 标签',anima:'Anima',krea2:'Krea 2'};
+    const categoryLabels = {'web-capture':'网页资料','kisega-tag':'服装与物件标签'};
+
     function tagCardTitle(item) { return item.kind === 'tag' ? displayCanonicalTag(item.title) : item.title; }
     function tagCardContent(item) {
       if (item.kind !== 'tag') return item.content;
@@ -745,7 +758,7 @@ INDEX_HTML = r"""<!doctype html>
 
     function setTagDisplayLanguage(language) {
       tagDisplayLanguage = language === 'en' ? 'en' : 'zh';
-      $('#tagLanguageToggle').textContent = tagDisplayLanguage === 'zh' ? '标签：中英' : 'TAGS: EN';
+      $('#tagLanguageToggle').textContent = tagDisplayLanguage === 'zh' ? '标签：中英' : '标签：仅英文';
       window.dispatchEvent(new CustomEvent('tag-language-change', {detail:{language:tagDisplayLanguage}}));
       if (currentMode === 'prompts') searchPrompts().catch(console.error);
     }
@@ -759,11 +772,12 @@ INDEX_HTML = r"""<!doctype html>
       if (!item.visuals?.length) return '';
       const multiple = item.visuals.length > 1;
       const cards = item.visuals.map((visual, index) => {
-        const visualSafety = escapeHtml(visual.safety || item.safety || 'sfw');
-        const openLabel = multiple ? `OPEN ${index + 1} ↗` : 'VIEW ORIGINAL ↗';
+        const rawVisualSafety = visual.safety || item.safety || 'unrated';
+        const visualSafety = escapeHtml(rawVisualSafety);
+        const openLabel = multiple ? `查看第 ${index + 1} 张 ↗` : '查看原图 ↗';
         return `<a class="visual-frame" href="${escapeHtml(visual.original_url)}" target="_blank" rel="noreferrer" aria-label="查看 ${escapeHtml(item.title)} 参照图 ${index + 1}">
           <img src="${escapeHtml(visual.thumbnail_url)}" alt="${escapeHtml(item.title)} 视觉参照 ${index + 1}" loading="lazy" decoding="async">
-          <span class="visual-label">${openLabel}</span><span class="visual-safety ${visualSafety}">${visualSafety}</span>
+          <span class="visual-label">${openLabel}</span><span class="visual-safety ${visualSafety}">${escapeHtml(safetyLabels[rawVisualSafety] || '尚未分级')}</span>
         </a>`;
       }).join('');
       return `<div class="visual-gallery ${multiple ? 'multi' : ''}" style="--visual-count:${item.visuals.length}">${cards}</div>`;
@@ -774,33 +788,33 @@ INDEX_HTML = r"""<!doctype html>
       const stars = [1, 2, 3, 4, 5].map(value => `<button class="star-button ${value <= rating ? 'active' : ''}" data-personal-action="rating" data-rating="${value}" aria-label="${value} 星" aria-pressed="${value === rating ? 'true' : 'false'}">★</button>`).join('');
       const note = item.user_note || '';
       return `<div class="personal-tools">
-        <button class="favorite-button" data-personal-action="favorite" aria-pressed="${item.favorite ? 'true' : 'false'}">${item.favorite ? '★ SAVED' : '☆ SAVE'}</button>
+        <button class="favorite-button" data-personal-action="favorite" aria-pressed="${item.favorite ? 'true' : 'false'}">${item.favorite ? '★ 已收藏' : '☆ 收藏'}</button>
         <div class="rating-control" aria-label="个人评分">${stars}</div>
-        <button class="note-button ${note ? 'has-note' : ''}" data-personal-action="note-toggle">${note ? 'NOTE ●' : 'NOTE'}</button>
+        <button class="note-button ${note ? 'has-note' : ''}" data-personal-action="note-toggle">${note ? '备注 ●' : '写备注'}</button>
       </div>
       ${note ? `<p class="note-preview">${escapeHtml(note)}</p>` : ''}
-      <div class="note-editor" hidden><textarea maxlength="1200" placeholder="记录适用模型、构图效果或测试想法…">${escapeHtml(note)}</textarea><button class="save-note-button" data-personal-action="note-save">SAVE</button></div>`;
+      <div class="note-editor" hidden><textarea maxlength="1200" placeholder="记录适用模型、构图效果或测试想法…">${escapeHtml(note)}</textarea><button class="save-note-button" data-personal-action="note-save">保存备注</button></div>`;
     }
 
     function characterCard(item, index) {
       const traits = [item.gender, item.age ? `${item.age}岁` : '', item.race, item.identity].filter(Boolean);
       const initial = Array.from(item.name || '?')[0] || '?';
       return `<article class="card character-card" data-character-index="${index}" style="animation-delay:${Math.min(index * 25, 250)}ms">
-        <div class="character-mark" data-initial="${escapeHtml(initial)}"><span>OC Manager / local copy</span><span>${escapeHtml(item.sheet_role || 'pc')}</span></div>
+        <div class="character-mark" data-initial="${escapeHtml(initial)}"><span>OC Manager 本地副本</span><span>${escapeHtml(item.sheet_role === 'npc' ? '非玩家角色' : item.sheet_role === 'pc' ? '玩家角色' : item.sheet_role || '角色')}</span></div>
         <div class="card-meta">
-          <span class="badge signal">character</span>
+          <span class="badge signal">角色</span>
           ${item.world ? `<span class="badge">${escapeHtml(item.world)}</span>` : ''}
           ${item.faction ? `<span class="badge soft">${escapeHtml(item.faction)}</span>` : ''}
         </div>
         <h3>${escapeHtml(item.name)}</h3>
         <p class="content">${escapeHtml(item.story_excerpt || '暂无故事简介')}</p>
         <div class="character-meta">
-          <span><strong>PROFILE</strong> ${escapeHtml(traits.join(' / ') || '未填写')}</span>
-          <span><strong>PROMPTS</strong> ${formatNumber(item.prompt_count)}</span>
-          <span><strong>GALLERY</strong> ${formatNumber(item.gallery_count)}</span>
-          <span><strong>UPDATED</strong> ${escapeHtml((item.source_updated_at || item.imported_at || '').slice(0, 10))}</span>
+          <span><strong>角色资料</strong> ${escapeHtml(traits.join(' / ') || '未填写')}</span>
+          <span><strong>提示词</strong> ${formatNumber(item.prompt_count)}</span>
+          <span><strong>图片</strong> ${formatNumber(item.gallery_count)}</span>
+          <span><strong>更新时间</strong> ${escapeHtml((item.source_updated_at || item.imported_at || '').slice(0, 10))}</span>
         </div>
-        <div class="character-actions"><button class="character-create-button" data-character-create>以此角色开始创作</button><button class="detail-button" data-character-action="details" aria-expanded="false">OPEN CHARACTER FILE ↘</button></div>
+        <div class="character-actions"><button class="character-create-button" data-character-create>以此角色开始创作</button><button class="detail-button" data-character-action="details" aria-expanded="false">展开角色资料 ↘</button></div>
         <div class="character-detail" hidden></div>
       </article>`;
     }
@@ -812,11 +826,11 @@ INDEX_HTML = r"""<!doctype html>
       const timeline = Array.isArray(profile.timeline) ? profile.timeline : [];
       const relationships = Array.isArray(profile.relationships) ? profile.relationships : [];
       const gallery = Array.isArray(profile.gallery) ? profile.gallery : [];
-      const promptMarkup = prompts.length ? prompts.map(prompt => `<div class="prompt-record"><strong>${escapeHtml(prompt.label || 'UNTITLED PROMPT')}</strong><p>${escapeHtml(prompt.text)}</p></div>`).join('') : '<p>这个角色还没有保存 Prompt。</p>';
-      return `<h4>Character profile</h4>
+      const promptMarkup = prompts.length ? prompts.map(prompt => `<div class="prompt-record"><strong>${escapeHtml(prompt.label || '未命名提示词')}</strong><p>${escapeHtml(prompt.text)}</p></div>`).join('') : '<p>这个角色还没有保存提示词。</p>';
+      return `<h4>角色资料</h4>
         <p>${escapeHtml(item.story || '暂无故事内容')}</p>
-        <div class="detail-counts"><span>${modules.length} MODULES</span><span>${timeline.length} TIMELINE</span><span>${relationships.length} RELATIONS</span><span>${gallery.length} IMAGES</span></div>
-        <h4>Stored prompts</h4>${promptMarkup}`;
+        <div class="detail-counts"><span>${modules.length} 个模块</span><span>${timeline.length} 条时间线</span><span>${relationships.length} 组关系</span><span>${gallery.length} 张图片</span></div>
+        <h4>角色提示词</h4>${promptMarkup}`;
     }
 
     async function loadStats() {
@@ -831,16 +845,16 @@ INDEX_HTML = r"""<!doctype html>
       $('#homeEntryCount').textContent = formatNumber(stats.entries);
       $('#homeSourceCount').textContent = formatNumber(stats.sources);
       $('#homeOcCount').textContent = formatNumber(stats.oc_manager?.characters);
-      $('#source').innerHTML = '<option value="">All sources</option>' + sources.map(s => `<option value="${escapeHtml(s.source_id)}">${escapeHtml(s.name)}</option>`).join('');
+      $('#source').innerHTML = '<option value="">全部来源</option>' + sources.map(s => `<option value="${escapeHtml(s.source_id)}">${escapeHtml(s.name)}</option>`).join('');
       if ([...$('#source').options].some(option => option.value === selectedSource)) $('#source').value = selectedSource;
-      $('#sourceList').innerHTML = '<p class="section-label">Sources</p>' + sources.map(s => `<div class="source-row"><span>${escapeHtml(s.name)}</span><span>${formatNumber(s.entry_count)}</span></div>`).join('');
+      $('#sourceList').innerHTML = '<p class="section-label">资料来源</p>' + sources.map(s => `<div class="source-row"><span>${escapeHtml(s.name)}</span><span>${formatNumber(s.entry_count)}</span></div>`).join('');
     }
 
     async function loadSourceSyncStatus() {
       const labels = {ready:'可以安全更新',dirty:'有本地改动',no_upstream:'没有上游',missing:'本地缺失',not_git:'不是 Git 仓库',failed:'检查失败'};
       const response = await fetch('/api/sources/sync-status');
       const sources = response.ok ? await response.json() : [];
-      $('#sourceSyncList').innerHTML = sources.map(item => `<div class="source-sync-row"><strong>${escapeHtml(item.name)}</strong><span class="source-sync-state ${escapeHtml(item.status)}">${escapeHtml(labels[item.status] || item.status)}</span><code>${escapeHtml(item.branch || '—')} · ${escapeHtml((item.before || '').slice(0, 10) || 'no commit')}</code></div>`).join('');
+      $('#sourceSyncList').innerHTML = sources.map(item => `<div class="source-sync-row"><strong>${escapeHtml(item.name)}</strong><span class="source-sync-state ${escapeHtml(item.status)}">${escapeHtml(labels[item.status] || item.status)}</span><code>${escapeHtml(item.branch || '—')} · ${escapeHtml((item.before || '').slice(0, 10) || '暂无版本')}</code></div>`).join('');
       const dirty = sources.filter(item => item.status === 'dirty').length;
       const ready = sources.filter(item => item.status === 'ready').length;
       $('#sourceSyncMessage').textContent = dirty ? `${dirty} 个资料源有本地改动，会自动跳过；其余 ${ready} 个可以安全更新。` : `${ready} 个资料源可以安全检查更新；只允许 fast-forward，不会覆盖本地修改。`;
@@ -849,47 +863,47 @@ INDEX_HTML = r"""<!doctype html>
     async function loadOcWorlds() {
       const selectedWorld = $('#ocWorld').value;
       const worlds = await fetch('/api/oc-manager/worlds').then(r => r.json());
-      $('#ocWorld').innerHTML = '<option value="">All worlds</option>' + worlds.map(world => `<option value="${escapeHtml(world.world_name)}">${escapeHtml(world.world_name)} · ${formatNumber(world.character_count)}</option>`).join('');
+      $('#ocWorld').innerHTML = '<option value="">全部世界</option>' + worlds.map(world => `<option value="${escapeHtml(world.world_name)}">${escapeHtml(world.world_name)} · ${formatNumber(world.character_count)}</option>`).join('');
       if ([...$('#ocWorld').options].some(option => option.value === selectedWorld)) $('#ocWorld').value = selectedWorld;
     }
 
     async function searchPrompts() {
-      $('#status').textContent = 'SEARCHING…';
+      $('#status').textContent = '正在查找…';
       $('#results').classList.remove('character-results');
       const params = new URLSearchParams({query: $('#query').value, kind: $('#kind').value, safety: $('#safety').value, source_id: $('#source').value, favorites_only: $('#favoritesOnly').getAttribute('aria-pressed'), limit: '30'});
       const data = await fetch('/api/search?' + params).then(r => r.json());
       currentResults = data.results;
       await ensureTagLabels(data.results.flatMap(tagValuesFromItem));
-      $('#status').textContent = `${data.count} MATCHES`;
+      $('#status').textContent = `找到 ${data.count} 条`;
       if (!data.results.length) {
-        $('#results').innerHTML = '<div class="empty"><strong>No matching cards</strong><span>换一个词，或放宽类型与安全等级筛选。</span></div>';
+        $('#results').innerHTML = '<div class="empty"><strong>没有找到对应资料</strong><span>换一个词，或放宽类型与内容分级。</span></div>';
         return;
       }
       $('#results').innerHTML = data.results.map((item, index) => `
         <article class="card ${item.favorite ? 'is-favorite' : ''}" data-result-index="${index}" style="animation-delay:${Math.min(index * 25, 250)}ms">
           ${visualMarkup(item)}
           <div class="card-meta">
-            <span class="badge signal">${escapeHtml(item.kind)}</span>
-            <span class="badge">${escapeHtml(item.safety)}</span>
-            ${item.model_family ? `<span class="badge soft">${escapeHtml(item.model_family)}</span>` : ''}
+            <span class="badge signal">${escapeHtml(kindLabels[item.kind] || '资料')}</span>
+            <span class="badge">${escapeHtml(safetyLabels[item.safety] || '尚未分级')}</span>
+            ${item.model_family ? `<span class="badge soft">${escapeHtml(modelFamilyLabels[item.model_family] || item.model_family)}</span>` : ''}
           </div>
           <h3>${escapeHtml(tagCardTitle(item))}</h3>
           <p class="content">${escapeHtml(tagCardContent(item))}</p>
           <div class="archive-add-tools"><select data-creative-slot aria-label="选择创作槽位"><option value="character">角色</option><option value="outfit">服装</option><option value="action">动作</option><option value="composition">构图</option><option value="scene">场景</option><option value="lighting">灯光</option><option value="style" ${item.kind === 'style' ? 'selected' : ''}>画风</option></select><button class="archive-add-button" data-creative-add>加入创作</button></div>
           ${personalMarkup(item)}
-          <footer><span>${escapeHtml(item.source_name)} · ${escapeHtml(item.category || 'uncategorized')}</span>${item.source_url ? `<a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">SOURCE ↗</a>` : ''}</footer>
+          <footer><span>${escapeHtml(item.source_name)} · ${escapeHtml(categoryLabels[item.category] || item.category || '未分类')}</span>${item.source_url ? `<a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">查看来源 ↗</a>` : ''}</footer>
         </article>`).join('');
     }
 
     async function searchCharacters() {
-      $('#status').textContent = 'SEARCHING OC…';
+      $('#status').textContent = '正在查找角色…';
       $('#results').classList.add('character-results');
       const params = new URLSearchParams({query: $('#query').value, world: $('#ocWorld').value, limit: '30'});
       const data = await fetch('/api/oc-manager/characters?' + params).then(r => r.json());
       currentCharacters = data.results;
-      $('#status').textContent = `${data.count} CHARACTERS`;
+      $('#status').textContent = `找到 ${data.count} 个角色`;
       if (!data.results.length) {
-        $('#results').innerHTML = '<div class="empty"><strong>No character files</strong><span>选择 OC Manager 导出的 JSON 文件，导入后即可在这里检索。</span></div>';
+        $('#results').innerHTML = '<div class="empty"><strong>还没有找到角色</strong><span>可以换一个关键词，或选择 OC Manager 导出的 JSON 文件进行导入。</span></div>';
         return;
       }
       $('#results').innerHTML = data.results.map(characterCard).join('');
@@ -906,10 +920,11 @@ INDEX_HTML = r"""<!doctype html>
       $('#ocFilters').hidden = !characterMode;
       $('#favoritesOnly').hidden = characterMode;
       $('#ocImportPanel').hidden = !characterMode;
-      $('#resultsTitle').textContent = characterMode ? 'Character files' : 'Index cards';
-      $('#query').placeholder = characterMode ? '角色名 / 世界 / 故事 / 外观…' : 'gothic dress / rabbit ears / anime…';
-      $('#searchButton').textContent = characterMode ? 'SEARCH OC / 检索角色' : 'SEARCH / 检索';
-      $('#searchLabel').textContent = characterMode ? 'Search characters / 检索角色' : 'Search the archive / 检索资料';
+      $('#resultsTitle').textContent = characterMode ? '角色结果' : '提示词结果';
+      $('#query').placeholder = characterMode ? '角色名、世界、故事或外观' : '例如：哥特连衣裙、兔耳、逆光';
+      $('#query').setAttribute('aria-label', characterMode ? '输入角色名、世界、故事或外观' : '输入提示词关键词');
+      $('#searchButton').textContent = characterMode ? '查找角色' : '查找提示词';
+      $('#searchLabel').textContent = characterMode ? '查找角色' : '查找提示词和视觉参考';
       $('#archiveNotice').innerHTML = characterMode ? '<strong>OC 角色库：</strong>导入 OC Manager JSON 后，可以按角色名、世界、故事和外观查找角色。' : '<strong>提示词与视觉资料库：</strong>输入服装、动作、构图、场景或画风关键词。找到合适内容后可以收藏并记录实测备注。';
       $('#query').value = '';
       if (characterMode) await loadOcWorlds();
@@ -955,7 +970,7 @@ INDEX_HTML = r"""<!doctype html>
         await window.ensureRemoteDevices();
       } else if (view === 'management') {
         currentMode = view;
-        await loadSourceSyncStatus();
+        await Promise.all([loadSourceSyncStatus(), window.ensureSourceCenter ? window.ensureSourceCenter() : Promise.resolve()]);
       } else {
         currentMode = view;
       }
@@ -974,12 +989,12 @@ INDEX_HTML = r"""<!doctype html>
       if (!file) return;
       const button = $('#ocImportButton');
       button.disabled = true;
-      button.textContent = 'IMPORTING…';
+      button.textContent = '正在导入…';
       $('#ocImportMessage').textContent = '';
       try {
         const response = await fetch('/api/oc-manager/import?filename=' + encodeURIComponent(file.name), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: file});
         const result = await response.json();
-        if (!response.ok) throw new Error(result.detail || `Import failed: ${response.status}`);
+        if (!response.ok) throw new Error(result.detail || `导入失败: ${response.status}`);
         $('#ocImportMessage').textContent = `已导入 ${formatNumber(result.characters_imported)} 个角色 · ${formatNumber(result.worlds_imported)} 个世界`;
         await Promise.all([loadStats(), loadOcWorlds()]);
         await searchCharacters();
@@ -987,7 +1002,7 @@ INDEX_HTML = r"""<!doctype html>
         $('#ocImportMessage').textContent = `导入失败：${error.message}`;
       } finally {
         button.disabled = false;
-        button.textContent = 'IMPORT TO LOCAL INDEX';
+        button.textContent = '导入到本地角色库';
       }
     }
 
@@ -997,9 +1012,9 @@ INDEX_HTML = r"""<!doctype html>
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({source_id: item.source_id, external_id: item.external_id, favorite: Boolean(item.favorite), rating: item.user_rating || null, note: item.user_note || ''})
       });
-      if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+      if (!response.ok) throw new Error(`保存失败: ${response.status}`);
       Object.assign(item, await response.json());
-      $('#status').textContent = 'PERSONAL MARK SAVED';
+      $('#status').textContent = '收藏和备注已保存';
       await loadStats();
       await searchPrompts();
     }
@@ -1007,12 +1022,12 @@ INDEX_HTML = r"""<!doctype html>
     async function rebuild() {
       const button = $('#importButton');
       button.disabled = true;
-      button.textContent = 'INDEXING…';
+      button.textContent = '正在重建索引…';
       try {
         const result = await fetch('/api/import', {method: 'POST'}).then(r => r.json());
         await loadStats();
         await searchPrompts();
-        $('#status').textContent = `INDEXED ${formatNumber(result.stats.entries)}`;
+        $('#status').textContent = `索引已更新，共 ${formatNumber(result.stats.entries)} 条资料`;
       } finally {
         button.disabled = false;
         button.textContent = '仅重建本地索引';
@@ -1064,7 +1079,7 @@ INDEX_HTML = r"""<!doctype html>
     $('#favoritesOnly').addEventListener('click', event => {
       const active = event.currentTarget.getAttribute('aria-pressed') === 'true';
       event.currentTarget.setAttribute('aria-pressed', String(!active));
-      event.currentTarget.textContent = active ? '☆ MY SHELF ONLY' : '★ SHOWING MY SHELF';
+      event.currentTarget.textContent = active ? '☆ 只看我的收藏' : '★ 正在只看收藏';
       searchPrompts();
     });
     $('#results').addEventListener('click', async event => {
@@ -1077,22 +1092,22 @@ INDEX_HTML = r"""<!doctype html>
         if (expanded) {
           detail.hidden = true;
           characterButton.setAttribute('aria-expanded', 'false');
-          characterButton.textContent = 'OPEN CHARACTER FILE ↘';
+          characterButton.textContent = '展开角色资料 ↘';
           return;
         }
         characterButton.disabled = true;
-        characterButton.textContent = 'LOADING…';
+        characterButton.textContent = '正在读取…';
         try {
           const response = await fetch('/api/oc-manager/characters/' + encodeURIComponent(item.character_id));
-          if (!response.ok) throw new Error(`Load failed: ${response.status}`);
+          if (!response.ok) throw new Error(`读取失败: ${response.status}`);
           detail.innerHTML = characterDetailMarkup(await response.json());
           detail.hidden = false;
           characterButton.setAttribute('aria-expanded', 'true');
-          characterButton.textContent = 'CLOSE CHARACTER FILE ↗';
+          characterButton.textContent = '收起角色资料 ↗';
         } catch (error) {
           detail.textContent = error.message;
           detail.hidden = false;
-          characterButton.textContent = 'RETRY CHARACTER FILE';
+          characterButton.textContent = '重新读取角色资料';
         } finally {
           characterButton.disabled = false;
         }
@@ -1115,12 +1130,13 @@ INDEX_HTML = r"""<!doctype html>
         item.user_rating = item.user_rating === selected ? null : selected;
       }
       if (action === 'note-save') item.user_note = card.querySelector('textarea').value;
-      try { await saveMark(item); } catch (error) { $('#status').textContent = 'SAVE ERROR'; console.error(error); await searchPrompts(); }
+      try { await saveMark(item); } catch (error) { $('#status').textContent = '保存失败，请重试'; console.error(error); await searchPrompts(); }
     });
     $('#importButton').addEventListener('click', rebuild);
     $('#sourceSyncButton').addEventListener('click', syncPublicSources);
+    window.loadPromptHubStats = loadStats;
     $('#tagLanguageToggle').addEventListener('click', window.toggleTagDisplayLanguage);
-    Promise.all([loadStats(), loadOcWorlds(), searchPrompts()]).catch(error => { $('#status').textContent = 'ERROR'; console.error(error); });
+    Promise.all([loadStats(), loadOcWorlds(), searchPrompts()]).catch(error => { $('#status').textContent = '读取失败，请刷新页面'; console.error(error); });
   </script>
 </body>
 </html>
@@ -1128,7 +1144,7 @@ INDEX_HTML = r"""<!doctype html>
 
 INDEX_HTML = INDEX_HTML.replace(
     "</head>",
-    f"{CREATIVE_STYLES}{WORKSPACE_STYLES}{LORA_STYLES}{COMFY_STYLES}{SEARCH_STYLES}{REMOTE_STYLES}</head>",
+    f"{CREATIVE_STYLES}{WORKSPACE_STYLES}{LORA_STYLES}{COMFY_STYLES}{SEARCH_STYLES}{REMOTE_STYLES}{SOURCE_CENTER_STYLES}</head>",
     1,
 )
 INDEX_HTML = INDEX_HTML.replace(
@@ -1137,7 +1153,12 @@ INDEX_HTML = INDEX_HTML.replace(
     1,
 )
 INDEX_HTML = INDEX_HTML.replace(
+    '      </section>\n    </section>\n\n    <div class="workspace" id="archiveWorkspace" hidden>',
+    f'      </section>\n{SOURCE_CENTER_HTML}\n    </section>\n\n    <div class="workspace" id="archiveWorkspace" hidden>',
+    1,
+)
+INDEX_HTML = INDEX_HTML.replace(
     "</body>",
-    f"{CREATIVE_SCRIPT}{SEARCH_SCRIPT}{WORKSPACE_SCRIPT}{LORA_SCRIPT}{COMFY_SCRIPT}{REMOTE_SCRIPT}</body>",
+    f"{CREATIVE_SCRIPT}{SEARCH_SCRIPT}{WORKSPACE_SCRIPT}{LORA_SCRIPT}{COMFY_SCRIPT}{REMOTE_SCRIPT}{SOURCE_CENTER_SCRIPT}</body>",
     1,
 )

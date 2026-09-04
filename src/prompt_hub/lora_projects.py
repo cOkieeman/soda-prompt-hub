@@ -728,7 +728,7 @@ def _concept_type(value: Any) -> str:
 def _trigger_word(value: Any) -> str:
     result = str(value).strip()
     if not _TRIGGER_RE.fullmatch(result):
-        raise LoraProjectError("Trigger word 必须是 3–64 位 ASCII 小写字母、数字或下划线")
+        raise LoraProjectError("触发词必须是 3–64 位小写英文字母、数字或下划线")
     return result
 
 

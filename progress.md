@@ -874,3 +874,232 @@
 - 已创建本地发布 commit，并成功创建 private GitHub 仓库 `cOkieeman/soda-prompt-hub`；首次 HTTPS push 在 TLS 握手阶段遇到 `SSL_ERROR_SYSCALL`，不是认证或代码失败，保留本地 commit 后检查连接并重试。
 - `gh auth setup-git` 后重试 push 成功；远端确认为 private、默认分支为 `main`，首次发布远端 SHA 与本地 `9871e7ae4e7476a32fa38fa86d41e55f383c6b84` 一致。
 - 阶段 28 已完成；本条完成记录将作为独立文档 commit 推送，最终再以新 SHA 复核远端。
+
+### 阶段 29：模型资产与工作流控制台
+- **状态：** in_progress
+- 用户明确要求先公开仓库再继续开发；完整 Git 历史安全门未发现凭据、模型权重、数据库、数据集、媒体或超过 1 MiB 的对象。
+- 历史记录仍含少量本机路径、局域网测试地址与测试主机名，但不含登录凭据；按用户授权将仓库切换为 public。
+- GitHub 已复核 `cOkieeman/soda-prompt-hub` 为 `PUBLIC`、默认分支 `main`、未归档。
+- 本阶段优先交付 Mac 可用的模型资产事实库与 Workflow 参数接口；Windows 只扫描配置白名单目录并回传 metadata，绝不打开、复制或计算大权重内容哈希。
+- 已完成六类模型根、Windows 清单任务、Mac SHA-256 验收、版本化事实库与检索接口的首版实现，并开始补充自动测试。
+- 首轮模型清单定向测试中，业务投递、导入、过滤均通过；冲突测试误假设 store 暴露在 `app.state`，已改为直接打开同一临时事实目录，不改生产实现。
+- Windows Worker 与 Mac 事实库共 16 项定向测试通过；覆盖多模型根、类型/模型族过滤、回传哈希、同名快照冲突和 Windows 反斜杠路径穿越。
+- 设备页已增加独立“ComfyUI 模型资产”区域：六类模型 → 顶层文件夹树、名称/路径/类型/模型族搜索、清单刷新，以及返回任务的验收导入按钮。
+- Workflow Profile 编译器开始加入受控模型、附加 LoRA、Sampler 与 Scheduler 覆盖；首轮测试暴露旧极简 fixture 缺少真实节点且无覆盖时仍错误要求采样节点，已改为按需校验并补齐真实依赖链。
+- 修正后的 7 项 Workflow Profile 功能测试通过；Ruff 仅提示新增断言使一个既有端到端测试超过 statement 上限，已将跨模型族拒绝拆成独立测试而不放宽规则。
+- 创作台的 5060 Ti 区域已加入 Profile 级受控模型、Sampler、Scheduler、最多 4 个附加 LoRA 与强度控件，并把 Width/Height 纳入项目生成参数；选择保存在项目 `generation.workflow_controls`，投递时由服务端重新按当前 Mac 清单解析和校验。
+- README 与 Mac/Windows 操作说明已同步模型清单和受控 Workflow 参数边界：留空保留 Profile 原值、附加 LoRA 不删除默认组合、当前两份主工作流只开放真实存在的 UNet/VAE/Text Encoder 节点。
+- 首次完整工程门中 102/102 pytest、80.32% coverage、Ruff、ty、锁文件、JSON 与 diff 均通过；整页 JavaScript 检查误用了不存在的 `PAGE` 常量，已改用实际 `INDEX_HTML` 重新提取，不把失败命令当作通过证据。
+- Workflow Profile 导入校验已覆盖两份真实工作流中的受控 UNet、VAE、Text Encoder、LoRA Loader 与 Sampler 节点；缺失节点会在导入阶段返回明确领域错误，不再延后到编译时触发普通 `KeyError`。
+- 新增 10 组受控节点缺失回归；目标测试的 18 个功能断言通过，单文件命令按预期触发全项目 coverage 门，最终以完整测试证据为准。
+- Windows 共享目录中的 `prompt_hub_worker.py`、`worker.py`、README 与示例配置已同步；两份 Worker SHA-256 均与项目源码 `f740a8b9d6e26837d5a2f5645588bce8a814e10477ddc15189fb45aadfad347d` 一致，个人 `worker-config.json` 未被覆盖。
+- 浏览器真实交互确认：模型资产页正确显示未同步空状态；Anima/Krea 2 Profile 可切换；Sampler 保存后刷新恢复；附加 `linhuier` LoRA 保存后刷新恢复；Krea 2 下只列出兼容或 unknown LoRA；测试结束已恢复 Anima、默认 Sampler 与无附加 LoRA。
+- Browser QA 在 684px 窄窗口发现顶部横向导航会把后半入口藏在滚动区域，已改为 900px 以下五列两行、620px 以下两列布局；复验所有入口直接可见，console 0 warning/error。
+- 本机服务已重启并通过 `/api/health`；`prompt-hub doctor` 确认正式数据库与 embedding 数据库完整、WD14 可用、磁盘余量 711.5 GiB、8765 服务正常。
+- 当前新鲜工程门：112/112 pytest、80.34% coverage、89 文件 Ruff format、Ruff lint、ty、锁文件、两个 Worker 配置 JSON、整页 JavaScript、服务健康与 `git diff --check` 全部通过。
+- 阶段 29 的 Mac 开发与 Windows 部署包已完成；仍等待 Windows 重启新版 Worker，再执行六类目录自检、真实模型清单验收、模型族过滤与最低成本 ComfyUI smoke test，因此阶段保持 `in_progress`。
+- 第二次真实模型清单任务 `task-20260903T085351Z-7b335faf9149` 完成并通过 SHA-256 验收，仍为 140 个模型且 `weights_read=false`；但 `SDXL/animagineXLV31...` 与 `Flux1_Dev/fluxKreaDev...` 继续被旧逻辑误分类，证明实际领取任务的是未退出的旧 Worker 进程。
+- 为跨进程诊断新增 `worker_build_sha256`：自检状态、成功任务与失败任务均回显启动时加载的脚本 SHA-256；回归测试先以缺失字段失败，修复后定向 pytest、Ruff format/lint 与 ty 通过。
+- 新 Worker 已同步到共享目录两份入口，项目源码与两份共享脚本 SHA-256 均为 `11f78bd64957e7f88c7e791e3c351e09f4a74a4fb9c8abaa0c8da831c645fb55`；等待用户彻底关闭所有旧 Worker 窗口后重新启动，再用任务回传指纹确认进程版本。
+- 用户关闭旧进程后，新任务 `task-20260903T095310Z-418e3862fe8f` 回传相同 build 指纹；140 个模型完整验收导入，`animagineXL` 正确为 SDXL、两个 `fluxKreaDev` 正确为 Flux，Anima/Krea 2 diffusion model 候选为 12/10。
+- 浏览器设备页确认最新快照、六类树、140 个模型与修正后的卡片已显示；创作台 Anima 底模菜单显示 12 个真实 Anima 候选，已知 Flux/SDXL 不进入该菜单。下一步执行低成本 ComfyUI smoke test，并在最终工程门前刷新旧 LoRA catalog 的家族分类。
+- 低成本 Anima 真机任务 `task-20260903T095542Z-f811542ce312` 使用 512×768、4 steps、CFG 1.0、seed 123456，Windows 约 7 秒完成；图片、workflow 和运行日志三项 SHA-256 均通过，并成功关联回测试项目。视觉检查确认银发调查员、军装、旧图书馆与黄昏光线均符合槽位。
+- Krea 2 页面在同步后未刷新时短暂保留旧 `fluxKreaDev` 候选；源码过滤检查显示逻辑已严格按 `model_family`，整页刷新后两项消失，故不做错误代码修补。测试项目已恢复 Anima，当前 revision 为 R25。
+- 新 LoRA 任务 `task-20260903T095635Z-4830806392fe` 回传 256 个 LoRA 与 386 张预览，387 个输出全部通过 SHA-256；Mac 导入后 221 个条目有图，旧 `Wan2.2_Animate` 五项均改为 `unknown`，不再误归 Anima，权重未读取。
+- 阶段 29 最终工程门通过：113/113 pytest、80.48% coverage、89 文件 Ruff format、Ruff lint、ty、`uv lock --check`、7 段页面 JavaScript、正式服务健康、数据库诊断与 `git diff --check` 全部通过。
+- Windows Worker 项目源码与共享目录两份入口的 SHA-256 一致，均为 `11f78bd64957e7f88c7e791e3c351e09f4a74a4fb9c8abaa0c8da831c645fb55`；操作文档补充 `worker_build_sha256` 的旧进程识别方法。
+- 阶段 29 标记为 `complete`：真实模型资产 140 项、Anima/Krea 2 家族过滤、受控 Anima smoke test、结果回流，以及 256 项 LoRA/386 张预览的刷新均已验收。整体路线中的数据集冻结、训练执行、视觉向量与监听收紧等后续事项继续保留，不混入本阶段完成结论。
+- 收尾文档更新后重新执行完整验证：113/113 pytest、80.48% coverage、89 文件 Ruff format、Ruff lint、ty、锁文件、7 段页面 JavaScript、正式健康接口、`prompt-hub doctor` 与 `git diff --check` 均通过；共享盘 README 与仓库部署说明一致，未 commit、未 push。
+
+### 阶段 30：LoRA 快速选择与底模视觉预览
+- **状态：** in_progress
+- 用户指出 256 个 LoRA 使用原生长下拉时需要滚动很久，而且底模控件被长列表拖到下方；要求改为适合大清单的选择方式，并为底模同步 LoRA Manager 风格的示例图。
+- 本阶段保持既有档案馆视觉风格，不引入前端框架；模型预览只同步允许格式的小型 sidecar 图片，不读取或复制权重。
+- 创作台已改为紧凑 LoRA 选择器：支持名称、路径、Trigger、标签搜索和 Windows 文件夹筛选，结果区最多渲染 60 项并在内部滚动；已选 LoRA 独立显示缩略图、强度与移除按钮，不再把底模区域推到长清单下方。
+- 真实浏览器复验：Anima 当前有 116 个兼容 LoRA；搜索 `linhuier` 返回 1 项且显示真实预览，筛选 `Anima/style` 返回 49 项；关闭按钮可见并能收起面板，页面 `scrollWidth` 与 `clientWidth` 均为 684，无横向溢出，控制台无 warning/error。
+- 底模预览链已完成源码实现：Windows Worker 只读发现模型同名、`.civitai_bak` 与 `.preview` sidecar 图片；Mac 验收 SHA-256 后缓存到独立 `model-previews`，设备页和创作台通过受控路由显示 Checkpoint / Diffusion Model 示例图或明确无图状态。
+- 项目源码、共享目录 `prompt_hub_worker.py` 与 `worker.py` 三份 Worker SHA-256 已核对一致，当前均为 `37be9da8f3b0f0b2d4112250647c31a4a2337607c302d77594eda263c71eae22`。Windows 正在运行的 Worker 自检时间仍为 `2026-09-03T08:44:42Z`，需要重新启动后再刷新并验收真实底模示例图数量。
+- 本轮新鲜工程门通过：114/114 pytest、80.48% coverage、89 文件 Ruff format、Ruff lint、ty、`uv lock --check`、7 段页面 JavaScript、正式健康接口、`prompt-hub doctor` 与 `git diff --check` 均正常；当前仅剩新版 Windows Worker 的真实底模图片同步验收。
+- Windows 重新启动后，模型清单任务 `task-20260903T104526Z-57c456f19acc` 由新版 Worker 领取；回传 `worker_build_sha256=37be9da8f3b0f0b2d4112250647c31a4a2337607c302d77594eda263c71eae22`，与项目源码及共享目录两份 Worker 完全一致。
+- 真实任务发现 140 个模型资产和 161 张 sidecar 示例图（约 224 MB），`weights_read=false`、`weights_copied=false`；Mac 逐文件 SHA-256 验收通过并导入，88 个模型带视觉参照，六类模型计数保持 58 Checkpoint、38 Diffusion Model、14 VAE、9 Text Encoder、6 Upscaler、15 ControlNet。
+- 创作台刷新后，默认 `anima-base-v1.0` 显示真实底模示例图；受控图片路由返回 `200 image/png`，页面身份、非空状态、无框架错误层和控制台 0 warning/error 均通过。阶段 30 标记为 `complete`。
+
+### 阶段 31：Civitai 来源链接同步
+- **状态：** in_progress
+- 用户希望从 Mac 的 LoRA/底模条目直接返回 Civitai 查看模型提示词。计划优先解析 LoRA Manager / Civitai sidecar 中已有 URL 或数字 ID，不联网猜测、不自动下载，也不暴露 Windows 本地路径。
+- 初步审计确认真实 LoRA 清单已带 Civitai model/version 数字 ID；模型清单目前未解析 sidecar，需要在 Worker 白名单模型根内增加小型 JSON sidecar 读取，再由 Mac 验收并展示。
+- 已先补来源链接回归断言；首个定向 pytest 命令误写了不存在的 `tests/test_api.py::test_home_page`，pytest 在执行前停止。已查询真实测试名为 `test_api_health_stats_search_and_page`，不重复错误命令。
+- 继续开发时一次 `apply_patch` 因同一文件被拆成两个 update 区块而在校验阶段拒绝，未写入任何内容；已合并为单一 update 后成功应用。
+- 第一轮定向 Ruff 在测试运行前发现新 URL 长度上限使用裸 `2000`；已提取为 `MAX_CIVITAI_URL_LENGTH`，要求从格式化、lint、类型检查和定向测试整组重跑。
+- Worker 已实现模型同名小型 sidecar 解析；Mac 的 LoRA/模型清单导入层再次执行 Civitai URL 白名单校验。只接受模型详情页，不接受本地路径、外站、下载 API 或图片 URL。
+- 设备页 LoRA/模型卡、创作台底模预览、LoRA 搜索结果与已选 LoRA 均增加独立的 Civitai 来源入口；搜索可使用 model/version ID。
+- 真实旧 LoRA 快照兼容验证：256 个 LoRA 中 232 个可返回 Civitai；`linhuier` 搜索唯一命中，并生成精确来源 `https://civitai.com/models/2885952?modelVersionId=3262276`。当前旧模型快照 140 个条目中来源为 0，需新版 Worker 重扫。
+- 新版 Worker 已同步到 SMB，项目源码和共享目录两份入口 SHA-256 一致：`1e68ec659948c848001a0f9bf843046418ca236771b0ad04af4af7cfe7db82a9`；个人 `worker-config.json` 未覆盖。
+- 定向功能测试 12 项通过；首轮选测因全项目 coverage 门而返回非零，随后用 `--no-cov` 确认功能断言，并以 121 项全量测试和 80.58% coverage 作为覆盖率证据。
+- 7 段页面 JavaScript 语法通过；首次提取正则转义错误得到 0 段，改用 `<script>` 分割后从头检查。Browser/Playwright 复验 `linhuier` 页面来源与创作台独立添加按钮，控制台 0 warning/error。
+- 首次后台启动本机服务后进程被宿主回收，页面出现连接拒绝；已改用持续工具会话 `56353`，当前 `/api/health` 正常。
+- 2026-09-03 再查 Windows `worker-status.json` 仍为旧时间 `2026-09-03T08:44:42Z` 且无 `worker_build_sha256`。阶段保持 in progress，等待用户彻底关闭旧 Worker 窗口并从共享目录重新执行自检与启动脚本。
+- 文档更新后的完成前工程门通过：89 文件 Ruff format、Ruff lint、ty、121/121 pytest、80.58% coverage、`uv lock --check`、7 段页面 JavaScript、正式 `/api/health`、doctor 7/7 与 `git diff --check` 全部正常。
+- 当前正式 API 复核为 LoRA `256 / 221 有图 / 232 有来源 / 386 张预览`，模型 `140 / 88 有图 / 0 有来源 / 161 张预览`。三份新版 Worker SHA-256 均为 `1e68ec659948c848001a0f9bf843046418ca236771b0ad04af4af7cfe7db82a9`。
+- 收尾检索时一次双引号 shell 参数包含 Markdown 反引号，shell 尝试执行两段文字并返回找不到命令；没有文件写入或状态变化，后续已改用不含反引号的精确读取方式。
+- 用户重启 Windows 后，Worker 状态时间更新为 `2026-09-03T11:15:58Z`，`worker_build_sha256` 与 Mac、SMB 两份脚本完全一致。
+- 投递并完成真实模型任务 `task-20260903T111630Z-59a120348175`：140 个模型、161 张示例图、完整性验收通过；新快照 `models-20260903T111633Z-7c0adb88d329` 有 71 个 Civitai 来源、88 个有图，权重未读取或复制。
+- 浏览器初验发现设备页按 model ID `1064295` 返回 0，而后端同一查询正确返回 `chosenMixXL_v41`；根因为前端本地筛选遗漏来源与 metadata ID。新增页面回归标记后测试先失败，再补齐 LoRA/模型筛选字段，目标测试通过。
+- Mac 服务已重启到修复版本，持续服务会话为 `4306`。应用内浏览器复验：模型 ID `1064295` 唯一命中 `chosenMixXL_v41`，LoRA ID `2885952` 唯一命中 `linhuier`；两者 Civitai URL 精确正确。
+- 创作台默认 Anima 底模显示示例图与 Civitai 来源；设备页显示 140 / 88 / 71 / 161，页面无横向溢出、无错误层、console 0 warning/error。阶段 31 标记 complete。
+- 最终新鲜工程门通过：89 文件 Ruff format、Ruff lint、ty、121/121 pytest、80.58% coverage、`uv lock --check`、7 段页面 JavaScript、doctor 7/7、正式 LoRA/模型状态与 `git diff --check` 全部正常；未 commit、未 push。
+
+### 阶段 32：设备页子页面导航
+
+- 用户指出设备页仍把任务、LoRA、底模纵向堆叠，必须翻过完整 LoRA 清单才能看到底模；确认这是页面信息架构问题，不是分类树本身的问题。
+- 方案确定为顶部三段式子页面导航：任务状态包含设备登记与任务列表，LoRA 与底模各自独立。切换只改变页面显示，不改清单、项目或 Windows 状态。
+- 首次并行读取设计技能时工作目录误写为 `prompt-h-hub`，命令在执行前失败且无文件变化；改用真实路径后完整读取。
+- 回归测试先因缺少三个 tab/panel 标记失败；随后在 `remote_web.py` 增加语义化三段导航、互斥面板、真实数量与键盘切换，目标测试转为通过。
+- 正式服务已重启到持续会话 `47255`。应用内浏览器实测任务、LoRA、底模切换时只有对应 panel 可见；684px 宽度横向溢出为 0，底模 ID 搜索与示例图弹窗保持正常，console 0 warning/error。
+- 完成前新鲜工程门通过：89 文件 Ruff format、Ruff lint、ty、121/121 pytest、80.58% coverage、`uv lock --check`、7 段页面 JavaScript、doctor 7/7 与 `git diff --check` 全部正常。阶段 32 标记 complete；未 commit、未 push。
+
+### 阶段 32 后路线审计
+
+- 应用户要求核对正常开发剩余工作与任务书更新情况；确认阶段 32 已记录，但阶段 8、19、20、22 和 Mac 操作手册仍有被后续真实 Windows 验收取代的历史状态。
+- `task_plan.md` 新增阶段 32 后权威剩余清单，按 P0 绘图闭环、P1 资料/视觉、P1 Windows 批量视觉、P2 安全发布和延后视频分组。
+- 将局域网 ComfyUI 交付、真实结果元数据回流、Worker 领取/回传/幂等和受控模型参数等已经完成的事项从旧待办中清理；保留真实未完成的 LoRA smoke test、网站缓存、CLIP/SigLIP、批量 VLM、GPU 占用保护和故障演练。
+- `MAC_OPERATIONS_GUIDE.md` 同步修正：底模/LoRA/采样参数绑定已经完成，不再列为等待 Windows 的工作。
+- 本轮只修改规划与操作文档，不改应用代码、数据库或 Windows Worker；未 commit、未 push。
+
+### 阶段 33：任务状态中文化与职责纠正
+
+- 用户纠正规划边界：Mac 只需交付打好标的数据集；Windows 中的标签终筛、正则、训练、checkpoint 和 LoRA 测试由用户自行操作，不纳入 Prompt Hub 完成条件。
+- `embedding_batch` 与 `vlm_caption_batch` 被解释并移到可选增强：前者用于大量图片的相似图向量，后者用于大量 Krea 2 caption 草稿；二者都不是 WD14 打标，也不执行训练。
+- 真实浏览器复现任务页：18 条历史任务直接显示 `model_catalog_snapshot`、`lora_catalog_snapshot`、`comfyui_generate`、`ATTEMPT / WORKER / ERROR`，用户无法判断用途和下一步。
+- 设备页增加中文任务说明，只把 ComfyUI 出图、LoRA 清单同步和底模清单同步列为当前实际任务；任务卡显示中文状态、用途和操作建议，技术 ID 与原始错误收进可展开详情。
+- 两条已知旧失败任务增加可理解的中文原因：seed 超限，以及旧生成包缺少完整性登记；原始错误仍保留在技术详情中供排查。
+- 页面回归断言先按预期失败，完成显示层实现并修正底模按钮术语后，`tests/test_api.py` 4/4 通过；仍待完整工程门与真实浏览器 QA。
+- 完整工程门通过：121/121 pytest、80.58% coverage、89 文件 Ruff format、Ruff lint、ty、`uv lock --check` 与 `git diff --check` 全部正常。
+- 正式服务已重启到持续会话 `63079`。应用内浏览器以 18 条真实任务验证三类中文任务、中文状态、下一步提示、两条友好失败原因与技术信息展开；684px 窗口 `scrollWidth=clientWidth=669`，无横向溢出，console 0 warning/error。
+- 浏览器运行时不支持 `tab.playwright.screenshot()`，首次截图调用失败；查询实际 API 后改用 `tab.screenshot()` 成功。两个 locator 级滚动方法分别不支持与超时，改用页面级 `window.scrollTo()` 完成截图定位，没有触发数据写入。
+- 首次单文件 JavaScript 检查没有先去掉 `REMOTE_SCRIPT` 模板开头的换行，导致 `<script>` 标签被送入 Node 并在项目脚本解析前失败；改为先 `strip()` 再移除标签后，真实 JavaScript 语法检查通过。
+- 阶段 33 标记 complete；任务书的完成边界同步收敛为 Mac 交付打好标的数据集包，Windows 训练与 LoRA 测试不再作为 Prompt Hub 待办。未 commit、未 push。
+- 进一步澄清任务数量：顶部数量改为“条”，任务区动态汇总总历史记录、等待/执行中、Windows 已回传和失败/取消，避免把 18 条历史记录误解成 18 个正在运行的任务。
+
+### 阶段 34–39 新开发计划
+
+- 应用户要求重新列出后续计划，并以最新职责边界替换阶段 33 后的临时 P0/P1/P2 清单。
+- 新路线包含：阶段 34 引导式数据集交付台、阶段 35 数据集包冻结与一键交付、阶段 36 本地提示词来源中心、阶段 37 Mac 本地视觉检索、阶段 38 灵感到数据集项目总览、阶段 39 稳定性与公开版本收尾。
+- Windows 自动训练、正则、checkpoint/LoRA 测试控制台明确不开发；Windows embedding/VLM 批量加速与 MiniMax H3 明确为可选或延后。
+- 本轮只更新 `task_plan.md`、`findings.md` 和 `progress.md`，未修改应用代码、数据库或 Windows Worker；未 commit、未 push。
+
+### 阶段 34：引导式数据集交付台（开始）
+
+- 已恢复任务书、发现记录和进度记录，并审计当前 `workspace_web.py`、数据集路由与导出约束。
+- 当前真实“林悔儿”工作区为 72 张有效图片、0 坏图、0 重复、72 份原 caption；Anima 72/72 已审核，图片审核状态仍为 72 张未审核。
+- 确认阶段 34 以现有成熟 API 为基础重组页面，不改变 WD14、Caption、审核或导出领域逻辑，也不加入 Windows 训练控制。
+- 计划实现五步导航、简单/高级模式、Profile 独立状态、阻塞项与下一步动作；阶段状态已切换为 `in_progress`。
+- 页面回归测试按测试先行预期失败，证明新增五步与模式标记尚不存在；完成首轮实现后已转为通过。
+- 首轮定向 Ruff 只发现测试断言中的中文全角逗号触发 `RUF001`，产品代码没有 lint 错误；已将断言缩短为不含歧义标点的稳定文案。
+- 已完成五步导航、自动推荐步骤、Anima/Krea 2 独立状态、八项可交付摘要、阻塞项与下一步按钮。
+- 简单模式按当前步骤和 Profile 收起无关工具；高级检查保留全部筛选、任务、WD14、Krea 2、批量标签、快照和交付面板。
+- 所有主要写操作都在附近说明“写草稿/建快照/导出副本”，冻结按钮在当前选择含不可交付项时禁用；页面不提供 Windows 训练控制。
+- 应用内浏览器真实验收“林悔儿”：Anima 自动落第 4 步并显示 72 张待审核；Krea 2 自动落第 3 步并显示缺 72 份 Caption；第 5 步未就绪时按钮禁用。
+- 浏览器 684px 窗口 `scrollWidth=clientWidth=669`，无横向溢出，console 0 warning/error；简单/高级模式互切及 Profile 专属工具显示正确。
+- 完成前工程门通过：121/121 pytest、80.58% coverage、89 文件 Ruff format、Ruff lint、ty、`uv lock --check`、整页 JavaScript、doctor 7/7、正式健康接口与 `git diff --check` 全部正常。
+- 阶段 34 标记 complete，操作手册同步为新五步流程；未 commit、未 push。
+
+### 阶段 35：数据集包冻结与一键交付（开始）
+
+- 已恢复任务书、发现记录和历史工作树，确认阶段 35 建立在现有独立版本目录与 ZIP 导出能力之上，不重做数据集导出。
+- 已确认缺口为正式交付前检查、Caption 审核状态强制、`hashes.sha256`、文件/容量统计、交付历史、Finder 入口和受控 SMB 复制。
+- 计划只允许复制到已登记 `compute_5060ti` 节点的挂载根内；前端不提交任意绝对路径，离线、只读或目标已存在时安全停止。
+- 真实“林悔儿”只做只读交付前检查和源哈希验证，不替用户把 72 张图片批量标记为保留。
+- 阶段状态已切换为 `in_progress`；未 commit、未 push。
+
+### 阶段 35：数据集包冻结与一键交付（完成）
+
+- 后端完成正式交付前检查、Anima/Krea 2 Profile 隔离、Caption 人工确认强制、来源变化检测、`hashes.sha256`、文件与容量统计、交付历史和受控 Finder 打开。
+- 完成 5060 Ti 安全复制：目标固定在已登记 SMB 挂载根的 `prompt-hub/datasets/<数据集名>/<version_id>`，临时复制后核对全目录哈希再原子改名；相同版本幂等返回，内容冲突时停止且不覆盖。
+- 页面第 5 步增加正式检查、保存到 Mac、按 Profile 分离的交付历史、下载 ZIP、打开 Finder、复制到 5060 Ti，以及中文加载与错误状态。
+- 真实“林悔儿”正式工作区只读复核仍为 72 张图片 pending、Anima Caption 72/72 reviewed、Krea 2 Caption 0/72、无正式导出；没有代替用户修改图片审核状态。
+- 使用同一批 72 张真实图片建立临时隔离工作区完成端到端冻结：ZIP 147 项，包含 72 张图片、72 份同名 `.txt`、`manifest.json`、`audit.json` 和 `hashes.sha256`；源目录前后聚合 SHA-256 均为 `c3824e1a94b6a8e61700356f57d01a4ec9a81b9f03db3227c5602747746ccb3d`。
+- 受限工作区中先确认阶段 35 的 17 项定向测试、Ruff、ty、锁文件、7 段 JavaScript 与 diff 检查通过；7 项 Worker 测试仅因环境禁止绑定本机临时端口失败，待权限恢复后重跑完整工程门。
+- 操作手册与 README 已更新为“正式检查 → 保存到 Mac → 在交付历史下载/Finder/复制到 5060 Ti”的实际顺序，并说明离线与哈希冲突不会覆盖。
+- 阶段 35 标记为 `complete`；下一阶段为阶段 36 本地提示词来源中心。未 commit、未 push。
+- 权限恢复后重新执行完整工程门：124/124 pytest 通过，coverage 80.64%；89 文件 Ruff format、Ruff lint、ty、`uv lock --check`、7 段页面 JavaScript 和 `git diff --check` 全部通过。
+- 正式服务已重启到持续会话 `99984`；`/api/health` 正常，doctor 7/7 通过，SQLite 与 embedding integrity 均为 `ok`，磁盘可用约 711.3 GiB。
+- 新建干净的应用内浏览器标签页复验真实数据集：桌面 `scrollWidth=clientWidth=1265`，正式“林悔儿”仍无导出版本，冻结按钮因未选择且 72 张图片尚未审核而禁用，console 0 warning/error。原 684px 用户标签页同样无横向溢出，并验证 Anima/Krea 2 历史独立。
+
+### 阶段 36 / 37：本地来源中心与 Mac 视觉检索（开始）
+
+- 用户要求阶段 36 与 37 连续完成，完成后再测试 5060 Ti；本轮不得以 Windows 在线或远程任务作为 Mac 功能完成前提。
+- 现有 4 个 Git 源均为干净 `main...origin/main`，本地数据库已有来源、URL、许可、更新时间和 33,631 条索引；阶段 36 复用现有 fast-forward-only 同步与 FTS，不重建个人收藏逻辑。
+- `prompt-library/sources/web` 已预留但为空；阶段 36 将新增有站点白名单、许可策略、内容哈希和图片缓存边界的网页摘录事实源，并以增量 upsert 保留个人收藏、评分和备注。
+- 现有 `EmbeddingIndexStore` 已支持版本化真实向量、SHA-256 回验、cosine 查询和按源图查相似；阶段 37 补齐 Mac 本地 encoder、素材发现、可恢复后台索引和查询图片入口。
+- 本机已有 ONNX Runtime 1.29.0 与 Pillow 12.3.0，没有 Torch/Transformers/MLX。确定使用 `Xenova/clip-vit-base-patch32` 的 vision ONNX（351,685,709 bytes、512 维、224px）作为 24GB Mac 的轻量起点，不引入 PyTorch 常驻开销。
+- 前端沿用现有纸张、墨色、signal/acid 与档案卡设计语言，来源中心以“馆藏台账”呈现，视觉检索以“灯箱/联系表”呈现；普通视图使用中文，高级信息收起。
+- 阶段 36 后端第一段已落地：新增固定站点策略、HTTPS/账号/端口检查、受控重定向、Content-Type 与 8 MiB 上限、正文/直链图片缓存、SHA-256 与 manifest，并将网页资料按 URL 增量 upsert 到 FTS。
+- Civitai、OpenArt、PromptHero 与 Promptomania 当前默认只保存链接、标题和个人备注；GitHub 与 raw.githubusercontent.com 允许受限正文或直链图片缓存。重复保存同一 URL 不删除 `user_marks`。
+- 新增 10 项网页摘录测试，覆盖 link-only、GitHub 正文、图片缓存、内容哈希、重复 URL、收藏保留、白名单、路径安全、重定向与容量上限；定向测试 `10 passed`。
+- 阶段 36 API 与页面第一版已接通：资料管理页新增网页保存表单、缓存策略说明、来源/许可/更新时间/条目数/视觉数馆藏台账，以及带来源链接与 SHA-256 详情的网页资料卡；API 定向回归 16 项通过。
+
+### 2026-09-04：阶段 36 / 37 收口验收
+
+- 重新启动本地服务后，真实页面显示 1,450 张本地视觉索引：提示词视觉 827、数据集 72、ComfyUI 回流 4、LoRA 预览 386、底模预览 161。
+- 收紧上传图片查询的版本边界：只能查询当前固定 CLIP model/revision 生成的索引，不会因其他模型恰好也是 512 维而串用不兼容向量。
+- 新增版本隔离、视觉簇分组/类型过滤和页面入口回归；阶段 36/37 相关 28 项测试使用 `--no-cov` 实际通过，完整 coverage 门留到全量工程门复核。
+- 应用内浏览器验收因 macOS 锁屏无法接入；Playwright 技能自带包装脚本又因无执行权限与 CRLF 行尾连续失败。已改用 `npx --package @playwright/cli playwright-cli` 直接入口，不修改技能文件；桌面页面已真实渲染，继续完成上传、灯箱、视觉簇、来源中心和窄屏验收。
+- 真实上传 Kisegaeningyou 参考图 `1741118591102.png` 查询成功，返回 48 张真实相似图；首张为原图、相似度 100%，其他结果带真实来源、本地媒体路由和内容分级。
+- “浏览视觉簇”实际从 240 张近期素材生成 27 个簇，页面按上限展示前 24 簇、237 张卡片，同时出现 Kisegaeningyou 和 Clio Style Library 结果。
+- 资料管理页真实显示 6 个来源、33,633 条资料、2,921 个视觉参照和 2 个网页来源；AnimaDex 为已离线缓存，林悔儿 Civitai 条目为只保存链接，均可回看原网址、许可与 SHA-256。
+- 684×900 窄屏验收：页面 `innerWidth=684`、`scrollWidth=684`，导航入口全部可见，视觉簇 237 张可见卡片中 0 张损坏图；来源中心同样无横向溢出，6 行来源、2 张网页卡和保存表单均可见。控制台 0 error / 0 warning。
+- 阶段 36/37 完成前工程门通过：97 个文件 Ruff format、Ruff lint、ty、142/142 pytest、80.43% coverage、`uv lock --check`、整页 JavaScript、`git diff --check`、正式 SQLite 与 embedding SQLite `integrity_check=ok`。CLIP ONNX 的 351,685,709 bytes 和 SHA-256 均与固定元数据一致；正式健康接口、1,450 张索引和 6 个来源均返回预期状态。
+- README、Mac 日常操作手册、总开发计划和任务书已改为当前真实边界：Mac 可独立保存来源、以图找图和浏览视觉簇；Windows embedding 仅是未来超大批加速选项。阶段 36、37 标记 `complete`，下一阶段为 38；未投递、未测试 5060 Ti，未 commit、未 push。
+- 页面组合曾把来源中心插到 `managementPage` 外部，HTML 栈检查发现后已改为管理页子节点；最新解析栈明确包含 `managementPage → sourceCaptureForm`，不会在其他页面常驻显示。
+- 新增素材发现测试文件时有一次工具输入格式错误；调用在解析阶段停止，未写入文件。已改为独立补丁继续，这不是应用代码失败。
+- Hugging Face 先前审计记录的 revision `e6a30b...` 已失效并返回 404；通过模型 API 重新确认当前固定 revision 为 `d15189d...`。首次下载在 296,417,780 bytes 处中断，使用同一目标续传后完成 351,685,709 bytes，SHA-256 为 `fd6e1402...d7d40`。
+- CLIP Vision ONNX 已安装到个人模型目录并保存 `model-info.json`；真实加载一张本地图得到 512 维向量，L2 范数约 `0.99999997`，确认模型输出和预处理匹配。
+- 首次完整 Mac 索引发现并成功写入 1,450 张、失败 0：提示词视觉 827、数据集 72、创作/ComfyUI 结果 4、LoRA 预览 386、底模预览 161。第二次完整运行新增 0、跳过 1,450，验证增量路径。
+- 使用真实创作结果图进行上传查询，返回数据集、LoRA、提示词视觉和 ComfyUI 回流等真实邻居；前 5 项相似度为 1.0、0.8345、0.8289、0.8155、0.8152。80 张样本可整理为 20 个视觉簇。
+
+### 2026-09-04：阶段 38 灵感到数据集项目总览（收尾中）
+
+- 新增项目总览、项目结果同步与来源档案的主体实现已经进入最终验证；继续保留“只同步手动精选、不自动审核、不替用户批准图片、外部数据集独立”的边界。
+- 复核发现 `project_revision` 曾重复写入单图来源、但遗漏在工作区 origin；已改到正确层级，并新增“同步后直接打开、项目再次修改后才提示更新”的回归断言。
+- 第一次定向 lint 被测试文案中的全角逗号拦截，改为普通逗号后重新运行；Ruff、ty 与阶段 38/API 定向测试 5/5 通过。
+- 正式服务已重启为 PID 42156。真实浏览器确认 1462px 为 3×2、684px 为单列且无横向溢出，总览标题不再受全局 `header` 样式影响产生大块留白。
+- 浏览器接口不支持直接设置 viewport，已改用现有 684px 应用内窗口和 1462px Edge 窗口分别验收，没有修改产品代码规避工具限制。
+
+### 2026-09-04：阶段 38 灵感到数据集项目总览（完成）
+
+- 创作台完成六阶段事实总览和下一步入口；手动精选结果可建立项目专属数据集工作区，重复同步幂等，项目 revision 变化后才提示更新。
+- 每张同步图片与冻结版本完整保留项目、结果图、双 Profile Prompt、ComfyUI workflow、checkpoint、LoRA、seed、尺寸、Steps、CFG 和 SHA-256；工作区与交付版本可返回来源项目/结果图。
+- 同步不改变图片 `pending`、`selected`、`approved` 或 Caption reviewed 状态；正式“林悔儿”72 张外部数据集仍保持独立且未替用户审核。
+- 浏览器发现并修正结果阶段按钮落点；1462px 为 3×2、684px 为单列且无横向溢出，修正后结果区落点可见，两个窗口 console 0 warning/error。
+- 完整工程门首次附加 SQLite 脚本误写为不存在的 `Settings.from_env()`；改用实际 `Settings.from_environment()` 后，正式主库与 embedding 库均为 `integrity_check=ok`。
+- 文档更新前的完整门为 143/143 pytest、80.63% coverage、99 文件 Ruff format、Ruff lint、ty、`uv lock --check`、8 段页面 JavaScript、`git diff --check`、doctor 7/7 和正式健康接口通过。阶段 38 标记 complete；未连接或投递 5060 Ti，未 commit、未 push。
+- README、Mac 操作手册、总开发计划、任务书和研究记录更新后重新执行最终工程门：143/143 pytest、80.63% coverage、99 文件格式、Ruff lint、ty、锁文件、8 段 JavaScript、doctor 7/7、两库 integrity、正式健康接口与 diff 检查全部通过。
+
+### 2026-09-04：阶段 39 稳定性回归（进行中）
+
+- 只读审计确认四个缺口：项目专属数据集来源未进入备份；冻结时底层 I/O 错误会越过用户提示；磁盘不足缺少无残留测试；SMB 与服务重启缺少连续恢复场景。
+- 先写回归并复现：定向测试中 2 项按预期失败，分别证明 `datasets/project-sources` 未备份，以及冻结 I/O 错误直接抛出 500；其余磁盘不足、SMB 离线恢复、服务重启恢复场景已在现有机制上通过。定向运行触发全局 coverage 门低于 80%，这是只运行少数测试导致，不是新增功能失败，最终会执行完整测试集。
+- 已做最小修复：备份加入 `datasets/project-sources`；冻结异常统一转为中文可恢复错误并保留半成品清理；数据集和设备普通状态改为中文，保留技术值仅供内部逻辑使用。
+
+### 2026-09-04：阶段 39 自动交付完成，等待人工验收
+
+- 新增 `MANUAL_ACCEPTANCE_GUIDE.md`，按日常创作、Windows 离线、结果到数据集、外部旧数据集、资料更新、项目变化、SMB 断线、服务异常、磁盘不足和备份恢复十种情景说明操作顺序，并提供不修改正式数据的人工验收清单。
+- 正式服务在无活动任务时从 PID 42339 重启到 PID 43871。重启后健康接口正常；“黄昏图书馆调查员”仍为 revision 25；“林悔儿”仍为 72 张全部 pending、0 selected、72 Anima reviewed、0 Krea 2，正式数据没有被测试改变。
+- 首次正式备份虽然校验成功，但因 `remote-nodes` 整体复制把 846 MB LoRA 和 428 MB 底模预览缓存纳入，体积约 1.37 GB。先增加失败回归，再排除这两类可重建缓存；旧中间备份已移到废纸篓，可恢复。
+- 最终正式备份位于 `/Users/soda/Documents/Codex/soda-person/backups/prompt-hub/20260904-stage39-final`：209 个文件、37,196,600 bytes、两个 SQLite 完整性均为 `ok`。隔离恢复位于 `/Users/soda/Documents/Codex/soda-person/restore-tests/prompt-hub-stage39-20260904`，文件哈希、SQLite 和关键事实数量一致。
+- 应用内浏览器 684px 验收：无横向溢出，工作区显示“可使用 · 72 张”，设备离线显示“共享目录未挂载”，LoRA 256 个和底模 140 个分别位于独立子页。隔离桌面浏览器 1462px 验收：六张项目卡为 3×2、数据集冻结按钮禁用、控制台 0 warning/error。
+- 完成前新鲜工程门：146/146 pytest、80.74% coverage、101 文件 Ruff format、Ruff lint、ty、`uv lock --check`、8 段页面 JavaScript、`git diff --check`、doctor 7/7、正式两库 integrity、敏感信息形状、仓库大文件和二进制资产检查全部通过。
+- 阶段 39 功能开发与自动验证完成，等待用户按人工验收清单检查。未 commit、未 push、未创建 PR 或 release tag。
+
+### 2026-09-04：阶段 40 界面语言与操作引导（完成）
+
+- 按真实使用顺序逐页复核普通界面，保留现有纸张、墨色和卡片式视觉风格，不改后端协议或正式数据。
+- 首页、创作台、提示词库、智能检索、角色库、数据集、LoRA 数据集、Windows 出图和资料管理的主要标题、按钮、状态与空页面已改成直接中文；Anima、Krea 2、LoRA、WD14、Checkpoint、VAE 等必要专业名词保留。
+- 设备连接页明确 Finder 与钥匙串的职责，LoRA 和底模分别说明清单边界；任务按“需要处理”和“历史记录”分组，18 条既有记录不会删除。
+- 补充清理项目卡的 V/R、参考卡 REMOVE、WD14 General/Character、原始安全分级值和 LoRA BASE/TRIGGER/TAGS 等开发者式显示。
+- 完整工程门通过：146/146 pytest、80.74% coverage、101 文件 Ruff format、Ruff lint、ty、`uv lock --check`、8 段页面 JavaScript、`git diff --check`、doctor 与正式两库完整性检查全部正常。
+- 正式服务重启后，应用内浏览器以 669px 逐页检查首页和 9 个功能页，所有页面均无横向溢出，旧文案扫描为空，控制台 0 warning/error。
+- 隔离浏览器以 1462px 复核 Windows 出图、创作台、数据集与设备连接；发现 Windows 出图卡片中的竖图按固有宽度撑开网格，补充图片容器和卡片正文的收缩约束后，1462px 与 669px 都恢复为页面宽度内显示，控制台仍为 0 warning/error。
+- 正式数据未被验收改动：设备页仍保留 18 条任务，“林悔儿”72 张图片的审核、选择和说明状态不变；未连接 Windows、未发送远程任务。
+- 阶段 40 标记 complete，等待用户按 `MANUAL_ACCEPTANCE_GUIDE.md` 人工验收。未 commit、未 push、未创建 PR。
