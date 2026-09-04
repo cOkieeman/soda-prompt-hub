@@ -8,6 +8,7 @@ REMOTE_STYLES = r"""
   .remote-copy h1 { margin: 16px 0 12px; font: 800 clamp(50px,7vw,92px)/.84 "Iowan Old Style",serif; letter-spacing: -.055em; }
   .remote-copy p { max-width: 700px; color: var(--muted); line-height: 1.7; }
   .remote-boundary { padding: 34px; background: var(--ink); color: var(--paper); }
+  .remote-boundary .section-label { color: #b9ae9f; }
   .remote-boundary strong { display: block; margin: 14px 0; color: var(--acid); font: 800 24px "Iowan Old Style",serif; }
   .remote-boundary p { color: #aaa99f; font-size: 11px; line-height: 1.65; }
   .remote-section-tabs { position: sticky; top: 10px; z-index: 8; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; margin-top: 14px; border: 1px solid var(--line); background: var(--line); box-shadow: var(--shadow); }

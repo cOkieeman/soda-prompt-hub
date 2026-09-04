@@ -2,6 +2,7 @@ SOURCE_CENTER_STYLES = r"""<style>
   .source-center-grid { display:grid; grid-template-columns:minmax(300px,.72fr) minmax(0,1.28fr); gap:18px; }
   .source-capture-panel,.source-ledger-panel,.source-capture-list-panel { padding:28px; background:var(--paper); box-shadow:var(--shadow); }
   .source-capture-panel { background:var(--ink); color:var(--paper); }
+  .source-capture-panel .section-label { color:#b9ae9f; }
   .source-center-heading { margin:8px 0 10px; font:700 34px/1.05 "Iowan Old Style",serif; letter-spacing:-.035em; }
   .source-center-copy { margin:0 0 22px; color:#aaa99f; font-size:12px; line-height:1.7; }
   .source-policy { display:grid; gap:8px; margin:0 0 22px; }

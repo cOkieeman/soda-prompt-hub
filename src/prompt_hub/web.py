@@ -23,9 +23,9 @@ INDEX_HTML = r"""<!doctype html>
       --ink: #171815;
       --paper: #ece8dc;
       --paper-deep: #d8d1bf;
-      --signal: #d84b2a;
+      --signal: #a33822;
       --acid: #d7e455;
-      --muted: #77756d;
+      --muted: #5b5a53;
       --line: rgba(23, 24, 21, .19);
       --shadow: 0 22px 55px rgba(29, 27, 20, .14);
     }
@@ -51,6 +51,7 @@ INDEX_HTML = r"""<!doctype html>
     }
     .shell { width: min(1480px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 60px; }
     button, input, select, textarea { font: inherit; }
+    button { border: 0; background: transparent; color: inherit; }
     button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
       outline: 3px solid var(--acid);
       outline-offset: 3px;
@@ -174,7 +175,7 @@ INDEX_HTML = r"""<!doctype html>
     .source-sync-state.dirty, .source-sync-state.failed { background: var(--signal); color: white; }
     .archive-notice { margin: 0 0 18px; padding: 14px 16px; background: #ded7c7; border-left: 4px solid var(--signal); color: #55564f; font-size: 12px; line-height: 1.6; }
     .archive-notice strong { color: var(--ink); }
-    header {
+    .archive-header {
       display: grid;
       grid-template-columns: minmax(0, 1.35fr) minmax(290px, .65fr);
       min-height: 230px;
@@ -248,7 +249,8 @@ INDEX_HTML = r"""<!doctype html>
       text-transform: uppercase;
     }
     .personal-summary strong { color: var(--acid); font-size: 14px; }
-    .personal-summary .divider { padding: 0 7px; color: rgba(236,232,220,.3); }
+    .personal-summary .divider { padding: 0 7px; color: rgba(236,232,220,.72); }
+    .stats-panel .section-label { color: #b9ae9f; }
     .sync-button {
       border: 1px solid var(--acid);
       color: var(--acid);
@@ -522,7 +524,7 @@ INDEX_HTML = r"""<!doctype html>
     .favorite-button { padding: 7px 9px; border: 1px solid var(--line); }
     .favorite-button[aria-pressed="true"] { background: var(--signal); border-color: var(--signal); color: #fff8eb; }
     .rating-control { display: flex; gap: 1px; margin-left: auto; }
-    .star-button { padding: 5px 2px; font-size: 15px; color: #aaa696; }
+    .star-button { padding: 5px 2px; font-size: 15px; color: #67655d; }
     .star-button.active { color: var(--signal); }
     .note-button { padding: 7px 5px; }
     .note-button.has-note { color: var(--signal); }
@@ -560,7 +562,7 @@ INDEX_HTML = r"""<!doctype html>
       .app-brand { width: 100%; min-height: 58px; border-right: 0; }
       .app-nav-items { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; }
       .app-nav-button { min-width: 0; min-height: 46px; padding: 0 8px; border-bottom: 1px solid var(--line); }
-      header, .workspace, .home-page { grid-template-columns: 1fr; }
+      .archive-header, .workspace, .home-page { grid-template-columns: 1fr; }
       aside { position: static; }
       .stats-panel { min-height: 220px; }
       .home-lead { min-height: auto; }
@@ -645,7 +647,7 @@ INDEX_HTML = r"""<!doctype html>
     </section>
 
     <section class="management-page" id="managementPage" hidden>
-      <header>
+      <header class="archive-header">
         <section class="masthead">
           <div class="eyebrow">本地资料管理</div>
           <h1>资料与<br>索引</h1>

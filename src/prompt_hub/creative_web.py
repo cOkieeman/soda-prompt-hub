@@ -17,7 +17,7 @@ CREATIVE_STYLES = r"""
   .project-rail { border-right: 1px solid var(--line); }
   .output-rail { border-left: 1px solid var(--line); background: var(--ink); color: #f4eddf; }
   .creative-editor { min-width: 0; padding: 26px; background-image: linear-gradient(rgba(31, 29, 25, .035) 1px, transparent 1px); background-size: 100% 36px; }
-  .rail-button, .creative-action { width: 100%; border: 1px solid currentColor; padding: 11px 12px; text-align: left; font: 800 10px/1.2 monospace; letter-spacing: .06em; text-transform: uppercase; }
+  .rail-button, .creative-action { width: 100%; border: 1px solid currentColor; background: transparent; padding: 11px 12px; text-align: left; font: 800 10px/1.2 monospace; letter-spacing: .06em; text-transform: uppercase; }
   .rail-button.primary { background: var(--signal); color: white; border-color: var(--signal); margin-bottom: 14px; }
   .project-list, .recipe-list { display: grid; gap: 7px; margin-top: 10px; }
   .project-item, .recipe-item { border: 1px solid rgba(31, 29, 25, .22); background: rgba(255,255,255,.35); padding: 10px; text-align: left; }
@@ -187,12 +187,12 @@ CREATIVE_STYLES = r"""
   .generation-grid .wide { grid-column: 1 / -1; }
   .generation-grid textarea { min-height: 65px; resize: vertical; }
   .output-profile-tabs { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid rgba(244,237,223,.45); margin-bottom: 16px; }
-  .profile-tab { padding: 10px; color: #f4eddf; font: 800 10px monospace; }
+  .profile-tab { border: 0; background: transparent; padding: 10px; color: #f4eddf; font: 800 10px monospace; }
   .profile-tab.active { background: var(--acid); color: var(--ink); }
   .output-block { margin-top: 18px; }
-  .output-block header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .output-block-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .output-block h3 { margin: 0 0 7px; color: var(--acid); font: 800 10px monospace; text-transform: uppercase; }
-  .output-copy { color: #f4eddf; border-bottom: 1px solid currentColor; font: 800 9px monospace; }
+  .output-copy { border: 0; border-bottom: 1px solid currentColor; background: transparent; padding: 3px 0; color: #f4eddf; font: 800 9px monospace; cursor: pointer; }
   .output-text { min-height: 128px; max-height: 260px; overflow: auto; white-space: pre-wrap; margin: 0; padding: 12px; border: 1px solid rgba(244,237,223,.28); color: #f4eddf; background: rgba(255,255,255,.04); font: 12px/1.65 monospace; }
   .output-negative { min-height: 88px; color: #dbbfad; }
   .warning-list { margin: 14px 0 0; padding: 0; list-style: none; }
@@ -258,7 +258,7 @@ CREATIVE_STYLES = r"""
   .workflow-lora-result > span:last-child { color: var(--acid); font: 900 8px monospace; }
   .workflow-lora-result .workflow-civitai-link { display: inline-block; margin-top: 4px; border-top: 0; border-bottom: 1px solid currentColor; padding: 0; text-align: left; }
   .workflow-lora-add { border: 1px solid rgba(244,237,223,.38); background: transparent; color: var(--acid); padding: 7px; font: 900 8px monospace; }
-  .workflow-task-link { margin-top: 8px; color: var(--acid); border-bottom: 1px solid currentColor; font: 800 8px monospace; }
+  .workflow-task-link { margin-top: 8px; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--acid); font: 800 8px monospace; cursor: pointer; }
   .output-actions { display: grid; gap: 8px; margin-top: 22px; }
   .output-actions .creative-action { color: #f4eddf; }
   .output-actions .creative-action.primary { background: var(--acid); color: var(--ink); border-color: var(--acid); }

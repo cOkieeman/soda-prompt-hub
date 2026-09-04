@@ -129,8 +129,8 @@ CREATIVE_HTML = r"""
     <aside class="output-rail">
       <p class="section-label" style="color:#b9ae9f">两种提示词结果</p>
       <div class="output-profile-tabs"><button class="profile-tab active" data-profile="anima">ANIMA</button><button class="profile-tab" data-profile="krea2">KREA 2</button></div>
-      <div class="output-block"><header><h3>正向提示词</h3><button class="output-copy" data-copy-output="positive">复制</button></header><pre class="output-text" id="creativePositive">先填写一部分画面内容。</pre></div>
-      <div class="output-block"><header><h3>不希望出现</h3><button class="output-copy" data-copy-output="negative">复制</button></header><pre class="output-text output-negative" id="creativeNegative"></pre></div>
+      <div class="output-block"><div class="output-block-head"><h3>正向提示词</h3><button class="output-copy" data-copy-output="positive">复制</button></div><pre class="output-text" id="creativePositive">先填写一部分画面内容。</pre></div>
+      <div class="output-block"><div class="output-block-head"><h3>不希望出现</h3><button class="output-copy" data-copy-output="negative">复制</button></div><pre class="output-text output-negative" id="creativeNegative"></pre></div>
       <ul class="warning-list" id="creativeWarnings"></ul>
       <section class="workflow-dispatch">
         <div class="workflow-dispatch-head"><strong>5060 Ti / 生成工作流</strong><span>ComfyUI</span></div>
