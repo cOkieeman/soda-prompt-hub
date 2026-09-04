@@ -18,14 +18,29 @@ CREATIVE_HTML = r"""
         <p class="lm-status" id="sourcingRailStatus">还没有查找参考</p>
       </section>
       <section class="rail-section">
-        <p class="section-label">让本地模型帮忙</p>
-        <p class="lm-status" id="lmStatus">正在检查 LM Studio…</p>
+        <p class="section-label">让模型帮忙</p>
+        <p class="lm-status" id="lmStatus">正在检查 LM Studio 和外部模型…</p>
         <select class="assist-select" id="lmModel"></select>
-        <button class="rail-button" id="assistCreative" style="margin-top:7px">用本地模型补全空白项</button>
+        <button class="rail-button" id="assistCreative" style="margin-top:7px">用所选模型补全空白项</button>
         <div class="assist-proposal" id="assistProposal" hidden>
           <strong>建议预览（尚未写入）</strong><pre id="assistPreview"></pre>
           <div class="assist-proposal-actions"><button class="rail-button primary" id="applyAssist">确认应用</button><button class="rail-button" id="cancelAssist">取消</button></div>
         </div>
+        <details class="external-model-settings" id="externalModelSettings">
+          <summary>连接外部模型（可选）</summary>
+          <p>本机 LM Studio 仍是默认选择。这里只接入 OpenAI-compatible API，密钥保存在个人文件夹，不会显示在网页响应里。</p>
+          <label>服务名称<input id="externalModelLabel" name="external-model-label" maxlength="160" autocomplete="off" placeholder="例如：OpenRouter"></label>
+          <label>Base URL<input id="externalModelBaseUrl" name="external-model-base-url" maxlength="2048" inputmode="url" autocomplete="url" autocapitalize="none" spellcheck="false" placeholder="https://服务地址/v1"></label>
+          <label>API Key<input id="externalModelApiKey" name="external-model-api-key" type="password" maxlength="12000" autocomplete="new-password" autocapitalize="none" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="只在保存时提交到本机"></label>
+          <button class="external-model-button" id="discoverExternalModels" type="button">读取可用模型</button>
+          <div class="external-model-candidates" id="externalModelCandidates"></div>
+          <label>模型名称<input id="externalModelName" maxlength="300" placeholder="可从上方选择，也可以手工填写"></label>
+          <label class="external-model-check"><input id="externalModelVision" type="checkbox"><span>这个模型可以看图</span></label>
+          <button class="external-model-button primary" id="saveExternalModel" type="button">保存这个模型</button>
+          <button class="external-model-button" id="cancelExternalModelEdit" type="button" hidden>取消编辑</button>
+          <p class="external-model-status" id="externalModelStatus">尚未连接外部模型</p>
+          <div class="external-model-list" id="externalModelList"></div>
+        </details>
       </section>
       <section class="rail-section">
         <p class="section-label">已保存配方</p>
@@ -71,11 +86,11 @@ CREATIVE_HTML = r"""
         <div class="creative-subsection-head"><h2>检查生成结果</h2><span>导入的图片只保存在本机</span></div>
         <div class="result-review-tools">
           <label>选择结果图<input id="resultImageFile" type="file" accept="image/png,image/jpeg,image/webp"></label>
-          <label>用于看图的本地模型<select id="visionModel"></select></label>
+          <label>用于看图的模型<select id="visionModel"></select></label>
           <button id="uploadResultImage">导入结果图</button>
         </div>
         <p class="result-review-status" id="resultReviewStatus">导入 PNG、JPEG 或 WebP 后，可选择一张进行反推与问题诊断。</p>
-        <p class="result-review-status" id="resultModelHint">正在读取 LM Studio 的视觉模型状态…</p>
+        <p class="result-review-status" id="resultModelHint">正在读取可用的视觉模型…</p>
         <div class="result-gallery" id="resultGallery"></div>
         <div class="wd14-toolbar">
           <div><strong>WD14 · 生成 Anima 标签草稿</strong><p>只处理已经选中的图片。自动结果需要人工检查，一次最多处理 24 张。</p></div>
@@ -89,7 +104,7 @@ CREATIVE_HTML = r"""
           <button id="exportDataset" disabled>导出精选数据集 ZIP</button>
         </div>
         <section class="review-proposal" id="reviewProposal" hidden>
-          <div class="review-proposal-head"><h3>本地视觉分析</h3><span id="reviewModelName"></span></div>
+          <div class="review-proposal-head"><h3>视觉模型分析</h3><span id="reviewModelName"></span></div>
           <p class="review-summary" id="reviewSummary"></p>
           <div class="review-slot-grid" id="reviewSlots"></div>
           <div class="review-findings" id="reviewFindings"></div>

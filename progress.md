@@ -1,5 +1,30 @@
 # 进度日志
 
+## 2026-09-05：阶段 41 外部模型 API 补充层（开始）
+
+- 用户确认由我们接手修改 PR #2 的方向；不直接合并对方分支。
+- 已完成根因审查和主分支对照：当前 `main` 干净，146/146 测试、coverage 80.74%、Ruff format/lint、ty 全部通过。
+- 已确定实施边界：保留 LM Studio 与现有所有交互；外部 API 为可选补充；密钥不返回前端、不写仓库；首版只支持 OpenAI-compatible。
+- 当前进入现有配置、API、模型调用和前端模式审计；未修改产品代码，未 commit、未 push、未创建 PR。
+- 首次一次性更新三个规划文件时因误判 `progress.md` 标题为英文而未应用；已核对实际标题后改用正确锚点，没有产生部分写入。
+- 已完成现有配置、API、模型调用、Krea 2 后台任务和绘图页事件流审计；确认采用独立 store/router + 显式依赖注入，不改动现有项目、数据集或 Windows 任务协议。
+- 已先增加 11 项后端回归；首次运行按预期因 `model_connections` 尚不存在而在收集阶段失败，证明测试能捕获缺失实现。
+- 新增私有模型连接 store、独立 API router 和 OpenAI-compatible 请求适配；配置固定写入个人库 `private/model-connections.json` 并设为 `0600`，公开响应不含密钥。
+- 模型发现改由后端执行；外部文本与视觉请求已使用真实 `model_name` 和服务密钥，现有 LM Studio 调用保持原协议。11 项定向测试已通过。
+- 恢复工作后定向 Ruff 复现 `_NoRedirect.redirect_request()` 的 6 个参数缺少类型；按标准库覆写签名补齐后，又触发 `HTTPMessage` 仅用于类型检查的单项规则，移入 `TYPE_CHECKING` 后解决。
+- 当前定向门为 Ruff、ty 与 12/12 测试通过；继续审计外部请求重定向、失效连接、前端编辑能力和完整回归，不提前标记阶段完成。
+- 安全审计补出两项失败回归：外部推理默认跟随重定向、已删除连接会退化为 LM Studio 模型名。实现后外部请求禁止重定向并限制响应为 4 MiB，失效连接会直接提示重新选择；本地 LM Studio 行为保持不变。
+- 页面补齐已有连接的“编辑 / 取消编辑”，编辑时 API Key 留空会保留原密钥；新增、修改、删除都复用同一连接列表和模型选择器。相关 Ruff、ty 与 13/13 定向测试通过。
+- 首次完整 pytest 为 158 passed / 1 failed；失败根因是 `create_app()` 给所有 Krea 2 模型强制注入新包装器，绕过了既有本地 captioner 扩展点。现已收窄为只有保留的外部连接 ID 走新适配，本地模型继续使用原入口；原失败用例与外部模型 13 项组合回归通过。
+- 修正后完整工程门通过：159/159 pytest、80.13% coverage、104 文件 Ruff format、Ruff lint、ty、`uv lock --check` 与 `git diff --check` 全部正常。
+- 首次页面 JavaScript 提取检查因 raw string 在 `<script>` 前带换行而把 HTML 标签交给 Node，属于验收命令提取错误；同时确认 8765 当前未运行，后续用正则剥离标签后重试并启动本轮代码。
+- 正则剥离后 8 段整页 JavaScript 全部通过 Node 语法检查；本轮服务已在 `127.0.0.1:8765` 启动。
+- 真实 Edge 页面首次发现密码管理器把外部模型表单误判成登录框并自动填充，未提交、未保存。已将 Base URL 标记为 URL、API Key 标记为 `new-password` 并增加常见密码管理器忽略标记；重启后复核三个输入均为空。
+- 浏览器桌面 1462px 和窄屏 684px 均无横向溢出；折叠区可展开，API Key 为 password 字段，窄屏完整显示读取、模型名、视觉标记和保存入口，console 0 warning/error。测试后已恢复桌面视口并折叠设置区。
+- 正式服务健康检查与 doctor 7/7 通过；当前未保存外部连接，公开 `/api/model-connections`、`/api/models` 均不含 `api_key` 字段，正式个人库未因验收创建假配置。
+- README 与 Mac 操作手册已补充外部模型的使用顺序、图片外发提示、协议范围和密钥位置。
+- 最终修改后工程门再次通过：159/159 pytest、80.13% coverage、104 文件 Ruff format、Ruff lint、ty、锁文件、8 段整页 JavaScript、doctor 7/7 与 `git diff --check` 全部正常。阶段 41 标记 complete；服务保留运行，未 commit、未 push、未创建 PR。
+
 ## 2026-09-03：ComfyUI LoRA Manager 真实适配
 
 - 用户已打开 5060 Ti；只读网络探测确认 `192.168.1.10:445` 与 `:8188` TCP 可达。

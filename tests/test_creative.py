@@ -17,6 +17,7 @@ from prompt_hub.creative import (
     next_iteration_values,
 )
 from prompt_hub.local_model import LocalModelError, organize_slots
+from prompt_hub.web import INDEX_HTML
 
 
 def sample_project() -> dict:
@@ -311,3 +312,24 @@ def test_local_models_unavailable_is_graceful(settings, monkeypatch) -> None:
             json={"brief": "test", "model": "missing", "target_profile": "anima"},
         )
         assert response.status_code == 503
+
+
+def test_external_model_ui_keeps_existing_creative_actions() -> None:
+    for marker in (
+        'id="externalModelSettings"',
+        'id="externalModelBaseUrl"',
+        'id="externalModelApiKey"',
+        'autocomplete="new-password"',
+        'id="discoverExternalModels"',
+        'id="saveExternalModel"',
+        'id="cancelExternalModelEdit"',
+        "function editExternalModel",
+        "data-edit-external-model",
+        "function runCreativeSourcing",
+        "function uploadResultImage",
+        "function exportDataset",
+        "function analyzeResultAsset",
+        "$('#newCreativeProject').addEventListener",
+        "$('#sendWorkflow').addEventListener",
+    ):
+        assert marker in INDEX_HTML
