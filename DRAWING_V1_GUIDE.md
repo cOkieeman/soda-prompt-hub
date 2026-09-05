@@ -1,4 +1,4 @@
-# Soda Prompt Hub 绘图 V1 使用顺序
+# Soda Prompt Hub 绘图使用顺序
 
 ## 最短流程
 
@@ -55,7 +55,7 @@
 3. 把文件复制到 Windows 后，在对应 ComfyUI 工作流中粘贴 `outputs.anima.positive/negative` 或 `outputs.krea2.positive/negative`。
 4. 结果图路径、共享目录地址或链接可逐行记回“实测记录”，再保存为配方。
 
-当前 V1 完成的是标准生成包与手动交付。局域网自动发送到两台 Windows、启动指定 ComfyUI workflow 和结果图自动回传，需要先确定每台 Windows 的固定地址、共享目录或 SSH/代理方式，后续单独接入。
+当前流程完成了标准生成包与手动交付。跨设备自动发送、启动指定 ComfyUI workflow 和结果图自动回传通过 5060 Ti 共享目录与 Worker 完成。
 
 ## 结果图复盘与下一轮改进
 
@@ -86,7 +86,7 @@
 7. 点“导出精选数据集 ZIP”。包内 `dataset` 文件夹包含原图和同名 `.txt`，可直接复制到 Windows 继续筛选或训练；`manifest.json` 记录项目版本、分级、图片来源和 caption 来源。
 8. 导出文件同时保存在 `$HOME/Documents/Codex/soda-person/prompt-library/exports/datasets`。移出精选不会删除原图，导出也不会重新编码图片。
 
-当前版本仍不做自动挑图或 SSH 传输：WD14 只生成可审核草稿，入选图片和最终 caption 仍由你确认，完成后再手动把 ZIP 复制到 9800X3D 训练机。
+当前流程仍不做自动挑图或 SSH 传输：WD14 只生成可审核草稿，入选图片和最终 caption 仍由你确认；完成后可以在数据集工作台复制交付版本，也可以手动处理 ZIP。
 
 ## 数据位置与备份
 

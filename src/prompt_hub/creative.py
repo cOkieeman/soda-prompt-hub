@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from prompt_hub.schema_migrations import record_schema_migration
+
 SLOT_ORDER = (
     "character",
     "outfit",
@@ -101,6 +103,12 @@ class CreativeStore:
     def initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(CREATIVE_SCHEMA)
+            record_schema_migration(
+                connection,
+                "creative_store",
+                1,
+                "Creative projects and recipes baseline",
+            )
             columns = {
                 str(row["name"])
                 for row in connection.execute("PRAGMA table_info(creative_projects)").fetchall()
@@ -110,6 +118,12 @@ class CreativeStore:
                     "ALTER TABLE creative_projects "
                     "ADD COLUMN lineage_json TEXT NOT NULL DEFAULT '{}'"
                 )
+            record_schema_migration(
+                connection,
+                "creative_store",
+                2,
+                "Creative project lineage",
+            )
             connection.commit()
 
     def create_project(self, values: Mapping[str, Any] | None = None) -> dict[str, Any]:

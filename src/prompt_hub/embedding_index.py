@@ -14,6 +14,8 @@ from typing import Any
 
 import numpy as np
 
+from prompt_hub.schema_migrations import record_schema_migration
+
 MAX_EMBEDDING_DIMENSION = 8192
 MAX_IMPORT_ITEMS = 100000
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -65,6 +67,12 @@ class EmbeddingIndexStore:
                 CREATE INDEX IF NOT EXISTS embeddings_type_idx
                     ON embeddings(index_id, asset_type);
                 """
+            )
+            record_schema_migration(
+                connection,
+                "embedding_index",
+                1,
+                "Versioned image embedding indexes and vectors baseline",
             )
 
     def list_indexes(self) -> list[dict[str, Any]]:

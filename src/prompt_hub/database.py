@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from prompt_hub.oc_manager import OCImportBundle, character_search_text, lore_search_text
+from prompt_hub.schema_migrations import record_schema_migration
 
 SCHEMA = """
 PRAGMA journal_mode = WAL;
@@ -230,6 +231,12 @@ class PromptDatabase:
     def initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            record_schema_migration(
+                connection,
+                "prompt_database",
+                1,
+                "Prompt sources, entries, marks, OC imports, and FTS baseline",
+            )
             connection.commit()
 
     def upsert_source(

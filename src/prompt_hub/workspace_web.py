@@ -8,11 +8,17 @@ WORKSPACE_HTML = r"""
   </header>
   <div class="dataset-layout">
     <aside class="dataset-sidebar">
+      <section class="dataset-continue" id="datasetContinue" hidden>
+        <span>继续上次整理</span>
+        <strong id="datasetContinueName">—</strong>
+        <p id="datasetContinueStatus">正在读取工作区状态</p>
+        <button class="dataset-primary" id="datasetContinueButton" type="button">继续整理</button>
+      </section>
       <form id="datasetImportForm">
-        <span class="dataset-step-kicker">01 · 导入素材</span>
+        <span class="dataset-step-kicker" id="datasetImportKicker">01 · 导入素材</span>
         <label>数据集文件夹路径<input id="datasetSourcePath" required placeholder="/Users/your-name/Pictures/my-dataset"></label>
         <label>显示名称（可选）<input id="datasetName" maxlength="160" placeholder="角色名 / 项目名"></label>
-        <button class="dataset-primary" type="submit">读取文件夹并开始检查</button>
+        <button class="dataset-primary" id="datasetImportSubmit" type="submit">读取文件夹并开始检查</button>
         <p class="dataset-hint">只读取并建立 Mac 工作区，不会移动、改名或覆盖文件夹中的任何内容。</p>
       </form>
       <div class="dataset-sidebar-head"><strong>最近工作区</strong><span id="datasetWorkspaceCount">0</span></div>
@@ -156,6 +162,12 @@ WORKSPACE_STYLES = r"""
   .dataset-mode-switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .dataset-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); min-height: 720px; }
   .dataset-sidebar { padding: 20px; border-right: 1px solid var(--line); background: #ddd5c5; }
+  .dataset-continue { display: grid; gap: 8px; margin-bottom: 18px; padding: 14px; border: 1px solid var(--ink); background: var(--acid); box-shadow: 5px 5px 0 rgba(31,29,25,.16); }
+  .dataset-continue[hidden] { display: none; }
+  .dataset-continue > span { color: #55564f; font: 900 8px/1 monospace; letter-spacing: .08em; }
+  .dataset-continue > strong { overflow: hidden; font: 700 21px/1.1 "Iowan Old Style", serif; text-overflow: ellipsis; white-space: nowrap; }
+  .dataset-continue > p { margin: 0; color: #55564f; font: 9px/1.45 monospace; }
+  .dataset-continue .dataset-primary { background: var(--ink); border-color: var(--ink); color: var(--paper); text-align: center; }
   .dataset-sidebar form { display: grid; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
   .dataset-step-kicker { color: var(--signal); font: 900 9px/1 monospace; letter-spacing: .08em; }
   .dataset-sidebar label, .dataset-toolbar label, .dataset-dialog-body label { display: grid; gap: 6px; color: var(--muted); font: 800 9px monospace; text-transform: uppercase; letter-spacing: .06em; }
@@ -327,7 +339,7 @@ WORKSPACE_SCRIPT = r"""
   async function api(url, options={}) { const response = await fetch(url, options); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.detail || `请求失败：${response.status}`); return data; }
   const jsonOptions = body => ({method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
   function duplicateSets() { const exact = new Set(), near = new Set(); (state.report?.exact_duplicates || []).forEach(group => group.files.forEach(path => exact.add(path))); (state.report?.near_duplicates || []).forEach(group => group.files.forEach(path => near.add(path))); return {exact, near}; }
-  function renderWorkspaces() { $('#datasetWorkspaceCount').textContent = state.workspaces.length; $('#datasetWorkspaceList').innerHTML = state.workspaces.length ? state.workspaces.map(item => `<button class="dataset-workspace-item ${state.active?.workspace_id === item.workspace_id ? 'active' : ''}" data-workspace-id="${escapeHtml(item.workspace_id)}"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(workspaceStatusLabels[item.status] || '状态待确认')} · ${formatNumber(item.summary?.image_count || 0)} 张</span><span>${escapeHtml(item.source_path)}</span></button>`).join('') : '<p class="dataset-hint">还没有读取过数据集。</p>'; }
+  function renderWorkspaces() { const latest=state.active || state.workspaces[0] || null, hasWorkspaces=Boolean(latest), status=latest?`${workspaceStatusLabels[latest.status] || '状态待确认'} · ${formatNumber(latest.summary?.image_count || 0)} 张图片`:''; $('#datasetWorkspaceCount').textContent = state.workspaces.length; $('#datasetWorkspaceList').innerHTML = state.workspaces.length ? state.workspaces.map(item => `<button class="dataset-workspace-item ${state.active?.workspace_id === item.workspace_id ? 'active' : ''}" data-workspace-id="${escapeHtml(item.workspace_id)}"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(workspaceStatusLabels[item.status] || '状态待确认')} · ${formatNumber(item.summary?.image_count || 0)} 张</span><span>${escapeHtml(item.source_path)}</span></button>`).join('') : '<p class="dataset-hint">还没有读取过数据集。</p>'; $('#datasetContinue').hidden=!hasWorkspaces; $('#datasetContinueName').textContent=latest?.name || '—'; $('#datasetContinueStatus').textContent=status; $('#datasetImportKicker').textContent=hasWorkspaces?'导入另一个文件夹':'01 · 导入素材'; $('#datasetImportSubmit').textContent=hasWorkspaces?'读取新的文件夹':'读取文件夹并开始检查'; }
   function renderDatasetOrigin() { const origin=state.active?.origin||{}, container=$('#datasetOrigin'); if(origin.kind!=='creative_project'||!origin.project_id) { container.innerHTML='<span class="independent">外部独立数据集 · 不要求绑定创作项目</span>'; return; } const assets=Array.isArray(origin.result_asset_ids)?origin.result_asset_ids:[]; container.innerHTML=`<span>来源：${escapeHtml(origin.project_title||'创作项目')} · V${Number(origin.project_iteration)||1} · ${assets.length} 张结果图</span><button type="button" data-origin-project="${escapeHtml(origin.project_id)}">返回来源项目</button>${assets.slice(0,3).map((id,index)=>`<a href="/result-media/${encodeURIComponent(origin.project_id)}/original/${encodeURIComponent(id)}" target="_blank" rel="noreferrer">来源图 ${index+1}</a>`).join('')}`; }
   function stat(value, label) { return `<div class="dataset-stat"><strong>${formatNumber(value)}</strong><span>${label}</span></div>`; }
   function formatDatasetBytes(value) { const bytes=Number(value)||0; if(bytes>=1073741824) return `${(bytes/1073741824).toFixed(1)} GiB`; if(bytes>=1048576) return `${(bytes/1048576).toFixed(1)} MiB`; if(bytes>=1024) return `${(bytes/1024).toFixed(1)} KiB`; return `${bytes} B`; }
@@ -382,10 +394,12 @@ WORKSPACE_SCRIPT = r"""
   function setDatasetMode(mode) { state.mode=mode==='advanced'?'advanced':'simple'; try { localStorage.setItem('soda-dataset-mode',state.mode); } catch(error) { console.debug(error); } renderJourney(); }
   function setDatasetStep(step,{preset=false,scroll=true}={}) { state.step=Math.min(5,Math.max(1,Number(step)||1)); const d=deliveryState(); if(preset&&state.step===2) { $('#datasetValidity').value=d.invalidOpen.length?'invalid':'all'; $('#datasetDuplicateFilter').value=!d.invalidOpen.length&&d.exactBlockingGroups.length?'exact':'all'; $('#datasetReviewFilter').value='all'; renderGrid(true); } else if(preset&&state.step===4) { $('#datasetValidity').value='valid'; $('#datasetDuplicateFilter').value='all'; $('#datasetReviewFilter').value=d.pending.length?'pending':d.needsReview.length?'needs_review':'all'; renderGrid(true); } else renderJourney(); if(state.step===5) runPreflight().catch(error=>{$('#datasetPreflightSummary').textContent=error.message;}); if(scroll) { const target=state.step===1?$('#datasetImportForm'):state.step===3?document.querySelector('[data-dataset-stage-panel="3"]'):state.step===5?$('#datasetDeliveryPanel'):document.querySelector('[data-dataset-stage-panel="2,4"]'); target?.scrollIntoView({behavior:'smooth',block:'start'}); if(state.step===1) $('#datasetSourcePath').focus(); } }
   function runDatasetNextAction() { const d=deliveryState(), step=state.step || d.recommended; if(step===1) return setDatasetStep(1,{scroll:true}); if(step===2&&d.invalidOpen.length+d.exactBlockingGroups.length===0) return setDatasetStep(3); if(step===3&&!d.missing.length) return setDatasetStep(4,{preset:true}); if(step===4&&!d.captionDraft.length&&!d.pending.length&&!d.needsReview.length&&d.deliverable.length) return setDatasetStep(5); if(step===5&&!d.deliverable.length) return setDatasetStep(4,{preset:true}); setDatasetStep(step,{preset:true}); }
+  async function continueWorkspace() { const id=state.active?.workspace_id || state.workspaces[0]?.workspace_id; if(!id) return; if(state.active?.workspace_id!==id) await selectWorkspace(id); const step=deliveryState().recommended; setDatasetStep(step,{preset:true,scroll:true}); }
   async function ensureWorkspace() { try { state.mode=localStorage.getItem('soda-dataset-mode')==='advanced'?'advanced':'simple'; } catch(error) { console.debug(error); } await Promise.all([loadModels(),loadTagCatalog(),loadWorkspaces()]); if (state.active) { const running=await refreshJobs(); if (running) startPolling(); } renderJourney(); }
   async function openDatasetWorkspace(workspaceId,step=0) { await loadWorkspaces(workspaceId); if(step) setDatasetStep(step,{preset:true,scroll:true}); const running=await refreshJobs(); if(running) startPolling(); }
   window.openDatasetWorkspace=openDatasetWorkspace;
   $('#datasetImportForm').addEventListener('submit',importWorkspace);
+  $('#datasetContinueButton').addEventListener('click',()=>continueWorkspace().catch(error=>alert(error.message)));
   $('#datasetModeSimple').addEventListener('click',()=>setDatasetMode('simple'));
   $('#datasetModeAdvanced').addEventListener('click',()=>setDatasetMode('advanced'));
   $('#datasetJourney').addEventListener('click',event=>{ const button=event.target.closest('[data-dataset-step]'); if(button) setDatasetStep(button.dataset.datasetStep,{preset:true}); });

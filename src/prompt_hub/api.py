@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
+from prompt_hub import __version__
 from prompt_hub.background_jobs import BackgroundJobRunner, BackgroundJobStore
 from prompt_hub.comfy_results import ComfyResultStore
 from prompt_hub.comfy_routes import create_comfy_router
@@ -241,8 +242,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application = FastAPI(
         title="Soda Prompt Hub",
-        version="0.1.3",
-        description="Local-first prompt, style, tag, and workflow archive.",
+        version=__version__,
+        description="Local-first prompt, style, tag, dataset, and workflow hub.",
         lifespan=lifespan,
     )
     application.include_router(create_dataset_router(active_settings, creative_store))
