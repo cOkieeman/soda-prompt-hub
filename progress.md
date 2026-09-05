@@ -1147,3 +1147,6 @@
 - 2026-09-05：用户明确授权提交并发布个人版 1.0；阶段 42 进入 `publishing`，发布范围包括 commit、push、PR、合并、`v1.0.0` tag 与 GitHub Release。发布前继续执行敏感信息、文件范围和大文件检查。
 - 提交前敏感信息与大文件扫描通过；`task-...` 历史任务 ID 被宽泛的 `sk-` 规则误报，人工确认不是密钥。精确暂存 16 个版本、文档、CI、测试与许可证文件，没有个人数据库、模型、图片或连接凭据。
 - 已创建提交 `9447661` 并推送分支 `codex/release-v1.0-hardening`；发布 PR #4 的首次 GitHub Actions quality job 全部通过（run `33936005792`，耗时约 1 分 26 秒）。
+- 发布记录提交 `47b54e1` 推送后，PR #4 的最终 CI run `33936141873` 通过；PR 随后合并为 `49a93de`。
+- 已在 merge commit `49a93de` 创建并推送 `v1.0.0`，GitHub Release 正式公开。仓库为 Public、默认分支为 `main`，GitHub 正确识别 MIT License；合并后的 `main` CI run `33936233534` 也全部通过。
+- 阶段 42 标记 complete。此后的功能优化进入新的开发阶段，不回写或移动已发布的 `v1.0.0` tag。

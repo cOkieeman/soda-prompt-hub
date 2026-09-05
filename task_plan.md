@@ -6,11 +6,11 @@
 
 ## 当前阶段
 
-阶段 42 发布中：在功能冻结的基础上整理个人版 1.0 发布基线，统一版本、产品名称、公开说明、验收结论和自动检查；不增加绘图或训练功能。
+阶段 42 已完成：个人版 1.0 已发布，版本、产品名称、公开说明、验收结论和自动检查已经统一；本阶段没有增加绘图或训练功能。
 
 本轮完成边界：Mac 必须能独立管理事实数据、审核草稿、检索资料、备份恢复并诊断；没有真实 CLIP/SigLIP embedding 时不得生成伪视觉结果。阶段 17/18 只保留 Mac 端真实数据集冻结与交付包验收门。
 
-本轮状态：**阶段 34–41 complete / 阶段 42 publishing**；本轮不连接或投递 5060 Ti，用户已明确授权 commit、push、创建 PR、合并、tag 与 Release。
+本轮状态：**阶段 34–42 complete**；本轮没有连接或投递 5060 Ti，`v1.0.0` 已公开发布。
 
 ## 各阶段
 
@@ -24,8 +24,9 @@
 - [x] 由用户选择开源许可证（MIT）
 - [x] 用户明确确认 commit、push、创建 PR、合并、tag 与 Release
 - [x] 创建发布 PR #4，并通过首次远端 GitHub Actions quality 检查
-- [ ] 合并 PR，并创建 `v1.0.0` tag 与 GitHub Release
-- **状态：** ready_to_merge / 发布 PR 已通过检查，等待合并与正式 Release
+- [x] 合并 PR #4，并创建 `v1.0.0` tag 与 GitHub Release
+- [x] 核对公开仓库、MIT License、默认分支、tag 指向与合并后 `main` CI
+- **状态：** complete / Soda Prompt Hub 个人版 1.0 已正式发布
 
 ### 阶段 41：安全的外部模型 API 补充层
 - [x] 在最新 `main` 上建立模型配置与调用边界，保留 LM Studio 自动发现和现有槽位选择

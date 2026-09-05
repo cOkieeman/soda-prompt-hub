@@ -1,8 +1,8 @@
-# Soda Prompt Hub 个人版 1.0 候选验收报告
+# Soda Prompt Hub 个人版 1.0 发布验收报告
 
 更新日期：2026-09-05
 
-候选版本：`1.0.0`
+发布版本：`1.0.0`
 
 范围：Mac 本地中枢、LM Studio/外部模型辅助、5060 Ti ComfyUI 出图、结果回流、资料与视觉检索、
 LoRA/底模只读清单，以及数据集冻结交付。
@@ -60,11 +60,12 @@ Prompt Hub 备份包含数据库、embedding 索引、创作项目、个人资�
 
 外部原始图片和 `.txt` 仍需用户单独备份；“工作区已备份”不代表外部源目录已经复制。
 
-## 发布前剩余动作
+## 发布结果
 
-1. 合并已通过远端 CI 的发布 PR #4；
-2. 在合并后的 `main` 创建 `v1.0.0` tag 和 GitHub Release；
-3. 核对仓库首页、MIT License、Release 与默认分支状态。
+- 发布 PR #4 已合并，merge commit 为 `49a93de`；
+- `v1.0.0` tag 与 GitHub Release 已公开发布；
+- 仓库为 Public，默认分支为 `main`，GitHub 已识别 MIT License；
+- 合并后的 `main` CI run `33936233534` 全部通过。
 
 ## 后续优化但不阻塞发布
 
