@@ -3,9 +3,73 @@ from __future__ import annotations
 import csv
 
 import numpy as np
+import pytest
 from PIL import Image
 
-from prompt_hub.wd14 import _load_labels, _prepare_image, _providers, _ranked
+from prompt_hub.wd14 import (
+    WD14Error,
+    WD14Tagger,
+    _load_labels,
+    _prepare_image,
+    _providers,
+    _ranked,
+)
+
+
+@pytest.mark.parametrize(
+    ("general_threshold", "character_threshold"),
+    [(-0.01, 0.85), (1.01, 0.85), (0.35, -0.01), (0.35, 1.01)],
+)
+def test_wd14_rejects_thresholds_outside_probability_range(
+    tmp_path,
+    general_threshold: float,
+    character_threshold: float,
+) -> None:
+    with pytest.raises(WD14Error, match="标签阈值必须在 0 到 1 之间"):
+        WD14Tagger(
+            model_root=tmp_path,
+            general_threshold=general_threshold,
+            character_threshold=character_threshold,
+        )
+
+
+def test_wd14_reports_missing_model_files(tmp_path) -> None:
+    with pytest.raises(WD14Error, match="WD14 模型文件不完整"):
+        WD14Tagger(model_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "tag_id,name,category,count\n",
+        "tag_id,name,count\n1,solo,1\n",
+        "tag_id,name,category,count\n1,solo,not-a-number,1\n",
+    ],
+)
+def test_wd14_reports_empty_or_invalid_label_tables(tmp_path, contents: str) -> None:
+    labels_path = tmp_path / "selected_tags.csv"
+    labels_path.write_text(contents, encoding="utf-8")
+
+    with pytest.raises(WD14Error, match="WD14 标签表"):
+        _load_labels(labels_path)
+
+
+def test_wd14_reports_unavailable_coreml_provider(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "prompt_hub.wd14.ort.get_available_providers",
+        lambda: ["CPUExecutionProvider"],
+    )
+
+    with pytest.raises(WD14Error, match="当前 ONNX Runtime 不支持 CoreML"):
+        _providers("coreml")
+
+
+def test_wd14_reports_unreadable_image(tmp_path) -> None:
+    image_path = tmp_path / "broken.png"
+    image_path.write_text("not an image", encoding="utf-8")
+
+    with pytest.raises(WD14Error, match="无法读取待打标图片"):
+        _prepare_image(image_path, 448)
 
 
 def test_wd14_preparation_pads_white_and_converts_to_bgr(tmp_path) -> None:

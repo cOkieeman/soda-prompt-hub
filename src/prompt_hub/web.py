@@ -79,6 +79,19 @@ INDEX_HTML = r"""<!doctype html>
       letter-spacing: .04em;
     }
     .app-brand span { display: block; margin-top: 5px; color: var(--acid); font: 700 8px/1 monospace; letter-spacing: .18em; text-transform: uppercase; }
+    .app-nav-toggle {
+      display: none;
+      border: 0;
+      border-left: 1px solid var(--line);
+      background: var(--acid);
+      color: var(--ink);
+      padding: 0 16px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .app-nav-toggle span, .app-nav-toggle small { display: block; }
+    .app-nav-toggle span { font: 800 10px/1.25 monospace; }
+    .app-nav-toggle small { margin-top: 5px; color: #55564f; font: 700 8px/1 monospace; }
     .app-nav-items { display: flex; align-items: stretch; overflow-x: auto; }
     .app-nav-button {
       min-width: 122px;
@@ -558,6 +571,10 @@ INDEX_HTML = r"""<!doctype html>
     .empty strong { display: block; font: 700 32px "Iowan Old Style", serif; }
     .empty span { color: var(--muted); font-size: 13px; }
     @keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (max-width: 1400px) and (min-width: 901px) {
+      .app-nav-button { min-width: 100px; padding: 0 11px; }
+      .app-brand { padding-inline: 18px; }
+    }
     @media (max-width: 900px) {
       .app-nav { display: block; }
       .app-brand { width: 100%; min-height: 58px; border-right: 0; }
@@ -571,7 +588,11 @@ INDEX_HTML = r"""<!doctype html>
     }
     @media (max-width: 620px) {
       .shell { width: min(100% - 18px, 1480px); padding-top: 9px; }
-      .app-nav-items { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .app-nav { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+      .app-brand { width: auto; min-width: 0; padding: 0 16px; border-right: 0; }
+      .app-nav-toggle { display: block; min-width: 112px; }
+      .app-nav-items { display: none; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .app-nav[data-menu-open="true"] .app-nav-items { display: grid; }
       .app-nav-button { min-height: 48px; padding: 0 12px; }
       .home-lead, .home-guide { padding: 28px 22px; }
       .home-lead h1 { font-size: 58px; }
@@ -592,9 +613,10 @@ INDEX_HTML = r"""<!doctype html>
 </head>
 <body>
   <div class="shell">
-    <nav class="app-nav" aria-label="主导航">
+    <nav class="app-nav" aria-label="主导航" data-menu-open="false">
       <button class="app-brand" data-view="home">Soda Prompt Hub<span>本地绘图与数据集</span></button>
-      <div class="app-nav-items">
+      <button class="app-nav-toggle" id="appNavToggle" type="button" aria-controls="appNavItems" aria-expanded="false"><span id="appNavCurrent">当前：首页</span><small>打开菜单</small></button>
+      <div class="app-nav-items" id="appNavItems">
         <button class="app-nav-button" data-view="creative">创作台</button>
         <button class="app-nav-button" data-view="prompts">提示词库</button>
         <button class="app-nav-button" data-view="discover">智能检索</button>
@@ -720,6 +742,15 @@ INDEX_HTML = r"""<!doctype html>
     let currentCharacters = [];
     let tagDisplayLanguage = 'zh';
     const tagLabelCache = new Map();
+    const viewLabels = {home:'首页', creative:'创作台', prompts:'提示词库', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'Windows 出图', management:'资料管理', remote:'设备连接'};
+
+    function setNavMenu(open) {
+      const nav = document.querySelector('.app-nav');
+      const toggle = $('#appNavToggle');
+      nav.dataset.menuOpen = String(Boolean(open));
+      toggle.setAttribute('aria-expanded', String(Boolean(open)));
+      toggle.querySelector('small').textContent = open ? '收起菜单' : '打开菜单';
+    }
 
     function displayCanonicalTag(tag) {
       const value = String(tag || '').trim();
@@ -935,6 +966,8 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     async function setView(view) {
+      setNavMenu(false);
+      $('#appNavCurrent').textContent = `当前：${viewLabels[view] || '首页'}`;
       const archiveMode = view === 'prompts' || view === 'characters';
       $('#homePage').hidden = view !== 'home';
       $('#creativePage').hidden = view !== 'creative';
@@ -1069,6 +1102,8 @@ INDEX_HTML = r"""<!doctype html>
     $('#safety').addEventListener('change', searchPrompts);
     $('#source').addEventListener('change', searchPrompts);
     $('#ocWorld').addEventListener('change', searchCharacters);
+    $('#appNavToggle').addEventListener('click', event => setNavMenu(event.currentTarget.getAttribute('aria-expanded') !== 'true'));
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') setNavMenu(false); });
     document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
     document.querySelectorAll('[data-start]').forEach(button => button.addEventListener('click', () => setView(button.dataset.start)));
     $('#exampleButton').addEventListener('click', openExample);

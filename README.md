@@ -40,7 +40,7 @@ uv run prompt-hub serve --host 127.0.0.1 --port 8765
 
 浏览器会打开 <http://127.0.0.1:8765>。关闭终端窗口或按 `Control-C` 即可停止。
 
-绘图 V1 的最短操作顺序见 [DRAWING_V1_GUIDE.md](DRAWING_V1_GUIDE.md)。按具体情况操作和人工验收见
+绘图创作的最短操作顺序见 [DRAWING_V1_GUIDE.md](DRAWING_V1_GUIDE.md)。按具体情况操作和人工验收见
 [MANUAL_ACCEPTANCE_GUIDE.md](MANUAL_ACCEPTANCE_GUIDE.md)；完整的 Mac 日常使用、数据集审核、
 LoRA 训练交付、Windows 回传、备份恢复和 SMB 配置顺序见 [MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)。首页点“新建或继续绘图项目”
 即可进入七槽位工作台；项目、锁定状态、参考资料、配方和实测记录都会保存在本机 SQLite。
@@ -89,7 +89,7 @@ caption，Krea 2 自然语言始终独立保存。
 - 点左栏 `☆ MY SHELF ONLY` 只看自己的收藏。
 
 收藏、评分和备注保存在 `prompt-library/database/prompt-library.sqlite`。它们使用来源与原始条目
-编号关联，执行“更新公共资料”或重建索引后仍会保留。这个数据库从 V1.2 起包含不可重建的个人
+编号关联，执行“更新公共资料”或重建索引后仍会保留。当前数据库包含不可重建的个人
 资料，需要和 `private`、`test-results`、`exports` 一起备份。
 
 ## 本地来源中心与以图找图
@@ -180,9 +180,9 @@ uv run prompt-hub tag-image /绝对路径/图片.png --limit 50
 不会创建或覆盖 `.txt`。本机实测 CoreML 无法完整执行这只 SwinV2 ONNX，所以 `auto` 默认使用
 CPU；单张 1024×1536 图片首次加载加推理约 0.7 秒。
 
-## V1.7 数据集工作台
+## 数据集工作台
 
-V1.7 后端已经能把任意本地图片目录注册为只读工作区，并在后台检查 PNG/JPEG/WebP、尺寸、
+数据集工作台能把任意本地图片目录注册为只读工作区，并在后台检查 PNG/JPEG/WebP、尺寸、
 坏图、同名 `.txt`、缺失 caption、孤立 `.txt`、SHA-256 完全重复和 pHash 近似重复。扫描会生成
 安全 WebP 缩略图与版本化 JSON 报告，保存在
 `prompt-library/datasets/workspaces`；来源目录中的图片和 `.txt` 不会被移动、改名或覆盖。
@@ -194,7 +194,7 @@ V1.7 后端已经能把任意本地图片目录注册为只读工作区，并在
 工作台每页最多渲染 200 张图片，已经用 1,000 与 10,000 张隔离目录完成扫描和页面验证；翻页不会
 改变筛选结果。“选择当前筛选结果”仍选择完整筛选集合，不会只选择当前 200 张。
 
-V1.7B 已把工作区 WD14 接入可恢复后台队列，不再受结果图区域的 24 张同步上限约束。选择图片后
+批量打标已把工作区 WD14 接入可恢复后台队列，不再受结果图区域的 24 张同步上限约束。选择图片后
 可以运行未打标/失败/多选/整个工作区队列，逐图结果和失败会持久化；同一任务重启后只继续未完成
 图片。每张图片分别保存 Anima 英文 canonical tags 与 Krea 2 英文自然语言，批量标签修改会先预览
 并生成可回退快照，中文标签只用于显示。
@@ -209,7 +209,7 @@ Anima/Krea 2 分开显示图片数、文件数、容量和时间，并可下载 
 5060 Ti `prompt-hub/datasets/数据集名/版本号`。复制采用临时目录、全目录哈希校验和原子改名；
 目标已有不同内容时停止且不覆盖。
 
-## V1.8 LoRA 项目台
+## LoRA 项目台
 
 主导航“LoRA 项目”用于在 Mac 上管理角色、服装、角色与签名服装一体、画风四类训练项目。
 每个项目都要先固定 Trigger，并分别填写固定特征、可控特征、允许变化和禁止漂移。项目可以只读
@@ -232,7 +232,7 @@ SHA-256 和审核判断，不复制或改写来源。
 `/api/compute/contract` 查看；当前 Worker 已支持 ComfyUI 生成，训练仍由 Windows
 AnimaLoraStudio 独立执行，Prompt Hub 不保存 Windows 登录凭据。
 
-## V1.9 ComfyUI 结果回流
+## ComfyUI 结果回流
 
 主导航“结果回流”负责把 ComfyUI 生成图带回 Mac。可以上传单张 PNG/JPEG/WebP，也可以只读
 扫描本地或后续 SMB 挂载的输出目录。Prompt Hub 会按 SHA-256 去重，并从图片中读取真实存在的

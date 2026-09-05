@@ -266,6 +266,11 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
         assert "data-creative-add" in page.text
 
 
+def test_openapi_reports_public_release_version(settings) -> None:
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/openapi.json").json()["info"]["version"] == "1.0.0"
+
+
 def test_page_uses_scoped_headers_and_accessible_contrast(settings) -> None:
     app = create_app(settings)
 
@@ -281,6 +286,23 @@ def test_page_uses_scoped_headers_and_accessible_contrast(settings) -> None:
     assert "--muted: #5b5a53;" in page.text
     assert "--signal: #a33822;" in page.text
     assert ".comfy-head .section-label, .comfy-head label { color: #b9ae9f; }" in page.text
+
+
+def test_page_has_mobile_menu_and_workspace_resume_entry(settings) -> None:
+    with TestClient(create_app(settings)) as client:
+        page = client.get("/")
+
+    assert page.status_code == 200
+    assert 'id="appNavToggle"' in page.text
+    assert 'aria-controls="appNavItems"' in page.text
+    assert 'id="appNavCurrent"' in page.text
+    assert '.app-nav[data-menu-open="true"] .app-nav-items' in page.text
+    assert "@media (max-width: 1400px) and (min-width: 901px)" in page.text
+    assert "setNavMenu(false);" in page.text
+    assert 'id="datasetContinue" hidden' in page.text
+    assert 'id="datasetContinueButton"' in page.text
+    assert "hasWorkspaces?'导入另一个文件夹':'01 · 导入素材'" in page.text
+    assert "deliveryState().recommended" in page.text
 
 
 def test_compute_contract(settings) -> None:

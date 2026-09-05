@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
 from prompt_hub.cli import main
 from prompt_hub.config import Settings
@@ -71,3 +72,45 @@ def test_mcp_server_lists_expected_tools(source_tree, monkeypatch) -> None:
         "search_tags",
         "search_world_lore",
     }
+
+
+def test_mcp_server_executes_every_public_tool(source_tree, monkeypatch) -> None:
+    monkeypatch.setattr("prompt_hub.importers._git_commit", lambda _path: "deadbeef")
+    database = PromptDatabase(source_tree.database_path)
+    import_all(source_tree, database)
+    server = create_mcp_server(source_tree)
+
+    calls = {
+        "search_prompts": {"query": "gothic"},
+        "search_styles": {"query": "gothic"},
+        "search_tags": {"query": "collared shirt"},
+        "search_characters": {},
+        "get_character_profile": {"character_id": "missing"},
+        "get_character_prompts": {"character_id": "missing"},
+        "search_world_lore": {},
+        "library_stats": {},
+    }
+
+    async def execute_calls() -> dict[str, dict[str, Any]]:
+        results: dict[str, dict[str, Any]] = {}
+        for name, arguments in calls.items():
+            result = await server.call_tool(name, arguments)
+            structured = getattr(result, "structured_content", None)
+            assert isinstance(structured, dict)
+            results[name] = structured
+        return results
+
+    results = asyncio.run(execute_calls())
+
+    assert results["search_prompts"]["count"] >= 1
+    assert results["search_styles"]["count"] >= 1
+    assert results["search_tags"]["count"] >= 1
+    assert results["search_characters"] == {"query": "", "count": 0, "results": []}
+    assert results["get_character_profile"] == {"found": False, "character": None}
+    assert results["get_character_prompts"] == {
+        "character_id": "missing",
+        "count": 0,
+        "prompts": [],
+    }
+    assert results["search_world_lore"] == {"query": "", "count": 0, "results": []}
+    assert results["library_stats"]["stats"]["entries"] >= 1

@@ -11,8 +11,10 @@ from PIL import Image
 from prompt_hub.api import create_app
 from prompt_hub.local_model import LocalModelError, analyze_result_image, organize_slots
 from prompt_hub.model_connections import (
+    MAX_API_KEY_CHARS,
     ModelConnectionError,
     ModelConnectionStore,
+    _parse_model_names,
     validate_model_base_url,
 )
 
@@ -62,6 +64,22 @@ def test_connection_update_preserves_secret_when_key_is_blank(settings) -> None:
     assert store.resolve(first["id"]).api_key == "secret-model-key"
 
 
+def test_connection_store_reports_damaged_private_config(settings) -> None:
+    store = ModelConnectionStore(settings)
+    store.initialize()
+    store.path.write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(ModelConnectionError, match="外部模型配置无法读取"):
+        store.list_connections()
+
+
+def test_connection_store_rejects_unknown_delete(settings) -> None:
+    store = ModelConnectionStore(settings)
+
+    with pytest.raises(ModelConnectionError, match="外部模型连接不存在"):
+        store.delete("external-0123456789abcdef")
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -100,6 +118,38 @@ def test_discovery_uses_backend_fetcher_without_storing_key(settings) -> None:
         "api_key": "temporary-key",
     }
     assert not store.path.exists()
+
+
+def test_discovery_rejects_overlong_api_key_before_request(settings) -> None:
+    called = False
+
+    def fetcher(_base_url: str, _api_key: str) -> list[str]:
+        nonlocal called
+        called = True
+        return []
+
+    store = ModelConnectionStore(settings, fetcher=fetcher)
+    with pytest.raises(ModelConnectionError, match="API Key 过长"):
+        store.discover(
+            "https://models.example.test/v1",
+            "x" * (MAX_API_KEY_CHARS + 1),
+        )
+
+    assert called is False
+
+
+def test_discovered_model_names_are_normalized_deduplicated_and_limited() -> None:
+    names = _parse_model_names(
+        [
+            {"id": "model-a"},
+            {"name": "model-a"},
+            " model-b ",
+            {"id": "", "name": "model-c"},
+            None,
+        ]
+    )
+
+    assert names == ["model-a", "model-b", "model-c"]
 
 
 def test_model_connection_api_never_returns_secret(settings, monkeypatch) -> None:

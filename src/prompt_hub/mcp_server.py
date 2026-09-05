@@ -4,6 +4,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
+from prompt_hub import __version__
 from prompt_hub.config import Settings
 from prompt_hub.database import PromptDatabase
 
@@ -20,7 +21,7 @@ def create_mcp_server(settings: Settings | None = None) -> MCPServer:
             "Search before composing image prompts. Preserve source attribution and model-family "
             "boundaries. Results may include legal adult material when explicitly requested."
         ),
-        version="0.1.3",
+        version=__version__,
     )
 
     @server.tool(description="Search all local prompt-library entries with optional filters.")

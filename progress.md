@@ -1150,3 +1150,32 @@
 - 发布记录提交 `47b54e1` 推送后，PR #4 的最终 CI run `33936141873` 通过；PR 随后合并为 `49a93de`。
 - 已在 merge commit `49a93de` 创建并推送 `v1.0.0`，GitHub Release 正式公开。仓库为 Public、默认分支为 `main`，GitHub 正确识别 MIT License；合并后的 `main` CI run `33936233534` 也全部通过。
 - 阶段 42 标记 complete。此后的功能优化进入新的开发阶段，不回写或移动已发布的 `v1.0.0` tag。
+- 2026-09-05：用户确认手机局域网模式可用，并要求继续原完整度审计中的第二层与第三层。已还原范围为“可维护性优化”和“体验微调”，明确不扩展 Windows 训练、视频或批量推理。
+- 从最新 `main` 提交 `3056a63` 建立本地分支 `codex/post-v1-maintainability-ux`；工作树起点干净。本轮未获得 commit、push 或 PR 授权。
+- 新增阶段 43/44：先审计三份大型领域模块、前端内嵌资源、数据库迁移和四个低覆盖风险模块，再小步拆分；体验层聚焦手机主导航、已有数据集工作区入口和产品称呼一致性。
+- 第一轮审计确认三个核心模块仍为 1791/1531/1518 行，主壳层 `web.py` 为 1167 行，主数据库没有统一 schema 版本。手机导航当前已是两列网格，原“横向滚动”问题已过期，阶段 44 将基于真实页面重新定义体验修复。
+- 审计命令误引用不存在的 `src/prompt_hub/dataset_web.py`，`wc` 对该单项报错；正确文件为 `workspace_web.py`，其他只读结果有效，没有修改应用。GitNexus 图工具当前不可用，改用静态调用搜索完成同等范围审计。
+- 已通过本机浏览器打开正式 8765 做改动前检查：标题、首页、9 个主入口、标签切换和真实资料统计均正常；未保存表单或改变个人数据。
+- 新增数据库 `schema_migrations` 台账和三项回归，主库按 `prompt_database`、`creative_store`、`background_jobs` 记录组件版本，embedding 库独立记录版本；旧 creative 库仍先补 `lineage_json` 再登记迁移。
+- 首轮定向验证在 lint 阶段停止：新模块的 `sqlite3` 仅用于类型却未放入 `TYPE_CHECKING`，两处普通 `ValueError` 长消息不符合项目异常规范；pytest 尚未执行。将只修规范，不改变迁移行为后重跑。
+- 第二轮 lint 证明本项目禁止在 `raise` 位置携带固定长消息，即使异常类型已自定义；再次未进入 pytest。固定错误文本改由两个无参数异常类持有，抛出点不再构造消息。
+- 数据集辅助函数首次提取后 lint 报出 15 项机械边界：主类仍直接依赖 `hashlib`、`re`、`normalize_tag_draft` 和 `_sha256`，新模块的 Path 只用于类型，三处原有异常写法受新文件 lint 约束；pytest 尚未执行。补回主类真实依赖并按现有规则调整新模块，不改变业务逻辑。
+- 修正依赖后 format、lint、ty 已通过；首次 pytest 命令误写不存在的 `tests/test_workspace_routes.py`，因此 0 项执行。实际相关文件为 `test_dataset_workspace.py`、`test_dataset_export.py`、`test_project_journey.py` 等，下一次使用真实清单运行。
+- 数据集结构拆分相关 22 项真实测试通过。四个低覆盖模块的 29 项基线测试也通过，并生成具体缺失分支清单；后续只补真实错误边界。
+- 已确认 MCP 测试可通过公开 `MCPServer.call_tool()` 直接执行工具并断言 `structured_content`，无需启动真实 stdio 服务。
+- 一次尝试同时修改版本与三组测试的整块补丁因 `src/prompt_hub/__init__.py` 预期上下文不匹配而被工具整体拒绝，没有部分写入。已读取真实文件，确认其中原有 `__version__ = "0.1.0"`；后续改为按文件、小补丁应用。
+- 随后首个版本小补丁仍把 FastAPI import 误写成单名导入，和实际的组合导入不匹配，因此再次整体拒绝且没有写入。已改用稳定的首个本地包 import 位置添加版本导入，不再匹配第三方 import 的具体形式。
+- 版本和边界测试首轮定向检查在 Ruff 停止：给既有 API 大型综合测试增加一条版本断言后达到 51 条 statements，超过 50 条上限；pytest 尚未执行。版本契约改为独立小测试，不放宽规则。
+- 独立版本测试首次插入到了原大型页面断言的中段；立即通过源码检查发现，未运行测试，也未改变产品代码。已把测试移到原函数结束后，恢复原页面断言的作用域。
+- 第二轮 format/lint 通过；对测试文件额外运行 ty 时暴露 MCP 返回类型包含 `InputRequiredResult` 的联合分支，以及既有模型测试的弱类型字典问题。正式 CI 只对 `src/` 运行 ty；新增 MCP 测试仍会显式确认 `structured_content` 为字典，避免依赖未经收窄的联合类型。
+- MCP 实际调用首轮 39 项中 38 项通过，唯一失败是测试把 wildcard `black dress` 当成 `tag` 类型查询；服务行为正确。测试改用夹具中真实的 Kisegaeningyou tag `collared shirt`，不改变生产检索逻辑。
+- 第三层首轮定向 lint 只发现新增页面测试直接写入全角冒号，触发项目的中文标点规则；pytest 尚未执行。测试改为断言稳定的元素 ID，页面中文文案不变。
+- 阶段 44 已实现手机折叠式主导航、当前页面提示、展开/收起与 Escape 状态；数据集页增加基于真实工作区列表的“继续上次整理”入口，无工作区时仍保持首次导入流程。
+- 真实桌面验收发现并修正 1280px 顶部导航内部横向滚动；最终导航宽度 1007/1007，无 console warning/error。
+- 390×844 手机正式资料库与隔离空资料库均完成页面和交互验收：无横向溢出，菜单点击后自动收起，已有/首次数据集入口分流正确，console 0 warning/error；测试未提交表单，正式资料未改变。
+- Playwright CLI 首次从仓库目录启动并生成了 4 个本轮临时快照/日志；安全策略拒绝 shell 删除后，已用精确文件补丁只移除这 4 个本轮文件，没有删除 `.playwright-cli` 中既有历史验收材料。隔离资料库位于 `/tmp`，由系统清理。
+- 完整工程门的 format、lint、ty、锁文件、180 项 pytest、80.78% coverage 与 8 段 JavaScript 语法均通过。首次 doctor 使用 `127.0.0.1:8765` 返回静态服务器 404；进程核对发现另一个工作目录的 Python http.server 后来占用了精确 loopback 地址，Prompt Hub 自身通过 `192.168.31.61:8765` 健康，不擅自停止外部进程。
+- 改用 LAN 地址后 doctor 7/7 通过，主数据库 integrity 为 `ok` 且迁移台账含 `prompt_database=1`、`creative_store=1/2`、`background_jobs=1`。随后手工查询 embedding 库时误用了不存在的 `visual-index` 路径，命令在该项停止；真实路径为 `indexes/embeddings/embeddings.sqlite`，将用正确路径重跑剩余检查。
+- 使用真实路径复核 embedding SQLite：integrity 为 `ok`，迁移台账为 `embedding_index=1`；`git diff --check` 通过。阶段 43、44 的实现、文档和自动/真实页面验收全部完成。
+- 本轮最终变更为 20 个文件：新增迁移模块、数据集辅助模块及相应测试，统一 API/MCP 版本，补三组风险边界测试，改进手机导航和数据集继续入口，并同步 README、绘图指南与开发计划。没有 commit、push 或创建 PR。
+- 2026-09-05：用户明确确认提交本轮 PR。远端 `origin/main` 与当前分支基线一致（ahead/behind 0/0）；将重新执行完整工程门和敏感信息检查后提交并创建 PR，不自动合并。

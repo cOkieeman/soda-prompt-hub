@@ -10,6 +10,8 @@ from threading import Event, Thread
 from typing import Any
 from uuid import uuid4
 
+from prompt_hub.schema_migrations import record_schema_migration
+
 JOB_SCHEMA = """
 PRAGMA foreign_keys = ON;
 
@@ -66,6 +68,12 @@ class BackgroundJobStore:
     def initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(JOB_SCHEMA)
+            record_schema_migration(
+                connection,
+                "background_jobs",
+                1,
+                "Recoverable background job queue baseline",
+            )
             connection.commit()
 
     def enqueue(
