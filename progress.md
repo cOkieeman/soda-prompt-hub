@@ -1145,3 +1145,5 @@
 - 阶段 42 本地实现已全部完成；仍未 commit、push、创建 PR、tag 或 Release，等待用户另行确认 Git 发布动作。
 - MIT License 与 Python 包元数据加入后重新执行完整验证：160/160 pytest、80.13% coverage、Ruff、ty、锁文件、diff 检查和 `1.0.0` wheel/sdist 构建均通过。
 - 2026-09-05：用户明确授权提交并发布个人版 1.0；阶段 42 进入 `publishing`，发布范围包括 commit、push、PR、合并、`v1.0.0` tag 与 GitHub Release。发布前继续执行敏感信息、文件范围和大文件检查。
+- 提交前敏感信息与大文件扫描通过；`task-...` 历史任务 ID 被宽泛的 `sk-` 规则误报，人工确认不是密钥。精确暂存 16 个版本、文档、CI、测试与许可证文件，没有个人数据库、模型、图片或连接凭据。
+- 已创建提交 `9447661` 并推送分支 `codex/release-v1.0-hardening`；发布 PR #4 的首次 GitHub Actions quality job 全部通过（run `33936005792`，耗时约 1 分 26 秒）。

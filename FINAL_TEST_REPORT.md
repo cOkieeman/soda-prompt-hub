@@ -27,11 +27,11 @@ Prompt Hub 不启动 Windows 训练，也不替代 AnimaLoraStudio 和 ComfyUI L
 | ty | `src/` 通过 |
 | 锁文件 | `uv lock --check` 通过，项目版本为 `1.0.0` |
 | Python wheel / sdist | `prompt_hub-1.0.0` 两种包均构建成功 |
-| GitHub Actions YAML | 本地语法解析通过；远端运行等待 push |
+| GitHub Actions | PR #4 的远端 quality job 已通过（format、lint、ty、pytest、build） |
 | `git diff --check` | 通过 |
 
-GitHub Actions 会在 push 到 `main` 或提交 PR 时运行同一组格式、lint、类型、测试和构建检查；当前
-工作流只存在于本地候选分支，尚未 push，因此不能把远端 CI 写成已经通过。
+GitHub Actions 会在 push 到 `main` 或提交 PR 时运行同一组格式、lint、类型、测试和构建检查。
+发布 PR #4 的首次远端运行已通过，结果见 GitHub Actions run `33936005792`。
 
 ## 浏览器验收
 
@@ -62,9 +62,9 @@ Prompt Hub 备份包含数据库、embedding 索引、创作项目、个人资�
 
 ## 发布前剩余动作
 
-1. 完成候选版全量自动检查、构建和桌面/窄屏页面验收；
-2. 经用户再次确认后 commit、push；
-3. 远端 CI 通过后再创建 `v1.0.0` tag 和 GitHub Release。
+1. 合并已通过远端 CI 的发布 PR #4；
+2. 在合并后的 `main` 创建 `v1.0.0` tag 和 GitHub Release；
+3. 核对仓库首页、MIT License、Release 与默认分支状态。
 
 ## 后续优化但不阻塞发布
 

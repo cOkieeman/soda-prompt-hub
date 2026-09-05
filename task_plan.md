@@ -23,8 +23,9 @@
 - [x] 完成全量自动测试、构建和桌面/窄屏浏览器验收
 - [x] 由用户选择开源许可证（MIT）
 - [x] 用户明确确认 commit、push、创建 PR、合并、tag 与 Release
-- [ ] 远端 CI 通过后合并 PR，并创建 `v1.0.0` tag 与 GitHub Release
-- **状态：** publishing / 本地发布收口完成，正在执行 GitHub 发布流程
+- [x] 创建发布 PR #4，并通过首次远端 GitHub Actions quality 检查
+- [ ] 合并 PR，并创建 `v1.0.0` tag 与 GitHub Release
+- **状态：** ready_to_merge / 发布 PR 已通过检查，等待合并与正式 Release
 
 ### 阶段 41：安全的外部模型 API 补充层
 - [x] 在最新 `main` 上建立模型配置与调用边界，保留 LM Studio 自动发现和现有槽位选择
