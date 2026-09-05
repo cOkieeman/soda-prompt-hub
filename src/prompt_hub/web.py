@@ -15,7 +15,8 @@ INDEX_HTML = r"""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Soda Prompt Archive</title>
+  <title>Soda Prompt Hub</title>
+  <meta name="application-name" content="Soda Prompt Hub">
   <meta name="description" content="Soda 的本地 AI 绘图提示词、视觉参考与 OC 创作中枢。">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23171815'/%3E%3Cpath d='M12 16h40v10H12zm0 22h26v10H12z' fill='%23d84b2a'/%3E%3Ccircle cx='48' cy='43' r='7' fill='%23d7e455'/%3E%3C/svg%3E">
   <style>
@@ -641,8 +642,8 @@ INDEX_HTML = r"""<!doctype html>
         </div>
       </aside>
       <div class="home-footnote">
-        <p><strong>当前可用：</strong>七槽位项目、双格式输出、资料引用、配方、OC JSON 与本地模型辅助。</p>
-        <p><strong>设备分工：</strong>Mac 整理项目并导出，Windows 的 ComfyUI 负责生成与测试。</p>
+        <p><strong>个人版 1.0：</strong>创作、资料引用、双格式输出、远程出图、结果回流与数据集交付已经形成完整闭环。</p>
+        <p><strong>设备分工：</strong>Mac 负责整理、审核与保存记录；5060 Ti 的 ComfyUI 负责生成与测试。</p>
       </div>
     </section>
 

@@ -71,7 +71,7 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
             '<section class="creative-subsection" id="creativeResultsSection">\n'
             '        <div class="creative-subsection-head"><h2>检查生成结果</h2>'
         ) in page.text
-        assert "Soda Prompt Archive" in page.text
+        assert "Soda Prompt Hub" in page.text
         assert "开始创作" in page.text
         assert "提示词库" in page.text
         assert "角色库" in page.text

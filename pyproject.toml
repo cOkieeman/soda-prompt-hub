@@ -1,8 +1,9 @@
 [project]
 name = "prompt-hub"
-version = "0.1.3"
+version = "1.0.0"
 description = "Local-first prompt, style, tag, LoRA, and workflow knowledge hub"
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "cOkieeman", email = "95237994+cOkieeman@users.noreply.github.com" }
 ]

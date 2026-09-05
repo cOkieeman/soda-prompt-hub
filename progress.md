@@ -1128,3 +1128,20 @@
 - 隔离浏览器以 1462px 复核 Windows 出图、创作台、数据集与设备连接；发现 Windows 出图卡片中的竖图按固有宽度撑开网格，补充图片容器和卡片正文的收缩约束后，1462px 与 669px 都恢复为页面宽度内显示，控制台仍为 0 warning/error。
 - 正式数据未被验收改动：设备页仍保留 18 条任务，“林悔儿”72 张图片的审核、选择和说明状态不变；未连接 Windows、未发送远程任务。
 - 阶段 40 标记 complete，等待用户按 `MANUAL_ACCEPTANCE_GUIDE.md` 人工验收。未 commit、未 push、未创建 PR。
+- 2026-09-05：开始阶段 42 个人版 1.0 发布收口。按用户确认先做第一层，不增加新功能，不操作个人数据库、模型、提示词库或 5060 Ti。
+- 已将本地 `main` 从 `d2a25fb` 快进到远端 merge commit `ca559ff`，并建立本地分支 `codex/release-v1.0-hardening`；工作树起点干净。
+- 本轮计划覆盖版本与产品名、公开 README、完成度/验收文档、CHANGELOG、GitHub Actions 和最终验证；LICENSE 等待用户选择，commit、push、PR、tag、Release 均等待另行确认。
+- 首次整块发布补丁因 README 的预期重复行与实际文件不一致而整体拒绝；确认没有部分写入后改为按产品文件、README 和文档分别应用，没有覆盖既有内容。
+- 已将软件包版本改为 `1.0.0`，浏览器标题与首页状态统一为 Soda Prompt Hub 个人版 1.0；公开 README 增加通用资料目录示例并清理固定来源数量。
+- 已新增 `CHANGELOG.md` 和最小权限 GitHub Actions；完成度审计与候选验收报告改为阶段 34–41 后的真实边界，历史阶段 17–25 的过期状态同步收口。
+- `BASELINE.md` 已明确为历史快照；开发计划增加个人版 1.0 状态说明；绘图短流程补充直接发送 5060 Ti 与离线 JSON 两种路径。
+- 候选版首次全量测试为 159 通过、1 失败；失败只来自页面测试仍断言旧标题 `Soda Prompt Archive`。根因是产品命名契约同步遗漏，已将同一测试更新为 `Soda Prompt Hub`，等待完整复验。
+- 更新标题测试后从头复验：160/160 pytest 通过，coverage 80.13%；105 个文件 Ruff format、Ruff lint、ty、`uv lock --check` 与 `git diff --check` 全部通过；`prompt_hub-1.0.0` wheel/sdist 构建成功，GitHub Actions YAML 本地解析成功。
+- 确认没有运行中的后台任务后重启正式 8765 服务。Playwright 桌面首页确认标题与“个人版 1.0”，点击“数据集”成功；390×844 窄屏 `scrollWidth=clientWidth=390`，两种视口控制台 0 warning/error。
+- 阶段 42 的实现与本地验证完成，状态改为 `ready_for_owner_decision`。仍未添加 LICENSE，未 commit、push、创建 PR、tag 或 Release。
+- 用户确认采用 MIT License；已新增标准 MIT 文本，版权持有人为 `cOkieeman`，并在 README 明确第三方提示词、图片、模型、工作流和数据集不随项目代码重新授权。
+- Python 包元数据同步声明 `license = "MIT"`，确保源码许可证与构建产物元数据一致。
+- 本轮开始时有数次工具脚本输入不完整/参数错误，均在执行任何文件或系统操作前被拒绝；随后改用最小 `pwd` 调用确认工具恢复，没有产生副作用。
+- 阶段 42 本地实现已全部完成；仍未 commit、push、创建 PR、tag 或 Release，等待用户另行确认 Git 发布动作。
+- MIT License 与 Python 包元数据加入后重新执行完整验证：160/160 pytest、80.13% coverage、Ruff、ty、锁文件、diff 检查和 `1.0.0` wheel/sdist 构建均通过。
+- 2026-09-05：用户明确授权提交并发布个人版 1.0；阶段 42 进入 `publishing`，发布范围包括 commit、push、PR、合并、`v1.0.0` tag 与 GitHub Release。发布前继续执行敏感信息、文件范围和大文件检查。
