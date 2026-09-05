@@ -1,14 +1,17 @@
 # Soda Prompt Hub
 
-本机优先的 AI 绘图提示词、风格、标签、wildcard 与视觉参照检索中枢。服务只监听
-`127.0.0.1`，资料与索引默认保存在：
+Soda Prompt Hub 个人版 1.0 是一个本机优先的 AI 绘图创作与数据集中枢。它在 Mac 上管理灵感、
+提示词、视觉参照、OC、结果和数据集，通过一台 Windows 5060 Ti 运行 ComfyUI；训练仍由用户在
+Windows 的 AnimaLoraStudio 中独立完成。
+
+项目默认只监听 `127.0.0.1`。代码仓库不包含模型权重、个人图片、数据库、API Key 或 Windows
+登录凭据。个人资料与索引默认保存在：
 
 `$HOME/Documents/Codex/soda-person/prompt-library`
 
 ## 安装与启动
 
-需要 Python 3.12+ 与 [uv](https://docs.astral.sh/uv/)。代码仓库不包含模型权重、图片数据集、
-SQLite、个人 Prompt Library、结果图或 Windows 凭据。
+需要 Python 3.12+ 与 [uv](https://docs.astral.sh/uv/)：
 
 ```bash
 git clone https://github.com/cOkieeman/soda-prompt-hub.git
@@ -17,8 +20,17 @@ uv sync
 uv run prompt-hub serve --host 127.0.0.1 --port 8765
 ```
 
-如需把个人资料放到其他位置，可设置 `PROMPT_HUB_LIBRARY_ROOT`；模型根目录可用
-`PROMPT_HUB_MODELS_ROOT` 覆盖。默认值适配 `soda-person` 文件夹结构。
+默认路径适配作者的 `soda-person` 文件夹结构。其他用户建议在首次启动前设置
+`PROMPT_HUB_LIBRARY_ROOT`；模型目录可以用 `PROMPT_HUB_MODELS_ROOT` 指定：
+
+```bash
+export PROMPT_HUB_LIBRARY_ROOT="$HOME/.local/share/soda-prompt-hub"
+export PROMPT_HUB_MODELS_ROOT="$HOME/.local/share/soda-prompt-hub-models"
+uv run prompt-hub serve --host 127.0.0.1 --port 8765
+```
+
+程序只会在指定的个人资料目录中保存运行数据。公共 Git 资料源、用户数据集和 Windows 共享目录
+仍各自保持独立，不会因为安装代码仓库而被复制进来。
 
 ## 日常使用
 
@@ -33,7 +45,7 @@ uv run prompt-hub serve --host 127.0.0.1 --port 8765
 LoRA 训练交付、Windows 回传、备份恢复和 SMB 配置顺序见 [MAC_OPERATIONS_GUIDE.md](MAC_OPERATIONS_GUIDE.md)。首页点“新建或继续绘图项目”
 即可进入七槽位工作台；项目、锁定状态、参考资料、配方和实测记录都会保存在本机 SQLite。
 
-在创作台写好中文想法后，可直接点“从本地库智能取材”。页面会先从 33,631 条本机资料中按
+在创作台写好中文想法后，可直接点“从本地库智能取材”。页面会先从 33,633 条本机资料中按
 角色、服装、动作、构图、场景、灯光、画风返回真实候选；若 LM Studio 可用，再异步扩展英文
 检索词。模型只负责帮助检索，最终卡片仍来自本地库，且只有点“加入槽位”后才会写入项目。
 
@@ -108,20 +120,13 @@ checkpoint、LoRA、seed、尺寸、Steps、CFG 与 SHA-256。重复同步不会
 新同步的图片仍然是“未审核、未选择”，必须按数据集五步人工确认。直接导入本地文件夹的旧数据集
 继续显示为“外部独立数据集”，不要求绑定任何创作项目。
 
-也可以在终端中启动：
-
-```bash
-cd "$HOME/Documents/Codex/soda-person/projects/prompt-hub"
-uv run prompt-hub serve --host 127.0.0.1 --port 8765
-```
-
 ## 更新公共资料
 
 双击：
 
 `$HOME/Documents/Codex/soda-person/更新-Prompt-资料库.command`
 
-它会按顺序更新 4 个公共资料源，然后重建本地索引与缺失缩略图。公共 Git 原始目录不要
+它会按顺序更新已配置的公共资料源，然后重建本地索引与缺失缩略图。公共 Git 原始目录不要
 手工修改；个人 prompt 请放在 `prompt-library/private`。
 
 ## 连接 OC Manager
@@ -365,3 +370,8 @@ uv run ruff check .
 uv run ty check src/
 uv run pytest
 ```
+
+## 许可证
+
+项目使用 [MIT License](LICENSE)。第三方提示词库、图片、模型、工作流和数据集仍遵循各自来源的
+许可证或使用条款，不因本项目采用 MIT 而改变。

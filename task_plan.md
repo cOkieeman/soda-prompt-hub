@@ -6,13 +6,26 @@
 
 ## 当前阶段
 
-阶段 41 已完成：已在最新 `main` 上安全重做 PR #2 的外部模型 API 能力。Mac 端现有 LM Studio、本地模型发现、绘图、数据集与 5060 Ti 工作流保持不变，外部 API 只作为可选补充。
+阶段 42 发布中：在功能冻结的基础上整理个人版 1.0 发布基线，统一版本、产品名称、公开说明、验收结论和自动检查；不增加绘图或训练功能。
 
 本轮完成边界：Mac 必须能独立管理事实数据、审核草稿、检索资料、备份恢复并诊断；没有真实 CLIP/SigLIP embedding 时不得生成伪视觉结果。阶段 17/18 只保留 Mac 端真实数据集冻结与交付包验收门。
 
-本轮状态：**阶段 34–41 complete**；阶段 41 未连接或投递 5060 Ti，未自动 commit、push 或创建 PR。
+本轮状态：**阶段 34–41 complete / 阶段 42 publishing**；本轮不连接或投递 5060 Ti，用户已明确授权 commit、push、创建 PR、合并、tag 与 Release。
 
 ## 各阶段
+
+### 阶段 42：个人版 1.0 发布收口
+- [x] 将本地 `main` 快进到已合并 PR #3 的 `origin/main`，并建立独立发布整理分支
+- [x] 统一软件包版本、浏览器标题和产品名称
+- [x] 重写公开 README 的安装、个人目录和功能边界说明
+- [x] 同步完成度审计与最终验收报告，移除已经完成的过期待办
+- [x] 增加 CHANGELOG 与 GitHub Actions 自动检查
+- [x] 完成全量自动测试、构建和桌面/窄屏浏览器验收
+- [x] 由用户选择开源许可证（MIT）
+- [x] 用户明确确认 commit、push、创建 PR、合并、tag 与 Release
+- [x] 创建发布 PR #4，并通过首次远端 GitHub Actions quality 检查
+- [ ] 合并 PR，并创建 `v1.0.0` tag 与 GitHub Release
+- **状态：** ready_to_merge / 发布 PR 已通过检查，等待合并与正式 Release
 
 ### 阶段 41：安全的外部模型 API 补充层
 - [x] 在最新 `main` 上建立模型配置与调用边界，保留 LM Studio 自动发现和现有槽位选择
@@ -165,7 +178,7 @@
 - [x] 增加标签频率、批量增删、冲突标签提示和 caption 版本快照
 - [x] 首版以 SHA-256 + pHash 完成完全重复与近似重复检测
 - [x] 导出前生成数据集清单、审计报告和不覆盖原始文件的版本包
-- **状态：** feature complete / Mac 真实数据集冻结与交付包验收待完成
+- **状态：** complete / 阶段 34–35 已完成真实数据集规模与冻结交付验收
 
 ### 阶段 18：V1.8 角色 / 服装 / 风格 LoRA 项目管理
 - [x] 支持 character、outfit、character_outfit、style 四类项目
@@ -174,7 +187,7 @@
 - [x] 增加景别、角度、姿态、服装、表情和背景覆盖矩阵
 - [x] 为 Anima tags 与 Krea 2 自然语言维护独立 caption 树
 - [x] 冻结数据集版本、文件哈希与 manifest，并导出可供 Windows 工具读取的数据集包
-- **状态：** feature complete / Mac 真实数据集冻结与交付包验收待完成；Windows 训练不纳入完成门
+- **状态：** complete / Mac 冻结交付已验收；Windows 训练不纳入完成门
 
 ### 阶段 19：V1.9 ComfyUI 结果元数据回流
 - [x] 读取 ComfyUI PNG 内嵌 workflow、prompt、seed、sampler、steps、CFG、模型与 LoRA 信息
@@ -188,18 +201,18 @@
 - [x] 根据最新设备方案，将制图与训练能力合并为单一 `compute_5060ti` 节点
 - [x] Mac 增加任务投递、五目录状态扫描、returned 待审核状态、失败重试和连接诊断
 - [x] 用真实 Windows worker 验证领取、回传、结果导入与重复导入幂等
-- [ ] 完成 SMB 断线恢复与 Windows 重启中的发布级故障演练
-- [x] Mac 接口不接受或保存 Windows 凭据；真实登录凭据明天只交给 Finder / macOS Keychain
-- **状态：** in_progress / 真实 SMB、Worker、领取、回传、导入与幂等已验收；只剩发布级故障演练
+- [x] 完成 SMB 断线恢复与服务重启中的发布级故障演练
+- [x] Mac 接口不接受或保存 Windows 凭据；真实登录凭据只交给 Finder / macOS Keychain
+- **状态：** complete / 真实 SMB、Worker、领取、回传、导入、幂等与恢复均已验收
 
 ### 阶段 21：V2.1 视觉检索与 Krea 2 批量 caption
-- [ ] 在 pHash 去重稳定后增加真实 CLIP/SigLIP embedding 相似图检索与视觉聚类
-- [ ] 增加 Git/网站提示词资料的本地缓存、来源、许可和更新时间
+- [x] 在 pHash 去重稳定后增加真实 CLIP embedding 相似图检索与视觉簇
+- [x] 增加 Git/网站提示词资料的本地缓存、来源、许可和更新时间
 - [x] 建立 FTS + 可选真实向量的混合召回，按四类分组并保留真实来源；无索引时明确空状态
 - [x] 为 Krea 2 增加异步 VLM 自然语言 caption 队列与人工审核
-- [x] 建立慢速视觉任务下放契约与哈希回验，Mac 继续负责审核与管理；真实 Windows worker 待接入
+- [x] 建立慢速视觉任务下放契约与哈希回验，Mac 继续负责审核与管理；Windows 加速保持可选
 - [x] 建立版本化 embedding Mac 事实源、SHA-256 回验与远程导入契约
-- **状态：** in_progress / Mac 检索产品层、M7D 与索引事实源完成；真实向量与网站缓存待后续
+- **状态：** complete / Mac 真实 CLIP 索引、混合检索、视觉簇、网站来源与 Caption 草稿链已完成
 
 ### 阶段 22：V2.2 单一 5060 Ti 生成 / 训练节点
 - [x] 取消 4070S 节点与双角色方案
@@ -230,7 +243,7 @@
 - [x] 各投递一个低成本模型生成任务，回传图片、PNG metadata、workflow 与日志
 - [x] 将回传结果验收进 Mac 结果库，并在任务带 project_id 时关联到创作项目和既有下一版本入口
 - [ ] 将 ComfyUI 监听地址从局域网收紧为本机，并复验 Worker 不受影响
-- **状态：** in_progress / 两类 Profile、真实出图与一键回流完成；仅剩 Windows 监听收紧
+- **状态：** product complete / Windows 主机仍建议移除 `--listen 0.0.0.0` 并只监听本机，该主机配置不属于 Mac 代码缺口
 
 ### 阶段 25：V2.5 用户真实数据集验收与职责收敛
 - [x] 原样保存 `linhuier-v012_data.rar`，校验归档路径与 SHA-256，并建立不覆盖原件的工作副本
@@ -241,8 +254,8 @@
 - [x] 增加“从原 caption 批量接续到 Anima/Krea 2 Profile”的可预览、单快照入口
 - [x] 增加基于文件名、原 caption 与横竖尺寸的保守覆盖初审；仅在用户确认后合并，不改变图片状态
 - [x] 清理数据集、LoRA、设备与检索页面的过期阶段文案，明确当前 Worker 只承诺 ComfyUI 自动闭环
-- [ ] 验证审核选择、冻结版本与向 5060 Ti 数据集交付包；训练、正则和最终标签筛选继续由 Windows AnimaLoraStudio 负责
-- **状态：** in_progress / 真实导入、扫描、批量 caption 接续入口和覆盖初审完成；等待用户确认保留项后再做冻结与交付验收
+- [x] 使用同一批 72 张真实图片在隔离工作区验证审核、冻结版本与 5060 Ti 数据集交付包；正式“林悔儿”工作区的保留选择继续由用户决定
+- **状态：** complete / 软件流程已验收；正式数据集内容仍保持未审核，不以测试替代用户判断
 
 ### 阶段 26：V2.6 Windows LoRA Manager 只读清单闭环
 - [x] 只读诊断真实 LoRA Manager、ComfyUI `LoraLoader`、LoRA 目录与预览文件
@@ -655,8 +668,8 @@ Windows 中的标签终筛、正则、训练、checkpoint 和 LoRA 测试由用�
 - 旧版无 lineage/无元数据图片仍能安全显示和手动关联。
 
 当前证据：3 项 M5 专项测试覆盖真实 PNG 文本块、去重、无 metadata JPEG、只读目录、关联、候选、
-失败和分支；隔离服务完成 1280px 与 390×844 浏览器验收。真实 Windows ComfyUI 产物与原 workflow
-人工对照作为明天 M6 接入的第一项 smoke test。
+失败和分支；隔离服务完成 1280px 与 390×844 浏览器验收。随后阶段 23/24 已完成真实 Windows
+ComfyUI 产物、原 workflow 与结果哈希的 smoke test。
 
 ### M6 / V2.0：Windows 共享目录交付桥
 
