@@ -14,7 +14,7 @@ SOURCE_CENTER_STYLES = r"""<style>
   .source-capture-form input,.source-capture-form textarea,.source-capture-form select { width:100%; border:1px solid rgba(236,232,220,.28); border-radius:0; background:#252622; color:var(--paper); padding:11px 12px; font:13px/1.5 "Avenir Next",sans-serif; }
   .source-capture-form textarea { min-height:84px; resize:vertical; line-height:1.5; }
   .source-form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .source-capture-submit { border:1px solid var(--acid); background:var(--acid); color:var(--ink); padding:13px 15px; cursor:pointer; text-align:left; font:800 10px/1 monospace; letter-spacing:.1em; transition:transform .18s ease, box-shadow .18s ease; }
+  .source-capture-submit { border:1px solid var(--acid); background:var(--acid); color:var(--ink); padding:13px 15px; cursor:pointer; text-align:left; font:800 10px/1 monospace; letter-spacing:.1em; transition:transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard); }
   .source-capture-submit:hover:not(:disabled) { transform:translate(-2px,-2px); box-shadow:var(--hard-lift); }
   .source-capture-submit:disabled { opacity:.55; cursor:wait; }
   .source-capture-message { min-height:38px; margin:0; padding:10px 12px; border-left:4px solid var(--acid); background:rgba(236,232,220,.08); color:var(--on-ink-muted); font:800 9px/1.55 monospace; }

@@ -241,23 +241,20 @@ WORKSPACE_STYLES = r"""
   .dataset-step-kicker { color: var(--signal); font: 900 9px/1 monospace; letter-spacing: .08em; }
   .dataset-sidebar label, .dataset-toolbar label, .dataset-dialog-body label { display: grid; gap: 6px; color: var(--muted); font: 800 9px monospace; text-transform: uppercase; letter-spacing: .06em; }
   .dataset-sidebar input, .dataset-toolbar select, .dataset-curation-block select, .dataset-curation-block input, .dataset-dialog-body select, .dataset-dialog-body textarea { width: 100%; border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 9px; font: 11px/1.45 monospace; }
-  .dataset-primary { border: 1px solid var(--signal); background: var(--signal); color: var(--cream); padding: 10px 12px; text-align: left; font: 800 9px/1 monospace; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease; }
+  .dataset-primary { border: 1px solid var(--signal); background: var(--signal); color: var(--cream); padding: 10px 12px; text-align: left; font: 800 9px/1 monospace; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; transition: transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard), background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard); }
   .dataset-primary:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
   .dataset-primary:disabled { opacity: .45; cursor: not-allowed; }
   .dataset-hint { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
-  .dataset-pick-folder { width: 100%; border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 10px 12px; text-align: left; font: 800 9px/1 monospace; text-transform: uppercase; letter-spacing: .1em; cursor: pointer; transition: background .18s ease, color .18s ease; }
+  .dataset-pick-folder { width: 100%; border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 10px 12px; text-align: left; font: 800 9px/1 monospace; text-transform: uppercase; letter-spacing: .1em; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard); }
   .dataset-pick-folder:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .dataset-picked-path { display: block; min-height: 14px; overflow-wrap: anywhere; color: var(--signal); font: 8px/1.4 monospace; text-transform: none; letter-spacing: 0; }
   .dataset-manual-path { color: var(--muted); font: 9px/1.45 monospace; text-transform: uppercase; }
   .dataset-manual-path summary { cursor: pointer; color: var(--muted); font: 800 8px monospace; }
   .dataset-manual-path input { margin-top: 7px; }
   .dataset-zip-row .dataset-pick-folder, .dataset-zip-row .dataset-primary { width: auto; }
-  .dataset-import-progress { display: grid; gap: 7px; padding: 11px; border: 1px solid var(--ink); background: #171714; color: var(--paper); }
   .dataset-import-progress[hidden], .dataset-manifest-note[hidden] { display: none; }
-  .dataset-import-progress strong { font: 800 9px/1 monospace; }
-  .dataset-import-progress progress { width: 100%; accent-color: var(--acid); }
-  .dataset-import-progress span { font: 8px/1.5 monospace; }
-  .dataset-import-progress button { border: 1px solid rgba(244,237,223,.5); background: transparent; color: var(--paper); padding: 7px 9px; font: 800 8px monospace; }
+  .dataset-import-progress button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 7px 9px; font: 800 8px monospace; }
+  .dataset-import-progress button:hover { background: var(--ink); color: var(--acid); }
   .dataset-manifest-note { display: grid; gap: 7px; padding: 11px; border-left: 4px solid var(--acid); background: var(--paper-wash); }
   .dataset-manifest-note strong { font: 800 9px monospace; }
   .dataset-manifest-note span { color: var(--muted); font: 9px/1.5 monospace; }
@@ -267,7 +264,7 @@ WORKSPACE_STYLES = r"""
   .dataset-browse-body { overflow: auto; max-height: calc(100vh - 28px); padding: 26px; }
   .dataset-browse-body h2 { margin: 5px 0 7px; font: 700 26px "Iowan Old Style", serif; }
   .dataset-browse-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-  .dataset-browse-quick button { border: 1px solid var(--ink); padding: 7px 9px; background: transparent; color: var(--ink); font: 800 8px monospace; cursor: pointer; transition: background .18s ease, color .18s ease; }
+  .dataset-browse-quick button { border: 1px solid var(--ink); padding: 7px 9px; background: transparent; color: var(--ink); font: 800 8px monospace; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard); }
   .dataset-browse-quick button:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .dataset-browse-quick button:disabled { opacity: .35; }
   .dataset-browse-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 13px; color: var(--muted); font: 8px monospace; }
@@ -303,15 +300,15 @@ WORKSPACE_STYLES = r"""
   .dataset-origin button, .dataset-origin a { border: 1px solid var(--ink); padding: 5px 7px; color: var(--ink); text-decoration: none; font: 800 7px monospace; }
   .dataset-origin .independent { border-left: 4px solid var(--acid); padding: 5px 8px; background: var(--paper-wash); }
   .dataset-title-actions { display: flex; gap: 7px; }
-  .dataset-title-actions button, .dataset-bulkbar button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 8px 9px; font: 800 8px monospace; cursor: pointer; transition: background .18s ease, color .18s ease; }
+  .dataset-title-actions button, .dataset-bulkbar button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 8px 9px; font: 800 8px monospace; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard); }
   .dataset-title-actions button:hover:not(:disabled), .dataset-bulkbar button:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .dataset-title-actions .danger { color: var(--signal); border-color: var(--signal); }
-  .dataset-job-panel { margin-top: 14px; border: 1px solid var(--ink); background: #171714; color: var(--paper); padding: 12px; }
-  .dataset-job-line { display: grid; grid-template-columns: 90px minmax(0,1fr) auto; gap: 10px; align-items: center; }
-  .dataset-job-line progress { width: 100%; accent-color: var(--acid); }
-  .dataset-job-line button { color: var(--acid); border-bottom: 1px solid currentColor; font: 800 8px monospace; }
-  .dataset-job-line span { font: 8px monospace; }
-  .dataset-job-message { margin: 7px 0 0; color: var(--paper-deep); font: 9px monospace; }
+  .dataset-job-panel { margin-top: 14px; }
+  .dataset-job-line { display: grid; grid-template-columns: minmax(90px, auto) minmax(0,1fr) auto; gap: 10px; align-items: center; }
+  .dataset-job-line progress { width: 100%; accent-color: var(--signal); }
+  .dataset-job-line button { color: var(--signal); border-bottom: 1px solid currentColor; font: 800 8px monospace; }
+  .dataset-job-line span { font: 800 8px/1.4 monospace; }
+  .dataset-job-message { margin: 7px 0 0; color: var(--muted); font: 800 9px/1.5 monospace; }
   .dataset-journey { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); margin-top: 18px; border: 1px solid var(--ink); background: var(--line); gap: 1px; }
   .dataset-journey button { position: relative; display: grid; min-width: 0; gap: 6px; padding: 13px 11px; background: var(--paper-panel); text-align: left; }
   .dataset-journey button::after { content: ""; position: absolute; inset: auto 0 0; height: 4px; background: transparent; }
@@ -349,7 +346,7 @@ WORKSPACE_STYLES = r"""
   .dataset-stage-heading p { max-width: 520px; }
   .dataset-write-note { margin: 8px 0 0; color: var(--muted); font: 8px/1.45 monospace; }
   .dataset-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px; }
-  .dataset-pagination button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 7px 10px; font: 800 8px monospace; cursor: pointer; transition: background .18s ease, color .18s ease; }
+  .dataset-pagination button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 7px 10px; font: 800 8px monospace; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard); }
   .dataset-pagination button:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .dataset-pagination button:disabled { opacity: .35; }
   .dataset-pagination span { min-width: 96px; text-align: center; color: var(--muted); font: 9px monospace; }
@@ -378,13 +375,13 @@ WORKSPACE_STYLES = r"""
     width: 34px !important; height: 19px; flex: 0 0 34px;
     border: 1px solid var(--line); border-radius: 999px;
     background: var(--paper-deep); position: relative; cursor: pointer;
-    transition: background .15s ease, border-color .15s ease;
+    transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
   }
   .dataset-caption-rules input[type="checkbox"]::after {
     content: ""; position: absolute; top: 2px; left: 2px;
     width: 13px; height: 13px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(23, 24, 21, .3);
-    transition: transform .15s ease;
+    transition: transform var(--motion-fast) var(--ease-standard);
   }
   .dataset-caption-rules input[type="checkbox"]:checked { background: var(--signal); border-color: var(--signal); }
   .dataset-caption-rules input[type="checkbox"]:checked::after { transform: translateX(15px); }

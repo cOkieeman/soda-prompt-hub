@@ -1,6 +1,6 @@
 # Soda Prompt Hub · 动效与交互设计计划书
 
-> 状态：草案 v0.1 · 2026-09-12  
+> 状态：执行中 v0.2 · 2026-09-12（Phase 0–3 已落地 / 部分残留见下）  
 > 工作区：`E:\个人开发项目\soda prompt hub`  
 > 关联分支 / PR：`ui/unify-art-direction` · https://github.com/cOkieeman/soda-prompt-hub/pull/16  
 > 原则：服务阅读与操作反馈，不做花哨特效；服从现有纸色 / 信号红 / 酸黄编辑式美术。
@@ -56,21 +56,21 @@
 
 ### 3.1 时长
 
-| Token（拟） | 值 | 用途 |
+| Token（已落地） | 值 | 用途 |
 |---|---|---|
 | `--motion-instant` | 0ms | reduced-motion / 关键切换兜底 |
 | `--motion-fast` | 120ms | hover、焦点、小按钮 |
 | `--motion-base` | 180ms | 默认控件（与现网 `.18s` 对齐） |
-| `--motion-enter` | 280–350ms | 卡片 / 面板进入（与现网 `reveal .35s` 对齐） |
+| `--motion-enter` | 350ms | 卡片 / 面板进入（与现网 `reveal` 对齐） |
 | `--motion-page` | 220ms | 视图切换（仅透明度或 4–8px 位移） |
 
 禁止：超过 500ms 的装饰性动画；循环呼吸光（除非任务进行中且可暂停）。
 
 ### 3.2 缓动
 
-| Token（拟） | 值 | 用途 |
+| Token（已落地） | 值 | 用途 |
 |---|---|---|
-| `--ease-standard` | `ease` 或 `cubic-bezier(.2,.75,.2,1)` | 默认；与现网图片 hover 曲线可统一 |
+| `--ease-standard` | `cubic-bezier(.2,.75,.2,1)` | 默认；图片 hover 与控件共用 |
 | `--ease-exit` | `ease-in` | 退出略快于进入 |
 
 禁止：弹跳、过度 spring、旋转花活。
@@ -148,10 +148,10 @@
 | 阶段 | 内容 | 产出 | 验收 |
 |---|---|---|---|
 | **Phase 0** ✅ | 美术 token / 控件 / 横幅统一 | PR #16 | 各主视图目测同一产品 |
-| **Phase 1** | `base.css` 运动 token + 按钮/卡片 utility；文档化 | 本计划落地 CSS 变量 | reduced-motion 回归；无新依赖 |
-| **Phase 2** | `setView` 轻量进入；创作台关键反馈 | 小 diff，行为不变 | 手测创作闭环不卡顿 |
-| **Phase 3** | 任务条 / 进度组件统一 | job UI 共用样式 | 出图 / 索引 / 打标三条路径一致 |
-| **Phase 4** | （可选）录屏对比 + 验收清单勾选 | `docs/design/` 更新 | 人工走 `MANUAL_ACCEPTANCE_GUIDE` 相关页 |
+| **Phase 1** ✅ | `base.css` 运动 token + 按钮/卡片 utility；文档化 | `--motion-*` / `--ease-*`；`.ui-btn*` / `.ui-job` | reduced-motion 保持；无新依赖 |
+| **Phase 2** ✅ | `setView` 轻量进入；创作台关键反馈 | `.view-enter`；槽位锁定 / Profile / 保存态 ≤180ms | 未改 auto-save / compile / workflow API |
+| **Phase 3** ✅（部分） | 任务条 / 进度组件统一 | 共享 `.ui-job` + 各页进度 `accent-color: var(--signal)` | HTML class 未全量改名；部分墨底工具条仍用 `.ui-job-ink` 变体 |
+| **Phase 4** ⏳ | （可选）录屏对比 + 验收清单勾选 | `docs/design/` 更新 | 人工走 `MANUAL_ACCEPTANCE_GUIDE` 相关页 |
 
 每阶段：**先改 CSS / 极薄 JS → 本地 `prompt-hub serve` 目测 → 再推分支**。不引入打包器和动效库。
 
@@ -189,12 +189,29 @@
 
 ---
 
-## 9. 下一步（待你拍板后执行）
+## 9. 执行记录（2026-09-12）
 
-1. Phase 1：把 §3 token 写进 `base.css`，按钮/横幅改用 utility（纯 CSS，行为不变）  
-2. 出一页「动效前后」对照说明（可附截图，可选）  
-3. Phase 2 起按 §4 P1 页面逐项改，每项可单独小提交  
+### 已完成
+
+- **Phase 0**：见 `ui-art-unification-log.md`（仍有效）
+- **Phase 1**：`base.css` 增加运动 token；控件/卡片 utility 使用 token；功能 CSS 中易替换的 `.18s` / `.35s` 等已改为 `var(--motion-*)` / `var(--ease-*)`；顺手修复 `--cream` 自引用为 `#fff8eb`
+- **Phase 2**：`base.js` `setView` 增加 `.view-enter`（opacity + 6px translateY，`--motion-page`）；创作台槽位锁定 / Profile tab 短色变；`#creativeSaveState` `.is-flash` ≤180ms；不触碰保存/编译/投递逻辑路径
+- **Phase 3**：新增共享 `.ui-job`；`visual-job` / `dataset-import-progress` / `dataset-job-panel` 对齐左边强调条 + `paper-panel` + `progress` 使用 `--signal`；`comfy-status` / `discovery-status` / `remote-message` / WD14 工具条朝同一语言靠拢
+
+### 剩余缺口（诚实）
+
+- 多数按钮 HTML **尚未**改成 `.ui-btn` class，仍靠平行选择器维持外观  
+- `.tag-cat-*` 蓝绿紫类别色未纳入编辑式色板  
+- 列表刷新「先淡出再入场」、交错 delay 未做  
+- Phase 4 录屏 / `MANUAL_ACCEPTANCE_GUIDE` 勾选未做  
+- 验收清单 §6 仍待人工勾选  
+
+### 下一步
+
+1. Phase 4：按 §6 手测 reduced-motion 与创作闭环，更新勾选  
+2. 可选：外置 `search`/`comfy`/`lora` CSS；HTML 挂 `.ui-btn` / `.ui-job`  
+3. 详见 `docs/design/frontend-audit.md`
 
 ---
 
-*本计划书补齐「先有目标与分期，再改界面」的记录。Phase 0 美术统一已发生；动效本体从 Phase 1 起按本文执行。*
+*本计划书补齐「先有目标与分期，再改界面」的记录。Phase 0–3 已在 `ui/unify-art-direction` 落地；Phase 4 为验收与可选深化。*

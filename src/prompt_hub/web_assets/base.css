@@ -6,7 +6,7 @@
       --paper-wash: #e2dccd;
       --paper-panel: #e9e1d1;
       --field: #f7f1e5;
-      --cream: var(--cream);
+      --cream: #fff8eb;
       --ink-soft: #55564f;
       --on-ink-muted: #b9ae9f;
       --on-ink-faint: #aaa99f;
@@ -17,6 +17,13 @@
       --line: rgba(23, 24, 21, .19);
       --shadow: 0 22px 55px rgba(29, 27, 20, .14);
       --hard-lift: 5px 5px 0 var(--ink);
+      --motion-instant: 0ms;
+      --motion-fast: 120ms;
+      --motion-base: 180ms;
+      --motion-enter: 350ms;
+      --motion-page: 220ms;
+      --ease-standard: cubic-bezier(.2, .75, .2, 1);
+      --ease-exit: ease-in;
       --home-step-label: "开始 / 01";
       --local-library-label: "本机资料";
       --search-step-label: "查找 / 02";
@@ -97,7 +104,7 @@
       cursor: pointer;
       font: 800 11px/1 monospace;
       letter-spacing: .08em;
-      transition: color .18s ease, background .18s ease;
+      transition: color var(--motion-base) var(--ease-standard), background var(--motion-base) var(--ease-standard);
     }
     .app-nav-button:hover { color: var(--ink); background: var(--paper-wash); }
     .app-nav-button[aria-current="page"] { background: var(--signal); color: var(--cream); }
@@ -141,7 +148,7 @@
       cursor: pointer;
       font: 800 11px/1 monospace;
       letter-spacing: .1em;
-      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+      transition: transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard), background var(--motion-base) var(--ease-standard);
     }
     .home-primary { background: var(--signal); border-color: var(--signal); color: var(--cream); }
     .home-secondary { background: transparent; color: var(--ink); }
@@ -310,7 +317,7 @@
       font: 700 11px/1 monospace;
       letter-spacing: .1em;
       cursor: pointer;
-      transition: .18s ease;
+      transition: transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard), background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard);
     }
     .sync-button:hover { background: var(--acid); color: var(--ink); transform: translateY(-2px); }
     .workspace {
@@ -393,7 +400,7 @@
       font: 800 11px/1 monospace;
       letter-spacing: .15em;
       cursor: pointer;
-      transition: .18s ease;
+      transition: transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard), background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard);
     }
     .search-button:hover { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
     .shelf-filter {
@@ -453,8 +460,8 @@
       background: var(--paper);
       padding: 20px;
       position: relative;
-      transition: background .18s ease;
-      animation: reveal .35s both;
+      transition: background var(--motion-base) var(--ease-standard);
+      animation: reveal var(--motion-enter) var(--ease-standard) both;
     }
     .card:hover { background: var(--paper-lift); z-index: 2; }
     .card.is-favorite { box-shadow: inset 4px 0 0 var(--signal); }
@@ -531,7 +538,7 @@
       display: block;
       object-fit: cover;
       filter: saturate(.9) contrast(1.03);
-      transition: transform .45s cubic-bezier(.2,.75,.2,1), filter .3s ease;
+      transition: transform var(--motion-enter) var(--ease-standard), filter var(--motion-base) var(--ease-standard);
     }
     .visual-frame:hover img { transform: scale(1.035); filter: saturate(1.05) contrast(1.02); }
     .visual-label, .visual-safety {
@@ -675,7 +682,7 @@
       text-align: left;
       font: 800 10px/1 monospace;
       letter-spacing: .1em;
-      transition: transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
+      transition: transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard), background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard);
     }
     .ui-btn-primary, .ui-btn.primary {
       border-color: var(--signal);
@@ -744,4 +751,57 @@
       font: 13px/1.5 "Avenir Next", sans-serif;
     }
 
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+    /* Shared job / progress / status strips (Phase 3) */
+    .ui-job, .visual-job, .dataset-import-progress, .dataset-job-panel {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--acid);
+      background: var(--paper-panel);
+      color: var(--ink);
+      box-shadow: none;
+      font: 800 9px/1.5 monospace;
+    }
+    .ui-job progress, .visual-job progress, .dataset-import-progress progress, .dataset-job-panel progress,
+    .ui-job-ink progress {
+      width: 100%;
+      accent-color: var(--signal);
+    }
+    .ui-job strong, .visual-job strong, .dataset-import-progress strong,
+    .ui-job span, .visual-job span, .dataset-import-progress span,
+    .ui-job p, .dataset-job-message {
+      margin: 0;
+      font: 800 9px/1.5 monospace;
+      color: inherit;
+    }
+    .ui-job-ink {
+      border-color: rgba(236, 232, 220, .28);
+      border-left: 4px solid var(--acid);
+      background: var(--ink);
+      color: var(--paper);
+      box-shadow: none;
+    }
+    .ui-status-strip {
+      min-height: 38px;
+      margin: 0;
+      border-left: 4px solid var(--acid);
+      background: var(--paper-panel);
+      padding: 10px 12px;
+      color: var(--ink);
+      font: 800 9px/1.55 monospace;
+    }
+
+    @keyframes view-enter {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: none; }
+    }
+    .view-enter {
+      animation: view-enter var(--motion-page) var(--ease-standard) both;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      .view-enter { animation: none !important; opacity: 1 !important; transform: none !important; }
+    }

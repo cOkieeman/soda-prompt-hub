@@ -343,19 +343,35 @@
       if (characterMode) await runSearch();
     }
 
+    function preferReducedMotion() {
+      return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function playViewEnter(element) {
+      if (!element || preferReducedMotion()) return;
+      element.classList.remove('view-enter');
+      void element.offsetWidth;
+      element.classList.add('view-enter');
+    }
+
     async function setView(view) {
       setNavMenu(false);
       $('#appNavCurrent').textContent = `当前：${viewLabels[view] || '首页'}`;
       const archiveMode = view === 'prompts' || view === 'characters';
-      $('#homePage').hidden = view !== 'home';
-      $('#creativePage').hidden = view !== 'creative';
-      $('#discoveryPage').hidden = view !== 'discover';
-      $('#workspacePage').hidden = view !== 'datasets';
-      $('#loraPage').hidden = view !== 'lora';
-      $('#comfyPage').hidden = view !== 'comfy';
-      $('#remotePage').hidden = view !== 'remote';
-      $('#managementPage').hidden = view !== 'management';
+      const pageByView = {
+        home: $('#homePage'),
+        creative: $('#creativePage'),
+        discover: $('#discoveryPage'),
+        datasets: $('#workspacePage'),
+        lora: $('#loraPage'),
+        comfy: $('#comfyPage'),
+        remote: $('#remotePage'),
+        management: $('#managementPage'),
+      };
+      Object.entries(pageByView).forEach(([key, node]) => { if (node) node.hidden = key !== view; });
       $('#archiveWorkspace').hidden = !archiveMode;
+      const enterTarget = archiveMode ? $('#archiveWorkspace') : pageByView[view];
+      playViewEnter(enterTarget);
       document.querySelectorAll('[data-view]').forEach(button => {
         if (button.classList.contains('app-nav-button')) {
           button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false');

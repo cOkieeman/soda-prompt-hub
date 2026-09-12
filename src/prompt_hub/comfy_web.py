@@ -17,14 +17,14 @@ COMFY_STYLES = r"""
   .comfy-panel label { display: grid; gap: 7px; color: var(--muted); font: 800 9px/1.4 monospace; text-transform: uppercase; }
   .comfy-panel input, .comfy-panel select { width: 100%; min-height: 42px; border: 1px solid var(--line); background: var(--field); padding: 9px; color: var(--ink); }
   .comfy-file { display: flex !important; align-items: center; justify-content: center; min-height: 42px; border: 1px dashed rgba(23,24,21,.42); background: var(--paper-panel); cursor: pointer; color: var(--ink) !important; }
-  .comfy-button { min-height: 40px; border: 1px solid var(--ink); background: var(--ink); padding: 9px 13px; color: var(--paper); font: 800 9px/1 monospace; letter-spacing: .08em; cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }
+  .comfy-button { min-height: 40px; border: 1px solid var(--ink); background: var(--ink); padding: 9px 13px; color: var(--paper); font: 800 9px/1 monospace; letter-spacing: .08em; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard); }
   .comfy-button.secondary { background: transparent; color: var(--ink); }
   .comfy-button.secondary:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .comfy-button.signal { border-color: var(--signal); background: var(--signal); color: var(--cream); }
   .comfy-button.signal:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
   .comfy-button:not(.secondary):not(.signal):hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .comfy-button:disabled { opacity: .45; cursor: not-allowed; }
-  .comfy-status { min-height: 42px; margin: 0 0 14px; border-left: 4px solid var(--acid); background: var(--paper); padding: 12px 15px; color: var(--ink); box-shadow: var(--shadow); font: 800 10px/1.6 monospace; }
+  .comfy-status { min-height: 42px; margin: 0 0 14px; border-left: 4px solid var(--acid); background: var(--paper-panel); padding: 12px 15px; color: var(--ink); box-shadow: var(--shadow); font: 800 10px/1.6 monospace; }
   .comfy-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 28px 0 12px; color: var(--paper); }
   .comfy-head h2 { margin: 0; font: 700 30px/1 "Iowan Old Style", serif; letter-spacing: -.03em; }
   .comfy-head .section-label, .comfy-head label { color: var(--on-ink-muted); }

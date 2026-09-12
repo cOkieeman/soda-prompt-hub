@@ -310,10 +310,21 @@
     creativeState.outputs = {anima, krea2}; renderOutput();
   }
 
+
+  function flashCreativeSaveState() {
+    const node = $('#creativeSaveState');
+    if (!node) return;
+    node.classList.remove('is-flash');
+    void node.offsetWidth;
+    node.classList.add('is-flash');
+    clearTimeout(creativeState.saveFlashTimer);
+    creativeState.saveFlashTimer = setTimeout(() => node.classList.remove('is-flash'), 180);
+  }
+
   function queueCreativeSave() {
     if (!creativeState.project) return;
     creativeState.iterationMessage = ''; creativeState.iterationMessageProjectId = '';
-    $('#creativeSaveState').textContent = '等待自动保存…';
+    $('#creativeSaveState').textContent = '等待自动保存…'; flashCreativeSaveState();
     clearTimeout(creativeState.saveTimer);
     clearTimeout(creativeState.compileTimer);
     creativeState.saveTimer = setTimeout(() => saveCreative().catch(showCreativeError), 650);
@@ -322,11 +333,11 @@
 
   async function saveCreative() {
     if (!creativeState.project?.project_id) return;
-    $('#creativeSaveState').textContent = '正在保存到本机…';
+    $('#creativeSaveState').textContent = '正在保存到本机…'; flashCreativeSaveState();
     creativeState.project = await creativeJson('/api/creative/projects/' + encodeURIComponent(creativeState.project.project_id), {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(collectCreative())});
     const index = creativeState.projects.findIndex(p => p.project_id === creativeState.project.project_id);
     if (index >= 0) creativeState.projects[index] = creativeState.project; else creativeState.projects.unshift(creativeState.project);
-    renderCreativeProjects(); $('#creativeSaveState').textContent = `已保存 · R${creativeState.project.revision}`; await Promise.all([loadIterationContext(),refreshProjectJourney()]);
+    renderCreativeProjects(); $('#creativeSaveState').textContent = `已保存 · R${creativeState.project.revision}`; flashCreativeSaveState(); await Promise.all([loadIterationContext(),refreshProjectJourney()]);
   }
 
   async function sendWorkflowProfile() {

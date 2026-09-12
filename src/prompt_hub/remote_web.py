@@ -42,11 +42,11 @@ REMOTE_STYLES = r"""
   .remote-check { display: flex !important; align-items: center; grid-template-columns: auto 1fr; }
   .remote-check input { width: auto; }
   .remote-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-  .remote-actions button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 9px 10px; font: 800 8px/1 monospace; letter-spacing: .06em; cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }
+  .remote-actions button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 9px 10px; font: 800 8px/1 monospace; letter-spacing: .06em; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard); }
   .remote-actions button:hover:not(:disabled):not(.primary) { background: var(--ink); color: var(--acid); }
   .remote-actions button.primary { border-color: var(--signal); background: var(--signal); color: var(--cream); }
   .remote-actions button.primary:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
-  .remote-message { min-height: 40px; margin-top: 12px; border-left: 4px solid var(--acid); background: var(--paper-wash); padding: 9px 11px; font: 8px/1.55 monospace; }
+  .remote-message { min-height: 40px; margin-top: 12px; border-left: 4px solid var(--acid); background: var(--paper-panel); padding: 9px 11px; font: 800 9px/1.55 monospace; }
   .remote-worker-compatibility { margin-top: 8px; border-left: 4px solid var(--acid); background: var(--paper-panel); padding: 8px 11px; color: var(--ink); font: 800 8px/1.55 monospace; }
   .remote-worker-compatibility.update_recommended, .remote-worker-compatibility.incompatible { border-left-color: var(--signal); }
   .remote-tasks { margin-top: 14px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
@@ -98,7 +98,7 @@ REMOTE_STYLES = r"""
   .remote-lora-search { display: flex; gap: 7px; }
   .remote-lora-search input { border: 1px solid var(--line); background: var(--field); padding: 9px; }
   .remote-lora-tools { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
-  .remote-lora-search button, .remote-lora-tools > button { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); padding: 9px; font: 800 8px/1 monospace; letter-spacing: .06em; cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }
+  .remote-lora-search button, .remote-lora-tools > button { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); padding: 9px; font: 800 8px/1 monospace; letter-spacing: .06em; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard); }
   .remote-lora-tools > button { background: var(--signal); border-color: var(--signal); color: var(--cream); }
   .remote-lora-tools > button:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
   .remote-lora-search button.secondary { background: transparent; color: var(--ink); }
@@ -131,7 +131,7 @@ REMOTE_STYLES = r"""
   .remote-lora-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; background: var(--line); }
   .remote-lora-card { min-width: 0; background: var(--paper-lift); padding: 15px; }
   .remote-lora-preview { position: relative; display: block; width: calc(100% + 30px); aspect-ratio: 4/3; margin: -15px -15px 13px; overflow: hidden; border: 0; border-bottom: 1px solid var(--line); background: var(--paper-deep); color: var(--muted); cursor: pointer; }
-  .remote-lora-preview img { width: 100%; height: 100%; object-fit: cover; transition: transform .24s ease, filter .24s ease; }
+  .remote-lora-preview img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--motion-base) var(--ease-standard), filter var(--motion-base) var(--ease-standard); }
   .remote-lora-preview:hover img { transform: scale(1.025); filter: contrast(1.04); }
   .remote-lora-preview-count { position: absolute; right: 9px; bottom: 9px; border: 1px solid rgba(255,255,255,.55); background: rgba(20,19,17,.82); color: var(--cream); padding: 5px 7px; font: 900 8px monospace; }
   .remote-lora-placeholder { display: grid; place-items: center; width: calc(100% + 30px); aspect-ratio: 4/3; margin: -15px -15px 13px; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(135deg,var(--paper-wash) 0 9px,var(--paper-deep) 9px 10px); color: var(--muted); font: 900 8px monospace; letter-spacing: .08em; text-transform: uppercase; }
@@ -145,7 +145,7 @@ REMOTE_STYLES = r"""
   .remote-endpoint-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; padding: 22px; border-bottom: 1px solid var(--line); }
   .remote-endpoint-head h2 { margin: 4px 0 0; font: 800 30px "Iowan Old Style",serif; }
   .remote-endpoint-presets, .remote-endpoint-actions, .remote-endpoint-row-actions, .remote-endpoint-model-actions { display: flex; flex-wrap: wrap; gap: 7px; }
-  .remote-endpoint-presets button, .remote-endpoint-actions button, .remote-endpoint-row-actions button, .remote-endpoint-model-actions button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 9px 10px; font: 800 8px/1 monospace; letter-spacing: .06em; cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }
+  .remote-endpoint-presets button, .remote-endpoint-actions button, .remote-endpoint-row-actions button, .remote-endpoint-model-actions button { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 9px 10px; font: 800 8px/1 monospace; letter-spacing: .06em; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard); }
   .remote-endpoint-presets button:hover:not(:disabled):not(.active), .remote-endpoint-actions button:hover:not(:disabled):not(.primary), .remote-endpoint-row-actions button:hover:not(:disabled), .remote-endpoint-model-actions button:hover:not(:disabled):not(.primary) { background: var(--ink); color: var(--acid); }
   .remote-endpoint-presets button.active:hover, .remote-endpoint-actions button.primary:hover:not(:disabled), .remote-endpoint-model-actions button.primary:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
   .remote-endpoint-presets button.active, .remote-endpoint-actions button.primary, .remote-endpoint-model-actions button.primary { border-color: var(--signal); background: var(--signal); color: var(--cream); }

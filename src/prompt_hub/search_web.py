@@ -22,13 +22,14 @@ SEARCH_STYLES = r"""
   .discovery-custom-form .visual-action { justify-self: start; }
   .discovery-custom-result { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(236,232,220,.22); }
   .discovery-custom-hint { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
-  .discovery-index .visual-job { margin-top: 14px; border-color: rgba(236,232,220,.35); }
+  .discovery-index .visual-job { margin-top: 14px; border-color: rgba(236,232,220,.28); border-left: 4px solid var(--acid); background: rgba(236,232,220,.06); color: var(--paper); }
   .discovery-index .visual-job strong { margin: 0; color: var(--paper); font: 800 10px/1.2 monospace; }
-  .discovery-index .visual-job span { color: var(--on-ink-faint); font-size: 10px; }
+  .discovery-index .visual-job span { color: var(--on-ink-faint); font: 800 10px/1.5 monospace; }
   .discovery-index .visual-job .visual-action { border-color: rgba(236,232,220,.45); color: var(--paper); padding: 8px 10px; }
+  .discovery-index .visual-job progress { accent-color: var(--signal); }
   .discovery-search { display: grid; grid-template-columns: minmax(0,1fr) 190px auto; gap: 8px; margin: 14px 0; padding: 16px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
   .discovery-search input, .discovery-search select { min-width: 0; border: 1px solid var(--line); background: var(--field); padding: 12px; color: var(--ink); }
-  .discovery-search button { border: 1px solid var(--signal); background: var(--signal); padding: 10px 18px; color: var(--cream); font: 800 10px/1 monospace; letter-spacing: .1em; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
+  .discovery-search button { border: 1px solid var(--signal); background: var(--signal); padding: 10px 18px; color: var(--cream); font: 800 10px/1 monospace; letter-spacing: .1em; cursor: pointer; transition: transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard); }
   .discovery-search button:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
   .discovery-modes { display:flex; gap:1px; margin-top:14px; background:var(--line); border:1px solid var(--line); box-shadow:var(--shadow); }
   .discovery-mode-button { flex:1; min-height:48px; border:0; background:var(--paper); color:var(--muted); cursor:pointer; font:900 10px/1 monospace; letter-spacing:.06em; }
@@ -49,11 +50,10 @@ SEARCH_STYLES = r"""
   .visual-action.acid { border-color:var(--acid); background:var(--acid); }
   .visual-action:disabled { opacity:.45; cursor:not-allowed; }
   .visual-index-note { margin:0; padding:12px; border-left:4px solid var(--acid); background:var(--paper-wash); color:var(--ink-soft); font-size:11px; line-height:1.6; }
-  .visual-job { display:grid; gap:7px; padding:11px; border:1px solid var(--line); }
-  .visual-job progress { width:100%; accent-color:var(--signal); }
+  /* .visual-job shared via base.css .ui-job language */
   .cluster-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; align-items:center; }
   .cluster-toolbar p { margin:0; color:var(--muted); font-size:11px; line-height:1.6; }
-  .discovery-status { min-height: 46px; margin-bottom: 14px; border-left: 4px solid var(--acid); background: var(--paper); padding: 13px 16px; box-shadow: var(--shadow); font: 800 9px/1.65 monospace; }
+  .discovery-status { min-height: 46px; margin-bottom: 14px; border-left: 4px solid var(--acid); background: var(--paper-panel); padding: 13px 16px; box-shadow: var(--shadow); font: 800 9px/1.65 monospace; }
   .discovery-status.active { border-left-color: var(--signal); }
   .discovery-groups { display: grid; gap: 14px; }
   .discovery-group { border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }

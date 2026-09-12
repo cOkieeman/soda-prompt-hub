@@ -28,9 +28,9 @@ LORA_STYLES = r"""
   .lora-delivery-format strong, .lora-delivery-format span { display: block; }
   .lora-delivery-format strong { font: 800 10px/1.35 monospace; }
   .lora-delivery-format span { margin-top: 5px; color: var(--muted); font: 9px/1.5 monospace; }
-  .lora-delivery-format button { border: 1px solid var(--ink); padding: 8px 10px; background: transparent; color: var(--ink); font: 800 8px/1.2 monospace; cursor: pointer; transition: background .18s ease, color .18s ease; }
+  .lora-delivery-format button { border: 1px solid var(--ink); padding: 8px 10px; background: transparent; color: var(--ink); font: 800 8px/1.2 monospace; cursor: pointer; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard); }
   .lora-delivery-format button:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
-  .lora-primary, .lora-secondary { border: 1px solid var(--ink); padding: 11px 13px; cursor: pointer; font: 800 10px/1 monospace; letter-spacing: .1em; transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }
+  .lora-primary, .lora-secondary { border: 1px solid var(--ink); padding: 11px 13px; cursor: pointer; font: 800 10px/1 monospace; letter-spacing: .1em; transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard); }
   .lora-primary { background: var(--signal); color: var(--cream); border-color: var(--signal); }
   .lora-primary:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
   .lora-secondary { background: transparent; color: var(--ink); }
