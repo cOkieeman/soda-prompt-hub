@@ -675,3 +675,77 @@ class _OneConnection:
 
 
 SERVICE_DOWN = "服务不可用"
+
+
+class TestThinkingModels:
+    """思考型模型会把 max_tokens 花在内部推理上。"""
+
+    def test_thinking_is_disabled_in_the_request(self, monkeypatch) -> None:
+        """不关掉的话额度全被推理吃光。content 是空的。"""
+        captured = {}
+
+        def fake_request(_url, **kwargs):
+            captured["payload"] = kwargs["payload"]
+            return {"choices": [{"message": {"content": '{"caption":"x"}'}}]}
+
+        monkeypatch.setattr(local_model, "_request_json", fake_request)
+        local_model._external_vision_completion(  # noqa: SLF001
+            connection=_vision_connection(),
+            system_prompt="s",
+            text_prompt="t",
+            image_data_url="data:image/jpeg;base64,AA==",
+            temperature=0.1,
+            max_tokens=300,
+        )
+
+        assert captured["payload"]["enable_thinking"] is False
+        assert captured["payload"]["chat_template_kwargs"]["enable_thinking"] is False
+
+    def test_empty_content_cut_by_length_says_so(self, monkeypatch) -> None:
+        """只回「没有返回可识别的 JSON」会让人去怀疑提示词或模型能力。"""
+        monkeypatch.setattr(
+            local_model,
+            "_request_json",
+            lambda *_args, **_kwargs: {
+                "choices": [{"message": {"content": ""}, "finish_reason": "length"}]
+            },
+        )
+        with pytest.raises(local_model.LocalModelError, match="内部推理"):
+            local_model._external_vision_completion(  # noqa: SLF001  # noqa: SLF001
+                connection=_vision_connection(),
+                system_prompt="s",
+                text_prompt="t",
+                image_data_url="data:image/jpeg;base64,AA==",
+                temperature=0.1,
+                max_tokens=300,
+            )
+
+
+def _vision_connection() -> ModelConnection:
+    return ModelConnection(
+        connection_id="c1",
+        label="local",
+        provider="openai_compatible",
+        base_url="http://127.0.0.1:1234/v1",
+        api_key="",
+        model_name="qwen",
+        supports_vision=True,
+    )
+
+
+class TestNoJsonDiagnostics:
+    """模型回了散文而不是 JSON 时。最常见的原因是它拒绝描述这张图。"""
+
+    def test_refusal_text_is_carried_into_the_error(self) -> None:
+        """看不到原文的人会一直去调提示词。而该做的是换一个模型。"""
+        message = local_model._no_json_message(  # noqa: SLF001
+            "I can't caption this image. If you have other photos, I'm glad to help."
+        )
+        assert "拒绝" not in message  # 不替模型下判断。把它说的话带出来就好
+        assert "I can't caption this image" in message
+
+    def test_empty_content_says_empty_not_unparseable(self) -> None:
+        assert local_model._no_json_message("   ")  # noqa: SLF001 == "视觉模型没有返回任何内容"
+
+    def test_long_output_is_trimmed(self) -> None:
+        assert len(local_model._no_json_message("x" * 5000)) < 250  # noqa: SLF001

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -26,6 +27,7 @@ from prompt_hub.dataset_curation_support import (
 from prompt_hub.dataset_tagging import normalize_tag_draft
 from prompt_hub.dataset_workspace import DatasetWorkspaceError
 from prompt_hub.local_model import draft_anima_tags, draft_krea2_caption
+from prompt_hub.tag_locale import TagLocaleError, translate_caption_with_model
 from prompt_hub.wd14 import ProviderMode, WD14Tagger
 
 if TYPE_CHECKING:
@@ -38,6 +40,40 @@ if TYPE_CHECKING:
 Tagger = Callable[[Path], dict[str, object]]
 TaggerFactory = Callable[[TaggerModelConfig, ProviderMode], Tagger]
 Krea2Captioner = Callable[[Path, str, str, Mapping[str, Any]], dict[str, Any]]
+
+
+def _batch_failure_message(label: str, failed: int, reasons: list[str]) -> str:
+    """整批失败时把最常见的原因说出来。
+
+    只写「共 N 张失败」的话。使用者得自己去翻每一张的记录才知道为什么。
+    而整批失败几乎总是同一个原因——送错模型。服务没开。来源不见了。
+    """
+    base = f"{label} 队列全部失败, 共 {failed} 张"
+    if not reasons:
+        return base
+    top, count = Counter(reasons).most_common(1)[0]
+    return f"{base}。{count} 张的原因是 {top}"
+
+
+def _locale_record(value: object) -> dict[str, Any]:
+    record = dict(value) if isinstance(value, dict) else {}
+    record.setdefault("status", "empty")
+    record.setdefault("source", "")
+    record.setdefault("localized", "")
+    record.setdefault("updated_at", "")
+    record.setdefault("error", "")
+    return record
+
+
+def _krea2_locale_source(item: Mapping[str, Any]) -> str:
+    """要对照的是人最终会看的那段英文。
+
+    已经确认的正式说明优先。还没确认时才看视觉草稿。
+    """
+    caption = _current_caption(item, "krea2")
+    if caption:
+        return caption
+    return str(_vlm_record(item.get("krea2_vlm"))["draft"])
 
 
 class DatasetCurationJobsMixin:
@@ -122,6 +158,7 @@ class DatasetCurationJobsMixin:
         completed = 0
         failed = 0
         skipped = 0
+        reasons: list[str] = []
         overwrite = bool(payload.get("overwrite", False))
         for index, relative_path in enumerate(paths, start=1):
             context.update(index - 1, len(paths), f"{label} {index}/{len(paths)} · {relative_path}")
@@ -187,6 +224,7 @@ class DatasetCurationJobsMixin:
                     tagger=tagger_mode,
                     model=model,
                 )
+                reasons.append(str(error))
                 failed += 1
             else:
                 self._store_tag_result(
@@ -201,7 +239,7 @@ class DatasetCurationJobsMixin:
                 completed += 1
             context.update(index, len(paths), f"已处理 {index}/{len(paths)}")
         if paths and completed == 0 and failed:
-            raise DatasetWorkspaceError(f"{label} 队列全部失败, 共 {failed} 张")
+            raise DatasetWorkspaceError(_batch_failure_message(label, failed, reasons))
         return {
             "workspace_id": workspace_id,
             "requested": len(paths),
@@ -240,6 +278,7 @@ class DatasetCurationJobsMixin:
         completed = 0
         failed = 0
         skipped = 0
+        reasons: list[str] = []
         for index, relative_path in enumerate(paths, start=1):
             context.update(
                 index - 1,
@@ -259,6 +298,7 @@ class DatasetCurationJobsMixin:
                     job_id=job_id,
                     source_sha256=expected_sha256,
                 )
+                reasons.append("图片不存在或扫描后已变更")
                 failed += 1
                 continue
             item = _state_item(state, relative_path)
@@ -280,6 +320,7 @@ class DatasetCurationJobsMixin:
                     job_id=job_id,
                     source_sha256=expected_sha256,
                 )
+                reasons.append(str(error))
                 failed += 1
             else:
                 self._store_krea2_result(
@@ -295,7 +336,7 @@ class DatasetCurationJobsMixin:
                 completed += 1
             context.update(index, len(paths), f"已处理 {index}/{len(paths)}")
         if paths and completed == 0 and failed:
-            raise DatasetWorkspaceError(f"Krea 2 VLM 队列全部失败, 共 {failed} 张")
+            raise DatasetWorkspaceError(_batch_failure_message("Krea 2 VLM", failed, reasons))
         return {
             "workspace_id": workspace_id,
             "model": model,
@@ -355,6 +396,205 @@ class DatasetCurationJobsMixin:
             "relative_path": relative_path,
             "krea2_vlm": vlm,
             "caption": _caption_record(item["captions"]["krea2"]),
+            "snapshot": snapshot,
+        }
+
+    def krea2_locale_job(self, payload: Mapping[str, Any], context: JobProgress) -> dict[str, Any]:
+        """把一批 Krea 2 英文说明翻成中文供人工对照。
+
+        逐张点「翻译成中文对照」在几百张的数据集上不现实。
+        译文只是对照。交付的永远是英文原文——所以这里不碰任何说明文字。
+        每张翻完就落盘。中断或重跑时已经翻好的不再送一次模型。
+        """
+        workspace_id = str(payload.get("workspace_id", ""))
+        if not workspace_id:
+            raise DatasetWorkspaceError("Krea 2 locale job is missing workspace_id")
+        overwrite = bool(payload.get("overwrite", False))
+        paths = self._select_krea2_locale_paths(workspace_id, payload)
+        completed = 0
+        failed = 0
+        skipped = 0
+        reasons: list[str] = []
+        state = self.read_state(workspace_id)
+        for index, relative_path in enumerate(paths, start=1):
+            context.update(
+                index - 1,
+                len(paths),
+                f"中文对照 {index}/{len(paths)} · {relative_path}",
+            )
+            item = _state_item(state, relative_path)
+            source_text = _krea2_locale_source(item)
+            if not source_text:
+                skipped += 1
+                continue
+            existing = _locale_record(item.get("krea2_locale"))
+            if not overwrite and existing["localized"] and existing["source"] == source_text:
+                skipped += 1
+                continue
+            try:
+                localized = translate_caption_with_model(
+                    source_text,
+                    connections=self._model_connections,
+                )
+            except TagLocaleError as error:
+                reasons.append(str(error))
+                self._store_krea2_locale(workspace_id, relative_path, source_text, "", str(error))
+                failed += 1
+                continue
+            if not localized:
+                reason = "翻译服务没有返回结果"
+                reasons.append(reason)
+                self._store_krea2_locale(workspace_id, relative_path, source_text, "", reason)
+                failed += 1
+                continue
+            self._store_krea2_locale(workspace_id, relative_path, source_text, localized, "")
+            completed += 1
+        context.update(len(paths), len(paths), f"已翻译 {completed}/{len(paths)}")
+        if paths and completed == 0 and failed:
+            raise DatasetWorkspaceError(_batch_failure_message("中文对照", failed, reasons))
+        return {
+            "workspace_id": workspace_id,
+            "requested": len(paths),
+            "completed": completed,
+            "failed": failed,
+            "skipped": skipped,
+        }
+
+    def _select_krea2_locale_paths(
+        self,
+        workspace_id: str,
+        payload: Mapping[str, Any],
+    ) -> list[str]:
+        report = self._require_report(workspace_id)
+        valid = [
+            str(item.get("relative_path", ""))
+            for item in report.get("images", [])
+            if isinstance(item, dict) and item.get("valid") is True
+        ]
+        scope = str(payload.get("scope", "selected"))
+        requested = payload.get("paths", [])
+        requested_set = (
+            {str(path) for path in requested if isinstance(path, str)}
+            if isinstance(requested, list)
+            else set()
+        )
+        if scope == "selected":
+            return [path for path in valid if path in requested_set]
+        if scope == "all":
+            return valid
+        if scope == "missing":
+            state = self.read_state(workspace_id)
+            missing = []
+            for path in valid:
+                item = _state_item(state, path)
+                source_text = _krea2_locale_source(item)
+                locale = _locale_record(item.get("krea2_locale"))
+                if source_text and (not locale["localized"] or locale["source"] != source_text):
+                    missing.append(path)
+            return missing
+        raise DatasetWorkspaceError("Unsupported Krea 2 locale queue scope")
+
+    def _store_krea2_locale(
+        self,
+        workspace_id: str,
+        relative_path: str,
+        source_text: str,
+        localized: str,
+        error: str,
+    ) -> None:
+        with self._lock:
+            latest = self.read_state(workspace_id)
+            item = _state_item(latest, relative_path)
+            item["krea2_locale"] = {
+                "status": "completed" if localized else "failed",
+                "source": source_text,
+                "localized": localized,
+                "updated_at": _now(),
+                "error": error,
+            }
+            self._write_state(workspace_id, latest)
+
+    def confirm_krea2_drafts(
+        self,
+        workspace_id: str,
+        paths: Iterable[str],
+        *,
+        overwrite_reviewed: bool = False,
+    ) -> dict[str, Any]:
+        """把一批已有草稿的 Krea 2 视觉草稿一次写入正式说明。
+
+        逐张确认在人工审核阶段太慢。一个数据集几百张。全部要开详情页再点一次。
+        这里只处理已经有草稿的图片。并且默认不覆盖人工确认过的说明——
+        批量操作看不到每一张的内容。覆盖别人手写的判断没有回头路。
+        真要覆盖时由调用方显式传 overwrite_reviewed。
+        """
+        requested = [path for path in dict.fromkeys(str(path) for path in paths) if path]
+        if not requested:
+            raise DatasetWorkspaceError("请先选择要写入 Krea 2 的图片")
+        for relative_path in requested:
+            self._known_record(workspace_id, relative_path)
+        skipped_empty: list[str] = []
+        skipped_unchanged: list[str] = []
+        skipped_reviewed: list[str] = []
+        with self._lock:
+            state = self.read_state(workspace_id)
+            pending: list[tuple[dict[str, Any], dict[str, Any], str]] = []
+            changes: list[dict[str, str]] = []
+            for relative_path in requested:
+                item = _state_item(state, relative_path)
+                vlm = _vlm_record(item.get("krea2_vlm"))
+                draft = _normalize_caption("krea2", str(vlm.get("draft", "")))
+                if not draft:
+                    skipped_empty.append(relative_path)
+                    continue
+                before = _current_caption(item, "krea2")
+                if before == draft:
+                    skipped_unchanged.append(relative_path)
+                    continue
+                caption = _caption_record(item["captions"]["krea2"])
+                if not overwrite_reviewed and caption.get("status") == "reviewed":
+                    skipped_reviewed.append(relative_path)
+                    continue
+                pending.append((item, vlm, draft))
+                changes.append({"relative_path": relative_path, "before": before, "after": draft})
+            snapshot = ""
+            if changes:
+                snapshot = self._write_snapshot(
+                    workspace_id,
+                    operation="confirm-krea2-vlm-batch",
+                    profile_id="krea2",
+                    changes=changes,
+                )
+                confirmed_at = _now()
+                for item, vlm, draft in pending:
+                    vlm.update(
+                        {
+                            "status": "confirmed",
+                            "draft": draft,
+                            "edited_at": confirmed_at,
+                            "error": "",
+                            "confirmed_at": confirmed_at,
+                            "confirmed_snapshot": snapshot,
+                        }
+                    )
+                    _set_caption(
+                        item,
+                        "krea2",
+                        draft,
+                        status="reviewed",
+                        source="vlm-confirmed",
+                        snapshot=snapshot,
+                    )
+                    item["krea2_vlm"] = vlm
+                self._write_state(workspace_id, state)
+        return {
+            "workspace_id": workspace_id,
+            "requested": len(requested),
+            "confirmed": len(changes),
+            "skipped_empty": len(skipped_empty),
+            "skipped_unchanged": len(skipped_unchanged),
+            "skipped_reviewed": len(skipped_reviewed),
+            "skipped_reviewed_paths": skipped_reviewed[:50],
             "snapshot": snapshot,
         }
 

@@ -38,6 +38,20 @@ if TYPE_CHECKING:
     from prompt_hub.dataset_workspace import DatasetWorkspaceStore
 
 
+def _duplicate_files(group: Mapping[str, Any]) -> list[str]:
+    """一组重复里涉及的所有文件。
+
+    完全重复是一个 files 列表。近似重复是两张比出来的 left_files / right_files。
+    两种形状。读错的一边不会报错。只会永远得到空。
+    """
+    files = group.get("files")
+    if isinstance(files, list):
+        return [str(path) for path in files]
+    left = group.get("left_files", [])
+    right = group.get("right_files", [])
+    return [str(path) for side in (left, right) if isinstance(side, list) for path in side]
+
+
 class DatasetExportMixin:
     settings: Settings
     workspace_store: DatasetWorkspaceStore
@@ -286,14 +300,16 @@ class DatasetExportMixin:
         )
 
         selected_set = set(known)
-        near_paths = [
-            path
-            for group in report.get("near_duplicates", [])
-            if isinstance(group, dict)
-            for path in group.get("files", [])
-            if str(path) in selected_set
-            and len(selected_set.intersection(str(item) for item in group.get("files", []))) > 1
-        ]
+        near_paths = []
+        for group in report.get("near_duplicates", []):
+            if not isinstance(group, dict):
+                continue
+            # 近似重复是两边比出来的。没有 files 这个键。
+            # 照 files 读不会报错。只会永远读到空。提醒就成了摆设。
+            grouped = [str(path) for path in _duplicate_files(group)]
+            selected_in_group = [path for path in grouped if path in selected_set]
+            if len(set(selected_in_group)) > 1:
+                near_paths.extend(selected_in_group)
         add_issue(warnings, "near_duplicate", "选择中有近似重复图片, 建议人工确认", near_paths)
         workspace_invalid = [
             path

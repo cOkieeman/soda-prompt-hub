@@ -35,6 +35,7 @@ from prompt_hub.dataset_curation_support import (
     _split_tags,
     _suspicious_tag,
     _timestamp_token,
+    is_prepend_only_operation,
     normalize_caption_settings,
     normalize_caption_with_settings,
 )
@@ -399,18 +400,87 @@ class DatasetCurationStore(DatasetCurationJobsMixin, DatasetExportMixin):
                 changes=changes,
             )
             state = self.read_state(workspace_id)
+            keep_status = is_prepend_only_operation(operation)
             for change in changes:
                 item = _state_item(state, str(change["relative_path"]))
+                before = _caption_record(item.get("captions", {}).get(preview["profile_id"]))
+                confirmed = keep_status and str(before.get("status", "")) == "reviewed"
                 _set_caption(
                     item,
                     preview["profile_id"],
                     str(change["after"]),
-                    status="draft",
-                    source="bulk-edit",
+                    status="reviewed" if confirmed else "draft",
+                    source="prepend-trigger" if keep_status else "bulk-edit",
                     snapshot=snapshot,
                 )
             self._write_state(workspace_id, state)
         return {**preview, "snapshot": snapshot}
+
+    def confirm_captions(
+        self,
+        workspace_id: str,
+        paths: Iterable[str],
+        *,
+        profile_id: CaptionProfile,
+    ) -> dict[str, Any]:
+        """把一批已经有内容的说明标记为人工确认。
+
+        说明文字本身一个字都不改。改的只是「这段我看过了」这个判断。
+        接续原说明、批量整理都会落成草稿。交付前检查要求确认过。
+        没有这条路的话。几百张就得一张一张开详情页点确认。
+        空白的说明不会被确认——确认一段不存在的内容没有意义。
+        """
+        requested = [path for path in dict.fromkeys(str(path) for path in paths) if path]
+        if not requested:
+            raise DatasetWorkspaceError("请先选择要确认说明的图片")
+        for relative_path in requested:
+            self._known_record(workspace_id, relative_path)
+        skipped_empty = 0
+        skipped_reviewed = 0
+        with self._lock:
+            state = self.read_state(workspace_id)
+            pending: list[tuple[str, dict[str, Any], str]] = []
+            for relative_path in requested:
+                item = _state_item(state, relative_path)
+                record = _caption_record(item["captions"][profile_id])
+                caption = str(record["current"]).strip()
+                if not caption:
+                    skipped_empty += 1
+                    continue
+                if str(record.get("status", "")) == "reviewed":
+                    skipped_reviewed += 1
+                    continue
+                pending.append((relative_path, item, str(record["current"])))
+            snapshot = ""
+            if pending:
+                snapshot = self._write_snapshot(
+                    workspace_id,
+                    operation=f"confirm-{profile_id}-caption",
+                    profile_id=profile_id,
+                    changes=[
+                        {"relative_path": relative_path, "before": caption, "after": caption}
+                        for relative_path, _item, caption in pending
+                    ],
+                )
+                for _relative_path, item, caption in pending:
+                    _set_caption(
+                        item,
+                        profile_id,
+                        caption,
+                        status="reviewed",
+                        source="manual-confirmed",
+                        snapshot=snapshot,
+                    )
+                self._write_state(workspace_id, state)
+        return {
+            "workspace_id": workspace_id,
+            "profile_id": profile_id,
+            "requested": len(requested),
+            "confirmed": len(pending),
+            "skipped_empty": skipped_empty,
+            "skipped_reviewed": skipped_reviewed,
+            "snapshot": snapshot,
+        }
 
     def list_snapshots(self, workspace_id: str) -> list[dict[str, Any]]:
         root = self._workspace_directory(workspace_id) / "caption-snapshots"

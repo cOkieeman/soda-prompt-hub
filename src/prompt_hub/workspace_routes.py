@@ -80,6 +80,22 @@ class DatasetKrea2DraftInput(BaseModel):
     confirm: bool = False
 
 
+class DatasetCaptionConfirmInput(BaseModel):
+    profile_id: Literal["anima", "krea2"]
+    paths: list[str] = Field(min_length=1, max_length=100000)
+
+
+class DatasetKrea2LocaleQueueInput(BaseModel):
+    scope: Literal["selected", "missing", "all"] = "selected"
+    paths: list[str] = Field(default_factory=list, max_length=100000)
+    overwrite: bool = False
+
+
+class DatasetKrea2DraftBatchInput(BaseModel):
+    paths: list[str] = Field(min_length=1, max_length=100000)
+    overwrite_reviewed: bool = False
+
+
 class DatasetKrea2VLMResultItem(BaseModel):
     relative_path: str = Field(min_length=1, max_length=4096)
     source_sha256: str = Field(min_length=64, max_length=64)
@@ -124,6 +140,7 @@ class DatasetBulkTagsInput(BaseModel):
     profile_id: Literal["anima", "krea2"] = "anima"
     paths: list[str] = Field(min_length=1, max_length=100000)
     add: list[str] = Field(default_factory=list, max_length=500)
+    prepend: list[str] = Field(default_factory=list, max_length=50)
     remove: list[str] = Field(default_factory=list, max_length=500)
     replace: dict[str, str] = Field(default_factory=dict)
     sort: bool = False
@@ -308,7 +325,10 @@ def create_workspace_router(
         job = job_runner.submit(
             "dataset_wd14",
             {"workspace_id": workspace_id, **payload.model_dump()},
-            max_attempts=2,
+            # 只在「一张都没成功」时才算失败。那几乎总是决定性的原因——
+            # 送错模型、服务没开、来源不见了。重跑整批只是把成本加倍。
+            # 扫描可以重试。它便宜。这两个每张都要呼叫一次模型。
+            max_attempts=1,
         )
         return {"workspace_id": workspace_id, "job": job}
 
@@ -325,7 +345,10 @@ def create_workspace_router(
         job = job_runner.submit(
             "dataset_krea2_vlm",
             {"workspace_id": workspace_id, **payload.model_dump()},
-            max_attempts=2,
+            # 只在「一张都没成功」时才算失败。那几乎总是决定性的原因——
+            # 送错模型、服务没开、来源不见了。重跑整批只是把成本加倍。
+            # 扫描可以重试。它便宜。这两个每张都要呼叫一次模型。
+            max_attempts=1,
         )
         return {"workspace_id": workspace_id, "job": job}
 
@@ -340,6 +363,52 @@ def create_workspace_router(
                 payload.relative_path,
                 draft=payload.draft,
                 confirm=payload.confirm,
+            )
+        except DatasetWorkspaceError as error:
+            _raise_workspace_http(error)
+
+    @router.post("/api/dataset-workspaces/{workspace_id}/captions/confirm")
+    def confirm_dataset_workspace_captions(
+        workspace_id: str,
+        payload: DatasetCaptionConfirmInput,
+    ) -> dict[str, Any]:
+        try:
+            return curation_store.confirm_captions(
+                workspace_id,
+                payload.paths,
+                profile_id=payload.profile_id,
+            )
+        except DatasetWorkspaceError as error:
+            _raise_workspace_http(error)
+
+    @router.post(
+        "/api/dataset-workspaces/{workspace_id}/krea2-locale",
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    def queue_dataset_workspace_krea2_locale(
+        workspace_id: str,
+        payload: DatasetKrea2LocaleQueueInput,
+    ) -> dict[str, Any]:
+        if workspace_store.get(workspace_id) is None:
+            raise HTTPException(status_code=404, detail="Dataset workspace not found")
+        job = job_runner.submit(
+            "dataset_krea2_locale",
+            {"workspace_id": workspace_id, **payload.model_dump()},
+            # 和打标、草稿一样每张都要呼叫一次模型。整批失败几乎总是同一个原因。
+            max_attempts=1,
+        )
+        return {"workspace_id": workspace_id, "job": job}
+
+    @router.post("/api/dataset-workspaces/{workspace_id}/krea2-drafts/confirm")
+    def confirm_dataset_workspace_krea2_drafts(
+        workspace_id: str,
+        payload: DatasetKrea2DraftBatchInput,
+    ) -> dict[str, Any]:
+        try:
+            return curation_store.confirm_krea2_drafts(
+                workspace_id,
+                payload.paths,
+                overwrite_reviewed=payload.overwrite_reviewed,
             )
         except DatasetWorkspaceError as error:
             _raise_workspace_http(error)

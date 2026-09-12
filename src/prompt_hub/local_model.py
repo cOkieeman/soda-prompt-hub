@@ -396,7 +396,7 @@ def draft_krea2_caption(
     try:
         raw = _extract_json_object(content)
     except json.JSONDecodeError as error:
-        raise LocalModelError("视觉模型没有返回可识别的 Krea 2 草稿 JSON") from error
+        raise LocalModelError(_no_json_message(content)) from error
     caption = normalize_caption_with_settings(
         "krea2",
         " ".join(str(raw.get("caption", "")).split()),
@@ -705,6 +705,12 @@ def _external_vision_completion(
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": False,
+        # 思考型模型会先把 max_tokens 花在内部推理上。300 个 token 全部
+        # 用完还没开始写答案。content 就是空的。finish_reason 是 length。
+        # 两种写法都送。不同后端认的键不一样。
+        # 已实测云端闸道会忽略不认得的键。本机 llama.cpp 认得其中之一。
+        "enable_thinking": False,
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     response = _request_json(
         f"{connection.base_url}/chat/completions",
@@ -717,9 +723,19 @@ def _external_vision_completion(
         service_name="外部模型服务",
     )
     try:
-        return str(response["choices"][0]["message"]["content"])
+        choice = response["choices"][0]
+        content = str(choice["message"]["content"] or "")
     except (KeyError, IndexError, TypeError) as error:
         raise LocalModelError("外部视觉模型返回格式错误") from error
+    if content.strip():
+        return content
+    # 空内容配上 length。几乎总是被推理吃光了额度。
+    # 只回「没有返回可识别的 JSON」的话。人会去怀疑提示词或模型能力。
+    if str(choice.get("finish_reason", "")) == "length":
+        raise LocalModelError(
+            "模型把输出额度用在内部推理上，没有留下内容。请调高说明长度，或换一个不做长推理的模型"
+        )
+    raise LocalModelError("外部视觉模型返回了空内容")
 
 
 def _image_data_url(path: Path) -> str:
@@ -733,6 +749,19 @@ def _image_data_url(path: Path) -> str:
         raise LocalModelError("无法为本地视觉模型读取结果图") from error
     encoded = base64.b64encode(output.getvalue()).decode("ascii")
     return f"data:image/jpeg;base64,{encoded}"
+
+
+def _no_json_message(content: str) -> str:
+    """模型回了散文而不是 JSON 时。把它说了什么带出来。
+
+    只写「没有返回可识别的 JSON」的话。最常见的原因会被藏起来
+    模型拒绝描述这张图。那不是技术故障。换一个愿意描述的模型就好。
+    但看不到原文的人会一直去调提示词。
+    """
+    snippet = " ".join(content.split())[:160]
+    if not snippet:
+        return "视觉模型没有返回任何内容"
+    return f"视觉模型没有返回可识别的草稿 JSON。它回了这段文字：{snippet}"
 
 
 def _extract_json_object(content: str) -> dict[str, Any]:

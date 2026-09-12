@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 from prompt_hub.api import create_app
 from prompt_hub.background_jobs import BackgroundJobStore, JobContext, JobInterruptedError
 from prompt_hub.dataset_curation import DatasetCurationStore
+from prompt_hub.dataset_curation_jobs import _batch_failure_message
 from prompt_hub.dataset_curation_support import (
     _normalize_caption,
     normalize_caption_settings,
@@ -1068,6 +1069,444 @@ def test_krea2_vlm_api_queues_drafts_and_requires_confirmation(
         assert calls[0][:3] == ("image-0.png", "test-vision-model", "")
 
 
+def test_krea2_drafts_confirm_batch_writes_only_drafted_images(
+    settings,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """人工审核阶段要能一次写入整批草稿。但不能压掉已经人工确认的说明。"""
+    source = _source(tmp_path, 3)
+    calls: list[tuple[str, str, str, dict]] = []
+    monkeypatch.setattr(
+        DatasetCurationStore,
+        "_default_krea2_captioner",
+        staticmethod(_fake_krea2_captioner(calls)),
+    )
+    with TestClient(create_app(settings)) as client:
+        imported = client.post(
+            "/api/dataset-workspaces/import",
+            json={"source_path": str(source)},
+        ).json()
+        workspace_id = imported["workspace"]["workspace_id"]
+        assert _wait(client, imported["job"]["job_id"])["status"] == "completed"
+        queued = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/krea2-vlm",
+            json={"scope": "missing", "model": "test-vision-model"},
+        )
+        job = _wait(client, queued.json()["job"]["job_id"])
+        assert job["result"]["completed"] == 3
+
+        handwritten = "A hand written English Krea 2 caption stays authoritative."
+        assert (
+            client.put(
+                f"/api/dataset-workspaces/{workspace_id}/caption",
+                json={
+                    "relative_path": "image-2.png",
+                    "profile_id": "krea2",
+                    "caption": handwritten,
+                    "caption_status": "reviewed",
+                },
+            ).status_code
+            == 200
+        )
+
+        paths = ["image-0.png", "image-1.png", "image-2.png"]
+        result = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/krea2-drafts/confirm",
+            json={"paths": paths},
+        )
+        assert result.status_code == 200
+        body = result.json()
+        assert body["requested"] == 3
+        assert body["confirmed"] == 2
+        assert body["skipped_reviewed"] == 1
+        assert body["skipped_reviewed_paths"] == ["image-2.png"]
+        assert body["snapshot"].startswith("snapshot-")
+
+        report = client.get(f"/api/dataset-workspaces/{workspace_id}/report").json()
+        captions = {
+            item["relative_path"]: item["curation"]["captions"]["krea2"]
+            for item in report["images"]
+        }
+        vlm = {item["relative_path"]: item["curation"]["krea2_vlm"] for item in report["images"]}
+        for relative_path in ("image-0.png", "image-1.png"):
+            assert captions[relative_path]["status"] == "reviewed"
+            assert captions[relative_path]["source"] == "vlm-confirmed"
+            assert captions[relative_path]["current"] == vlm[relative_path]["draft"]
+            assert vlm[relative_path]["status"] == "confirmed"
+        assert captions["image-2.png"]["current"] == handwritten
+        assert vlm["image-2.png"]["status"] == "completed"
+        assert report["images"][0]["curation"]["captions"]["anima"]["current"] == ""
+
+        repeated = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/krea2-drafts/confirm",
+            json={"paths": paths},
+        ).json()
+        assert repeated["confirmed"] == 0
+        assert repeated["skipped_unchanged"] == 2
+        assert repeated["skipped_reviewed"] == 1
+        assert repeated["snapshot"] == ""
+
+        overwritten = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/krea2-drafts/confirm",
+            json={"paths": ["image-2.png"], "overwrite_reviewed": True},
+        ).json()
+        assert overwritten["confirmed"] == 1
+        report = client.get(f"/api/dataset-workspaces/{workspace_id}/report").json()
+        confirmed_item = next(
+            item for item in report["images"] if item["relative_path"] == "image-2.png"
+        )
+        assert (
+            confirmed_item["curation"]["captions"]["krea2"]["current"]
+            == confirmed_item["curation"]["krea2_vlm"]["draft"]
+        )
+
+        missing = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/krea2-drafts/confirm",
+            json={"paths": ["image-9.png"]},
+        )
+        assert missing.status_code == 404
+
+
+def test_bulk_prepend_puts_trigger_word_first(settings, tmp_path) -> None:
+    """触发词只有排在最前面才是触发词。排序和去重都不能把它挤走。"""
+    _source_path, workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=2)
+    curation = DatasetCurationStore(settings, workspace_store)
+    workspace_id = workspace["workspace_id"]
+    paths = ["image-0.png", "image-1.png"]
+    for relative_path in paths:
+        curation.update_caption(
+            workspace_id,
+            relative_path,
+            profile_id="anima",
+            caption="solo, portrait, soda_char",
+        )
+        curation.update_caption(
+            workspace_id,
+            relative_path,
+            profile_id="krea2",
+            caption="A studio portrait with soft light.",
+        )
+
+    anima = curation.apply_bulk_edit(
+        workspace_id,
+        paths,
+        {"profile_id": "anima", "prepend": ["soda_char"], "sort": True},
+    )
+    assert anima["changed"] == 2
+    state = curation.read_state(workspace_id)
+    assert (
+        state["items"]["image-0.png"]["captions"]["anima"]["current"] == "soda_char, portrait, solo"
+    )
+
+    krea2 = curation.apply_bulk_edit(
+        workspace_id,
+        paths,
+        {"profile_id": "krea2", "prepend": ["soda_char"]},
+    )
+    assert krea2["changed"] == 2
+    state = curation.read_state(workspace_id)
+    assert (
+        state["items"]["image-0.png"]["captions"]["krea2"]["current"]
+        == "soda_char, A studio portrait with soft light."
+    )
+
+    repeated = curation.apply_bulk_edit(
+        workspace_id,
+        paths,
+        {"profile_id": "krea2", "prepend": ["soda_char"]},
+    )
+    assert repeated["changed"] == 0
+
+
+def test_krea2_locale_job_translates_selected_captions(settings, tmp_path, monkeypatch) -> None:
+    """批次翻译只产生中文对照。英文说明一个字都不能动。"""
+    _source_path, workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=2)
+    curation = DatasetCurationStore(settings, workspace_store)
+    workspace_id = workspace["workspace_id"]
+    english = "A studio portrait with soft directional light."
+    curation.update_caption(
+        workspace_id,
+        "image-0.png",
+        profile_id="krea2",
+        caption=english,
+    )
+    calls: list[str] = []
+
+    def _translate(caption: str, *, connections: object) -> str:  # noqa: ARG001
+        calls.append(caption)
+        return "一张柔和方向光下的棚拍肖像。"
+
+    monkeypatch.setattr(
+        "prompt_hub.dataset_curation_jobs.translate_caption_with_model",
+        _translate,
+    )
+    result = curation.krea2_locale_job(
+        {
+            "workspace_id": workspace_id,
+            "scope": "selected",
+            "paths": ["image-0.png", "image-1.png"],
+        },
+        _RecordingContext(),
+    )
+    assert result["completed"] == 1
+    assert result["skipped"] == 1
+    assert calls == [english]
+    state = curation.read_state(workspace_id)
+    locale = state["items"]["image-0.png"]["krea2_locale"]
+    assert locale["status"] == "completed"
+    assert locale["source"] == english
+    assert locale["localized"] == "一张柔和方向光下的棚拍肖像。"
+    assert state["items"]["image-0.png"]["captions"]["krea2"]["current"] == english
+
+    again = curation.krea2_locale_job(
+        {"workspace_id": workspace_id, "scope": "selected", "paths": ["image-0.png"]},
+        _RecordingContext(),
+    )
+    assert again["completed"] == 0
+    assert again["skipped"] == 1
+    assert calls == [english]
+
+
+def test_krea2_locale_job_reports_a_dead_translation_service(
+    settings,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """翻不出来要说出来。静默完成会让人以为这批没有可翻的内容。"""
+    _source_path, workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=1)
+    curation = DatasetCurationStore(settings, workspace_store)
+    workspace_id = workspace["workspace_id"]
+    curation.update_caption(
+        workspace_id,
+        "image-0.png",
+        profile_id="krea2",
+        caption="A studio portrait with soft directional light.",
+    )
+    monkeypatch.setattr(
+        "prompt_hub.dataset_curation_jobs.translate_caption_with_model",
+        lambda caption, *, connections: "",  # noqa: ARG005
+    )
+    with pytest.raises(DatasetWorkspaceError, match="翻译服务没有返回结果"):
+        curation.krea2_locale_job(
+            {"workspace_id": workspace_id, "scope": "all"},
+            _RecordingContext(),
+        )
+    state = curation.read_state(workspace_id)
+    assert state["items"]["image-0.png"]["krea2_locale"]["status"] == "failed"
+
+
+def test_review_batch_api_inserts_trigger_and_queues_translation(
+    settings,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """人工审核页面上的两个批次按钮走的是这两条路由。装配错了只会在运行时才发现。"""
+    _source_path, _workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=1)
+    workspace_id = workspace["workspace_id"]
+    monkeypatch.setattr(
+        "prompt_hub.dataset_curation_jobs.translate_caption_with_model",
+        lambda caption, *, connections: f"zh-{caption}",  # noqa: ARG005
+    )
+    with TestClient(create_app(settings)) as client:
+        assert (
+            client.put(
+                f"/api/dataset-workspaces/{workspace_id}/caption",
+                json={
+                    "relative_path": "image-0.png",
+                    "profile_id": "krea2",
+                    "caption": "A studio portrait with soft light.",
+                    "caption_status": "reviewed",
+                },
+            ).status_code
+            == 200
+        )
+        inserted = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/bulk-tags/apply",
+            json={
+                "profile_id": "krea2",
+                "paths": ["image-0.png"],
+                "prepend": ["soda_char"],
+            },
+        )
+        assert inserted.status_code == 200
+        assert inserted.json()["changed"] == 1
+
+        queued = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/krea2-locale",
+            json={"scope": "selected", "paths": ["image-0.png"]},
+        )
+        assert queued.status_code == 202
+        job = _wait(client, queued.json()["job"]["job_id"])
+        assert job["status"] == "completed"
+        assert job["result"]["completed"] == 1
+
+        image = client.get(f"/api/dataset-workspaces/{workspace_id}/report").json()["images"][0]
+        assert image["curation"]["captions"]["krea2"]["current"] == (
+            "soda_char, A studio portrait with soft light."
+        )
+        assert image["curation"]["krea2_locale"]["localized"] == (
+            "zh-soda_char, A studio portrait with soft light."
+        )
+
+        assert (
+            client.post(
+                "/api/dataset-workspaces/does-not-exist/krea2-locale",
+                json={"scope": "all"},
+            ).status_code
+            == 404
+        )
+
+
+def test_prepend_keeps_a_confirmed_caption_confirmed(settings, tmp_path) -> None:
+    """插触发词不改任何既有内容。把整批已确认的说明打回草稿会直接挡住交付。"""
+    _source_path, workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=1)
+    curation = DatasetCurationStore(settings, workspace_store)
+    workspace_id = workspace["workspace_id"]
+    curation.update_caption(
+        workspace_id,
+        "image-0.png",
+        profile_id="krea2",
+        caption="A studio portrait with soft light.",
+        status="reviewed",
+    )
+    curation.apply_bulk_edit(
+        workspace_id,
+        ["image-0.png"],
+        {"profile_id": "krea2", "prepend": ["soda_char"]},
+    )
+    record = curation.read_state(workspace_id)["items"]["image-0.png"]["captions"]["krea2"]
+    assert record["current"] == "soda_char, A studio portrait with soft light."
+    assert record["status"] == "reviewed"
+    assert record["source"] == "prepend-trigger"
+
+    # 真正改写内容的批量整理仍然要人重新看一遍。
+    curation.apply_bulk_edit(
+        workspace_id,
+        ["image-0.png"],
+        {"profile_id": "krea2", "add": ["wearing a red coat"]},
+    )
+    rewritten = curation.read_state(workspace_id)["items"]["image-0.png"]["captions"]["krea2"]
+    assert rewritten["status"] == "draft"
+    assert rewritten["source"] == "bulk-edit"
+
+
+def test_confirm_captions_marks_a_batch_reviewed_without_touching_text(
+    settings,
+    tmp_path,
+) -> None:
+    """草稿状态的说明要能整批确认。文字不动。空白的不确认。"""
+    _source_path, workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=2)
+    curation = DatasetCurationStore(settings, workspace_store)
+    workspace_id = workspace["workspace_id"]
+    caption = "A studio portrait with soft light."
+    curation.update_caption(
+        workspace_id,
+        "image-0.png",
+        profile_id="krea2",
+        caption=caption,
+        status="draft",
+    )
+    result = curation.confirm_captions(
+        workspace_id,
+        ["image-0.png", "image-1.png"],
+        profile_id="krea2",
+    )
+    assert result["confirmed"] == 1
+    assert result["skipped_empty"] == 1
+    assert result["snapshot"].startswith("snapshot-")
+    record = curation.read_state(workspace_id)["items"]["image-0.png"]["captions"]["krea2"]
+    assert record["current"] == caption
+    assert record["status"] == "reviewed"
+    assert record["source"] == "manual-confirmed"
+
+    repeated = curation.confirm_captions(workspace_id, ["image-0.png"], profile_id="krea2")
+    assert repeated["confirmed"] == 0
+    assert repeated["skipped_reviewed"] == 1
+    assert repeated["snapshot"] == ""
+
+
+def test_confirm_captions_api_unblocks_delivery_preflight(settings, tmp_path) -> None:
+    """交付前检查挡的就是这个状态。确认之后同一批图片要能通过。"""
+    _source_path, _workspace_store, workspace = _scanned_workspace(settings, tmp_path, count=1)
+    workspace_id = workspace["workspace_id"]
+    with TestClient(create_app(settings)) as client:
+        client.put(
+            f"/api/dataset-workspaces/{workspace_id}/caption",
+            json={
+                "relative_path": "image-0.png",
+                "profile_id": "krea2",
+                "caption": "A studio portrait with soft light.",
+                "caption_status": "draft",
+            },
+        )
+        client.put(
+            f"/api/dataset-workspaces/{workspace_id}/review",
+            json={"items": [{"relative_path": "image-0.png", "status": "approved"}]},
+        )
+        blocked = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/preflight",
+            json={"profile_id": "krea2", "paths": ["image-0.png"]},
+        ).json()
+        assert any(item["code"] == "caption_not_reviewed" for item in blocked["blockers"])
+
+        confirmed = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/captions/confirm",
+            json={"profile_id": "krea2", "paths": ["image-0.png"]},
+        )
+        assert confirmed.status_code == 200
+        assert confirmed.json()["confirmed"] == 1
+
+        cleared = client.post(
+            f"/api/dataset-workspaces/{workspace_id}/preflight",
+            json={"profile_id": "krea2", "paths": ["image-0.png"]},
+        ).json()
+        assert cleared["ready"] is True
+
+
+def test_preflight_warns_about_selected_near_duplicates(settings, tmp_path) -> None:
+    """近似重复是 left_files / right_files 两边比出来的。
+
+    照 exact 的 files 形状去读不会报错。只会永远读到空。提醒就成了摆设。
+    """
+    source = tmp_path / "near-duplicate-source"
+    source.mkdir()
+    base = Image.linear_gradient("L").resize((80, 64)).convert("RGB")
+    base.save(source / "left.png")
+    ImageEnhance.Brightness(base).enhance(0.99).save(source / "right.png")
+    workspace_store = DatasetWorkspaceStore(settings)
+    workspace_store.initialize()
+    workspace = workspace_store.register(source, name="Near duplicates")
+    job_store = BackgroundJobStore(settings.database_path)
+    job_store.initialize()
+    job = job_store.enqueue("dataset_scan", {"workspace_id": workspace["workspace_id"]})
+    assert job_store.claim_next({"dataset_scan"}) is not None
+    workspace_store.scan(workspace["workspace_id"], JobContext(job_store, job["job_id"], Event()))
+    workspace_id = workspace["workspace_id"]
+    report = workspace_store.read_current_report(workspace_id)
+    assert report is not None
+    assert report["near_duplicates"]
+    assert "files" not in report["near_duplicates"][0]
+
+    curation = DatasetCurationStore(settings, workspace_store)
+    paths = ["left.png", "right.png"]
+    for relative_path in paths:
+        curation.update_caption(
+            workspace_id,
+            relative_path,
+            profile_id="krea2",
+            caption="A soft grey gradient study.",
+        )
+    workspace_store.update_review_state(
+        workspace_id,
+        [{"relative_path": path, "status": "approved"} for path in paths],
+    )
+    preflight = curation.preflight_export(workspace_id, profile_id="krea2", paths=paths)
+    assert preflight["ready"] is True
+    assert {item["code"] for item in preflight["warnings"]} == {"near_duplicate"}
+    assert preflight["warnings"][0]["count"] == 2
+
+
 class TestCaptionLanguageGate:
     """要挡的是模型回了中日韩文字。不是所有非 ASCII 字符。"""
 
@@ -1113,3 +1552,21 @@ def test_trigger_word_is_optional_in_every_mode() -> None:
 
     filled = normalize_caption_settings("krea2", {"mode": "portrait", "trigger": "miru"})
     assert filled["trigger"] == "miru"
+
+
+def test_batch_failure_message_names_the_reason() -> None:
+    """整批失败几乎总是同一个原因。
+
+    只写「共 N 张失败」的话。使用者得自己去翻每一张的记录才知道为什么。
+    """
+    message = _batch_failure_message(
+        "Krea 2 VLM",
+        79,
+        ["视觉模型没有返回可识别的草稿 JSON"] * 79,
+    )
+    assert "79" in message
+    assert "视觉模型没有返回可识别的草稿 JSON" in message
+
+
+def test_batch_failure_message_survives_having_no_reasons() -> None:
+    assert "共 3 张" in _batch_failure_message("WD14", 3, [])

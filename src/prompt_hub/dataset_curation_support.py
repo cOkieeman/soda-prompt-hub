@@ -249,7 +249,20 @@ def _apply_tag_operation(caption: str, operation: Mapping[str, Any]) -> str:
             deduped = [trigger, *sorted(deduped[1:])]
         else:
             deduped.sort()
-    return ", ".join(deduped)
+    return ", ".join(_prepend_tags(deduped, operation))
+
+
+def _prepend_tags(tags: list[str], operation: Mapping[str, Any]) -> list[str]:
+    """把触发词放到最前面。
+
+    触发词只有排在第一位才是触发词。所以插入要在排序之后做。
+    已经出现在别处时先删掉再放到最前——同一个词出现两次会稀释它。
+    """
+    leading = _normalize_tag_list(operation.get("prepend", []))
+    if not leading:
+        return tags
+    head = list(dict.fromkeys(tag for tag in leading if tag))
+    return [*head, *(tag for tag in tags if tag not in head)]
 
 
 def _apply_krea2_operation(caption: str, operation: Mapping[str, Any]) -> str:
@@ -265,6 +278,7 @@ def _apply_krea2_operation(caption: str, operation: Mapping[str, Any]) -> str:
     if additions:
         suffix = ", ".join(additions)
         clean = f"{clean}, {suffix}" if clean else suffix
+    clean = _prepend_krea2(clean, operation)
     clean = _normalize_caption("krea2", clean)
     if _should_apply_caption_settings(operation):
         return _apply_krea2_caption_settings(
@@ -272,6 +286,23 @@ def _apply_krea2_operation(caption: str, operation: Mapping[str, Any]) -> str:
             normalize_caption_settings("krea2", operation),
         )
     return clean
+
+
+def _prepend_krea2(caption: str, operation: Mapping[str, Any]) -> str:
+    """把触发词插到整段说明的最前面。
+
+    自然语言说明没有标签那种顺序无关性。触发词要在开头才会被学到。
+    已经以它开头的就不再插一次——批量操作会被人反复按。
+    """
+    leading = [str(item).strip() for item in operation.get("prepend", []) if str(item).strip()]
+    if not leading:
+        return caption
+    head = ", ".join(dict.fromkeys(leading))
+    if not caption:
+        return head
+    if caption.lower().startswith(head.lower()):
+        return caption
+    return f"{head}, {caption}"
 
 
 def _normalize_tag_list(value: object) -> list[str]:
@@ -344,6 +375,23 @@ def _operation_profile(operation: Mapping[str, Any]) -> CaptionProfile:
         message = "Invalid bulk caption profile"
         raise DatasetWorkspaceError(message)
     return profile_id  # type: ignore[return-value]
+
+
+def is_prepend_only_operation(operation: Mapping[str, Any]) -> bool:
+    """这一批是不是只在最前面插了一个触发词。
+
+    一般的批量整理会改写说明内容。改完要人重新看一遍。所以落成草稿。
+    但插触发词不改任何一个既有的字。人也是刚刚亲手输入的。
+    把它当成需要重新确认的改写。就会把整批已确认的说明打回草稿。
+    然后交付被自己挡下来。
+    """
+    if not [str(item).strip() for item in operation.get("prepend", []) if str(item).strip()]:
+        return False
+    if operation.get("add") or operation.get("remove") or operation.get("replace"):
+        return False
+    if bool(operation.get("sort", False)):
+        return False
+    return not _should_apply_caption_settings(operation)
 
 
 def _should_apply_caption_settings(operation: Mapping[str, Any]) -> bool:

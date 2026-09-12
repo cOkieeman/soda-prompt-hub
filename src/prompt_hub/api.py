@@ -265,6 +265,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ARCHIVE_JOB_TYPE: workspace_store.import_archive_job,
             "dataset_wd14": curation_store.tag_job,
             "dataset_krea2_vlm": curation_store.krea2_vlm_job,
+            "dataset_krea2_locale": curation_store.krea2_locale_job,
             "source_sync": source_sync.job,
             "local_visual_index": local_visual.job,
             DOWNLOAD_JOB_TYPE: make_download_handler(bundled_model_root),
