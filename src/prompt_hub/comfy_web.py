@@ -5,29 +5,32 @@ COMFY_STYLES = r"""
   .comfy-hero { display: grid; grid-template-columns: 1.15fr .85fr; min-height: 330px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
   .comfy-hero-copy { position: relative; overflow: hidden; padding: 48px; border-right: 1px solid var(--line); background: linear-gradient(135deg, rgba(216,75,42,.08), transparent 55%); }
   .comfy-hero-copy::after { content: var(--result-step-label); position: absolute; right: -8px; bottom: -20px; color: rgba(23,24,21,.06); font: 900 72px/1 monospace; transform: rotate(-5deg); }
-  .comfy-hero h1 { max-width: 720px; margin: 12px 0 16px; font: 900 clamp(46px, 7vw, 90px)/.83 Georgia, serif; letter-spacing: -.06em; }
+  .comfy-hero h1 { max-width: 720px; margin: 12px 0 16px; font: 700 clamp(46px, 7vw, 90px)/.83 "Iowan Old Style", serif; letter-spacing: -.055em; }
   .comfy-hero p { max-width: 720px; line-height: 1.7; }
-  .comfy-flow { display: flex; flex-direction: column; justify-content: center; padding: 38px; background: #d8d1bf; }
+  .comfy-flow { display: flex; flex-direction: column; justify-content: center; padding: 38px; background: var(--paper-deep); }
   .comfy-flow ol { margin: 18px 0 0; padding: 0; list-style: none; counter-reset: flow; }
   .comfy-flow li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(23,24,21,.18); font-weight: 750; }
   .comfy-flow li::before { counter-increment: flow; content: "0" counter(flow); color: var(--signal); font: 900 10px monospace; }
   .comfy-controls { display: grid; grid-template-columns: 1fr 1fr .8fr; gap: 12px; margin: 14px 0; }
   .comfy-panel { border: 1px solid var(--line); background: var(--paper); padding: 20px; }
-  .comfy-panel h2 { margin: 0 0 14px; font: 900 16px Georgia, serif; }
+  .comfy-panel h2 { margin: 0 0 14px; font: 700 18px/1.1 "Iowan Old Style", serif; letter-spacing: -.02em; }
   .comfy-panel label { display: grid; gap: 7px; color: var(--muted); font: 800 9px/1.4 monospace; text-transform: uppercase; }
-  .comfy-panel input, .comfy-panel select { width: 100%; min-height: 42px; border: 1px solid var(--line); background: #fbf6ec; padding: 9px; color: var(--ink); }
-  .comfy-file { display: flex !important; align-items: center; justify-content: center; min-height: 42px; border: 1px dashed rgba(23,24,21,.42); background: #eee7da; cursor: pointer; color: var(--ink) !important; }
-  .comfy-button { min-height: 40px; border: 1px solid var(--ink); background: var(--ink); padding: 9px 13px; color: var(--paper); font: 900 9px monospace; cursor: pointer; }
+  .comfy-panel input, .comfy-panel select { width: 100%; min-height: 42px; border: 1px solid var(--line); background: var(--field); padding: 9px; color: var(--ink); }
+  .comfy-file { display: flex !important; align-items: center; justify-content: center; min-height: 42px; border: 1px dashed rgba(23,24,21,.42); background: var(--paper-panel); cursor: pointer; color: var(--ink) !important; }
+  .comfy-button { min-height: 40px; border: 1px solid var(--ink); background: var(--ink); padding: 9px 13px; color: var(--paper); font: 800 9px/1 monospace; letter-spacing: .08em; cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }
   .comfy-button.secondary { background: transparent; color: var(--ink); }
-  .comfy-button.signal { border-color: var(--signal); background: var(--signal); }
+  .comfy-button.secondary:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
+  .comfy-button.signal { border-color: var(--signal); background: var(--signal); color: var(--cream); }
+  .comfy-button.signal:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
+  .comfy-button:not(.secondary):not(.signal):hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .comfy-button:disabled { opacity: .45; cursor: not-allowed; }
-  .comfy-status { min-height: 42px; margin: 0 0 14px; border-left: 5px solid var(--acid); background: #30351f; padding: 12px 15px; color: #f4eddf; font: 800 10px/1.6 monospace; }
+  .comfy-status { min-height: 42px; margin: 0 0 14px; border-left: 4px solid var(--acid); background: var(--paper); padding: 12px 15px; color: var(--ink); box-shadow: var(--shadow); font: 800 10px/1.6 monospace; }
   .comfy-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 28px 0 12px; color: var(--paper); }
-  .comfy-head h2 { margin: 0; font: 900 30px Georgia, serif; }
-  .comfy-head .section-label, .comfy-head label { color: #b9ae9f; }
-  .comfy-head select { min-height: 36px; border: 1px solid rgba(244,237,223,.38); background: #f7f1e5; padding: 7px 9px; color: var(--ink); }
+  .comfy-head h2 { margin: 0; font: 700 30px/1 "Iowan Old Style", serif; letter-spacing: -.03em; }
+  .comfy-head .section-label, .comfy-head label { color: var(--on-ink-muted); }
+  .comfy-head select { min-height: 36px; border: 1px solid rgba(244,237,223,.38); background: var(--field); padding: 7px 9px; color: var(--ink); }
   .comfy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .comfy-card { display: grid; grid-template-rows: 250px auto; min-width: 0; border: 1px solid var(--line); background: var(--paper); box-shadow: 6px 8px 0 rgba(23,24,21,.09); }
+  .comfy-card { display: grid; grid-template-rows: 250px auto; min-width: 0; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
   .comfy-card-image { position: relative; display: block; width: 100%; min-width: 0; overflow: hidden; border-bottom: 1px solid var(--line); background: #1e1f1c; }
   .comfy-card-image img { display: block; width: 100%; max-width: 100%; min-width: 0; height: 100%; object-fit: contain; }
   .comfy-disposition { position: absolute; top: 10px; left: 10px; border: 1px solid var(--ink); background: var(--acid); padding: 6px 8px; color: var(--ink); font: 900 8px monospace; }
@@ -35,13 +38,13 @@ COMFY_STYLES = r"""
   .comfy-card-title { display: flex; justify-content: space-between; gap: 12px; }
   .comfy-card-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .comfy-card-title span { color: var(--muted); font: 800 8px monospace; white-space: nowrap; }
-  .comfy-meta-summary { margin: 12px 0; padding: 10px; border: 1px solid rgba(23,24,21,.15); background: #eee7da; font: 9px/1.6 monospace; }
-  .comfy-no-meta { border-color: var(--signal); color: #9d321e; }
+  .comfy-meta-summary { margin: 12px 0; padding: 10px; border: 1px solid rgba(23,24,21,.15); background: var(--paper-panel); font: 9px/1.6 monospace; }
+  .comfy-no-meta { border-color: var(--signal); color: var(--signal); }
   .comfy-prompt { max-height: 72px; overflow: auto; margin: 7px 0; white-space: pre-wrap; word-break: break-word; }
   .comfy-details summary { cursor: pointer; font: 900 9px monospace; }
-  .comfy-details pre { max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; padding: 10px; background: #20211e; color: #ece8dc; font: 8px/1.5 monospace; }
+  .comfy-details pre { max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; padding: 10px; background: #20211e; color: var(--paper); font: 8px/1.5 monospace; }
   .comfy-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
-  .comfy-empty { grid-column: 1 / -1; min-height: 260px; display: grid; place-items: center; border: 1px dashed rgba(23,24,21,.35); background: rgba(236,232,220,.65); text-align: center; }
+  .comfy-empty { grid-column: 1 / -1; min-height: 260px; display: grid; place-items: center; border: 1px dashed var(--line); background: var(--paper-wash); text-align: center; color: var(--muted); }
   @media (max-width: 1000px) { .comfy-controls, .comfy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .comfy-controls .comfy-panel:last-child { grid-column: 1 / -1; } }
   @media (max-width: 760px) { .comfy-page { width: min(100% - 18px, 1480px); margin-top: 9px; } .comfy-hero, .comfy-controls, .comfy-grid { grid-template-columns: 1fr; } .comfy-hero-copy { padding: 30px 22px; border-right: 0; border-bottom: 1px solid var(--line); } .comfy-flow { padding: 24px 22px; } .comfy-controls .comfy-panel:last-child { grid-column: auto; } .comfy-card { grid-template-rows: 230px auto; } .comfy-actions { grid-template-columns: 1fr; } .comfy-head { display: block; } }
 </style>

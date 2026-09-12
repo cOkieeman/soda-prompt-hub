@@ -5,9 +5,9 @@ LORA_STYLES = r"""
   .lora-hero { display: grid; grid-template-columns: 1.2fr .8fr; background: var(--paper); box-shadow: var(--shadow); }
   .lora-hero-copy { padding: clamp(30px, 5vw, 58px); }
   .lora-hero-copy h1 { margin: 18px 0; font-size: clamp(48px, 7vw, 88px); }
-  .lora-hero-copy p { max-width: 720px; color: #55564f; line-height: 1.7; }
+  .lora-hero-copy p { max-width: 720px; color: var(--ink-soft); line-height: 1.7; }
   .lora-flow { padding: 30px; background: var(--ink); color: var(--paper); }
-  .lora-flow .section-label { color: #b9ae9f; }
+  .lora-flow .section-label { color: var(--on-ink-muted); }
   .lora-flow ol { margin: 24px 0 0; padding: 0; list-style: none; counter-reset: steps; }
   .lora-flow li { counter-increment: steps; display: grid; grid-template-columns: 38px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(236,232,220,.2); font-size: 12px; line-height: 1.5; }
   .lora-flow li::before { content: "0" counter(steps); color: var(--acid); font: 800 16px/1 monospace; }
@@ -15,25 +15,28 @@ LORA_STYLES = r"""
   .lora-sidebar, .lora-main { background: var(--paper); box-shadow: var(--shadow); padding: 26px; min-width: 0; }
   .lora-main { display: grid; gap: 18px; align-content: start; }
   .lora-form { display: grid; gap: 12px; }
-  .lora-form label, .lora-fieldset { display: grid; gap: 6px; color: #55564f; font: 700 10px/1.3 monospace; letter-spacing: .04em; }
-  .lora-form input, .lora-form select, .lora-form textarea { width: 100%; border: 1px solid var(--line); background: #f7f2e7; padding: 10px; color: var(--ink); }
+  .lora-form label, .lora-fieldset { display: grid; gap: 6px; color: var(--muted); font: 800 9px/1.3 monospace; letter-spacing: .1em; }
+  .lora-form input, .lora-form select, .lora-form textarea { width: 100%; border: 1px solid var(--line); background: var(--field); padding: 10px; color: var(--ink); }
   .lora-form textarea { min-height: 72px; resize: vertical; }
   .lora-checks { display: flex; flex-wrap: wrap; gap: 8px; }
-  .lora-checks label { display: inline-flex; grid-template-columns: auto 1fr; align-items: center; gap: 6px; padding: 8px; border: 1px solid var(--line); background: #e3ddce; cursor: pointer; }
+  .lora-checks label { display: inline-flex; grid-template-columns: auto 1fr; align-items: center; gap: 6px; padding: 8px; border: 1px solid var(--line); background: var(--paper-wash); cursor: pointer; }
   .lora-format-help { margin: 0; color: var(--muted); font: 9px/1.55 monospace; }
   .lora-delivery-readiness { display: grid; gap: 9px; margin: 12px 0; }
-  .lora-delivery-format { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--line); background: #f4efe3; }
-  .lora-delivery-format.ready { border-color: #52735d; box-shadow: inset 4px 0 0 #52735d; }
-  .lora-delivery-format.blocked { border-color: #b66a58; box-shadow: inset 4px 0 0 var(--signal); }
+  .lora-delivery-format { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--line); background: var(--paper-lift); }
+  .lora-delivery-format.ready { border-color: var(--ink); box-shadow: inset 4px 0 0 var(--acid); background: var(--paper-lift); }
+  .lora-delivery-format.blocked { border-color: var(--signal); box-shadow: inset 4px 0 0 var(--signal); background: #f1e4d7; }
   .lora-delivery-format strong, .lora-delivery-format span { display: block; }
   .lora-delivery-format strong { font: 800 10px/1.35 monospace; }
   .lora-delivery-format span { margin-top: 5px; color: var(--muted); font: 9px/1.5 monospace; }
-  .lora-delivery-format button { border: 1px solid var(--ink); padding: 8px 10px; background: transparent; color: var(--ink); font: 800 8px/1.2 monospace; cursor: pointer; }
-  .lora-primary, .lora-secondary { border: 1px solid var(--ink); padding: 11px 13px; cursor: pointer; font: 800 10px/1 monospace; letter-spacing: .06em; }
-  .lora-primary { background: var(--signal); color: white; border-color: var(--signal); }
+  .lora-delivery-format button { border: 1px solid var(--ink); padding: 8px 10px; background: transparent; color: var(--ink); font: 800 8px/1.2 monospace; cursor: pointer; transition: background .18s ease, color .18s ease; }
+  .lora-delivery-format button:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
+  .lora-primary, .lora-secondary { border: 1px solid var(--ink); padding: 11px 13px; cursor: pointer; font: 800 10px/1 monospace; letter-spacing: .1em; transition: background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }
+  .lora-primary { background: var(--signal); color: var(--cream); border-color: var(--signal); }
+  .lora-primary:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--hard-lift); }
   .lora-secondary { background: transparent; color: var(--ink); }
+  .lora-secondary:hover:not(:disabled) { background: var(--ink); color: var(--acid); }
   .lora-project-list { margin-top: 24px; display: grid; gap: 8px; }
-  .lora-project-button { width: 100%; border: 1px solid var(--line); background: #e4dece; padding: 12px; cursor: pointer; text-align: left; }
+  .lora-project-button { width: 100%; border: 1px solid var(--line); background: var(--paper-wash); padding: 12px; cursor: pointer; text-align: left; }
   .lora-project-button[aria-current="true"] { border-color: var(--signal); box-shadow: inset 4px 0 0 var(--signal); }
   .lora-project-button strong, .lora-project-button small { display: block; }
   .lora-project-button small { margin-top: 6px; color: var(--muted); font: 700 9px/1.4 monospace; }
@@ -45,40 +48,40 @@ LORA_STYLES = r"""
   .lora-stat { padding: 13px; background: var(--ink); color: var(--paper); }
   .lora-stat strong, .lora-stat span { display: block; }
   .lora-stat strong { color: var(--acid); font: 800 24px/1 monospace; }
-  .lora-stat span { margin-top: 7px; color: #aaa99f; font-size: 9px; }
+  .lora-stat span { margin-top: 7px; color: var(--on-ink-faint); font-size: 9px; }
   .lora-journey { position: sticky; top: 10px; z-index: 6; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 1px; border: 1px solid var(--line); background: var(--line); box-shadow: var(--shadow); }
-  .lora-journey button { min-width: 0; border: 0; background: #d8d1c2; padding: 11px 8px; color: var(--ink); text-align: left; cursor: pointer; }
+  .lora-journey button { min-width: 0; border: 0; background: var(--paper-deep); padding: 11px 8px; color: var(--ink); text-align: left; cursor: pointer; }
   .lora-journey button[aria-current="step"] { background: var(--ink); color: var(--paper); }
   .lora-journey button span, .lora-journey button strong { display: block; }
   .lora-journey button span { color: var(--signal); font: 800 8px monospace; }
   .lora-journey button[aria-current="step"] span { color: var(--acid); }
   .lora-journey button strong { margin-top: 4px; overflow: hidden; font: 800 11px/1.25 "Iowan Old Style",serif; text-overflow: ellipsis; white-space: nowrap; }
   .lora-step-panel[hidden] { display: none; }
-  .lora-panel { border-top: 6px solid var(--ink); background: #e4dece; padding: 18px; }
+  .lora-panel { border-top: 6px solid var(--ink); background: var(--paper-wash); padding: 18px; }
   .lora-panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
   .lora-panel h3 { margin: 0; font: 700 24px/1 "Iowan Old Style", serif; }
   .lora-workspace-picker { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-  .lora-workspace-picker select { min-width: 0; border: 1px solid var(--line); background: #f7f2e7; padding: 10px; }
+  .lora-workspace-picker select { min-width: 0; border: 1px solid var(--line); background: var(--field); padding: 10px; }
   .lora-source-grid, .lora-asset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-  .lora-source-card, .lora-asset-card { background: #f4efe3; border: 1px solid var(--line); min-width: 0; overflow: hidden; }
-  .lora-source-card img, .lora-asset-card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #cbc5b7; display: block; }
+  .lora-source-card, .lora-asset-card { background: var(--paper-lift); border: 1px solid var(--line); min-width: 0; overflow: hidden; }
+  .lora-source-card img, .lora-asset-card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--paper-deep); display: block; }
   .lora-source-card label { display: grid; grid-template-columns: auto 1fr; gap: 7px; padding: 9px; align-items: start; font-size: 10px; overflow-wrap: anywhere; cursor: pointer; }
   .lora-asset-body { padding: 10px; display: grid; gap: 8px; }
   .lora-asset-name { margin: 0; font: 700 9px/1.4 monospace; overflow-wrap: anywhere; }
-  .lora-asset-body select { width: 100%; border: 1px solid var(--line); background: white; padding: 7px; font-size: 10px; }
+  .lora-asset-body select { width: 100%; border: 1px solid var(--line); background: var(--field); padding: 7px; font-size: 10px; }
   .lora-coverage-editor summary { cursor: pointer; color: var(--signal); font: 800 9px/1.4 monospace; }
   .lora-chip-group { margin-top: 8px; }
   .lora-chip-group strong { display: block; margin-bottom: 4px; font-size: 9px; }
-  .lora-chip-group label { display: inline-flex; gap: 3px; align-items: center; margin: 2px; padding: 5px; background: #ddd6c6; font-size: 8px; cursor: pointer; }
+  .lora-chip-group label { display: inline-flex; gap: 3px; align-items: center; margin: 2px; padding: 5px; background: var(--paper-deep); font-size: 8px; cursor: pointer; }
   .lora-matrix { display: grid; gap: 10px; }
   .lora-matrix-row { display: grid; grid-template-columns: 86px 1fr; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
   .lora-matrix-row > strong { color: var(--signal); font: 800 10px/1.4 monospace; }
   .lora-matrix-items { display: flex; flex-wrap: wrap; gap: 5px; }
-  .lora-matrix-item { padding: 6px 8px; background: #cac4b5; color: #494a44; font-size: 9px; }
+  .lora-matrix-item { padding: 6px 8px; background: var(--paper-deep); color: var(--ink-soft); font-size: 9px; }
   .lora-matrix-item.complete { background: var(--acid); color: var(--ink); }
-  .lora-warning { padding: 10px; border-left: 4px solid var(--signal); background: #f1e4d7; color: #6e392d; font-size: 10px; line-height: 1.5; }
+  .lora-warning { padding: 10px; border-left: 4px solid var(--signal); background: var(--paper-panel); color: var(--signal); font-size: 10px; line-height: 1.5; font-family: monospace; }
   .lora-coverage-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
-  .lora-coverage-result { margin: 0 0 12px; padding: 10px; border-left: 4px solid var(--acid); background: #f3ede0; color: var(--muted); font: 9px/1.5 monospace; }
+  .lora-coverage-result { margin: 0 0 12px; padding: 10px; border-left: 4px solid var(--acid); background: var(--paper-panel); color: var(--muted); font: 800 9px/1.5 monospace; }
   .lora-review-badge { width: fit-content; padding: 4px 6px; background: var(--acid); color: var(--ink); font: 800 7px/1 monospace; }
   .lora-pagination { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 0 0 14px; }
   .lora-pagination[hidden] { display: none; }
