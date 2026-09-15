@@ -42,9 +42,15 @@ def test_project_image_formats_have_fixed_media_types(
     assert media_type_for(Path(filename)) == expected
 
 
-def test_unknown_extension_still_falls_back_to_mimetypes() -> None:
-    guessed = media_type_for(Path("archive.zip"))
-    assert guessed in {"application/zip", "application/octet-stream"}
+def test_unknown_extension_still_falls_back_to_mimetypes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        mimetypes,
+        "guess_type",
+        lambda *_args, **_kwargs: ("application/x-test-archive", None),
+    )
+    assert media_type_for(Path("archive.zip")) == "application/x-test-archive"
 
 
 @pytest.mark.usefixtures("without_system_mime_database")
