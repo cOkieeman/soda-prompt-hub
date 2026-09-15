@@ -83,6 +83,16 @@ jobs:
             }
           }
 
+      - name: Test installer lifecycle
+        shell: pwsh
+        run: |
+          $installerRoot = Join-Path $env:RUNNER_TEMP "soda-commercial\installers"
+          $statusPath = Join-Path $installerRoot "WINDOWS_LIFECYCLE_STATUS.json"
+          ./deploy/windows-installer/test-lifecycle.ps1 `
+            -InstallerRoot $installerRoot `
+            -StatusPath $statusPath
+          Get-Content -LiteralPath $statusPath -Raw -Encoding UTF8
+
       - name: Upload unsigned installers
         uses: actions/upload-artifact@v4
         with:
