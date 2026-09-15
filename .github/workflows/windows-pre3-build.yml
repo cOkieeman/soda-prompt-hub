@@ -40,6 +40,8 @@ jobs:
 
       - name: Verify fixed media behavior
         shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           uv sync --locked
           uv run pytest --no-cov tests/test_media_types.py -q
