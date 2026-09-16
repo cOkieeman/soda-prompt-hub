@@ -59,6 +59,47 @@ def test_browse_roots_response_lists_home_and_volumes(store, scoped_home) -> Non
     assert payload["entries"][1]["selectable"] is True
 
 
+def test_home_shortcuts_skip_xdg_directories_disabled_as_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    config = home / ".config"
+    config.mkdir(parents=True)
+    (config / "user-dirs.dirs").write_text(
+        'XDG_DESKTOP_DIR="$HOME/"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+
+    assert workspace_module.home_shortcuts(home) == []
+
+
+def test_browse_quick_entries_only_include_reachable_xdg_paths(
+    store: DatasetWorkspaceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    volume = tmp_path / "mounts" / "disk"
+    mounted_pictures = volume / "pictures"
+    outside = tmp_path / "outside-pictures"
+    config = home / ".config"
+    for directory in (mounted_pictures, outside, config):
+        directory.mkdir(parents=True)
+    user_dirs = config / "user-dirs.dirs"
+    roots = [home.resolve(), volume.resolve()]
+    monkeypatch.setattr(Path, "home", classmethod(lambda _cls: home))
+    monkeypatch.setattr(workspace_module, "browse_roots", lambda: roots)
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+
+    user_dirs.write_text(f'XDG_PICTURES_DIR="{outside}"\n', encoding="utf-8")
+    outside_payload = store.browse_directory(None)
+    assert "图片" not in {entry["label"] for entry in outside_payload["quick"]}
+
+    user_dirs.write_text(f'XDG_PICTURES_DIR="{mounted_pictures}"\n', encoding="utf-8")
+    mounted_payload = store.browse_directory(None)
+    mounted_quick = {entry["label"]: entry for entry in mounted_payload["quick"]}
+    assert mounted_quick["图片"]["path"] == str(mounted_pictures.resolve())
+
+
 def test_browse_marks_imported_counts_and_reasons(store, scoped_home) -> None:
     trained = scoped_home / "trained"
     _image_files(trained, 3, ".png")
