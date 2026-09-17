@@ -1,0 +1,102 @@
+name: Windows stable build
+
+on:
+  push:
+    branches: [codex/stable-windows-build]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-stable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-installers:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Verify pagination and Windows packaging
+        shell: pwsh
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          uv sync --locked
+          uv run pytest --no-cov tests/test_api.py tests/test_windows_desktop.py -q
+
+      - name: Build portable payloads
+        shell: pwsh
+        run: |
+          $payloadRoot = Join-Path $env:RUNNER_TEMP "soda-payloads"
+          ./deploy/windows-desktop/build.ps1 -OutputRoot $payloadRoot
+          ./deploy/windows-shell/build.ps1 -OutputRoot $payloadRoot
+
+      - name: Build installers
+        shell: pwsh
+        run: |
+          $payloadRoot = Join-Path $env:RUNNER_TEMP "soda-payloads"
+          $commercialRoot = Join-Path $env:RUNNER_TEMP "soda-commercial"
+          ./deploy/windows-installer/build.ps1 `
+            -DesktopPackageRoot (Join-Path $payloadRoot "Soda-Prompt-Hub-Desktop-1.1.1-win-x64") `
+            -WorkerPackageRoot (Join-Path $payloadRoot "Soda-Compute-Worker-1.1.1-win-x64") `
+            -OutputRoot $commercialRoot
+
+      - name: Verify installer manifest
+        shell: pwsh
+        run: |
+          $installerRoot = Join-Path $env:RUNNER_TEMP "soda-commercial\installers"
+          $manifestPath = Join-Path $installerRoot "COMMERCIAL_RELEASE.json"
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($manifest.version -ne "1.1.1" -or @($manifest.installers).Count -ne 2) {
+            throw "Windows installer manifest is incomplete."
+          }
+          foreach ($item in $manifest.installers) {
+            $path = Join-Path $installerRoot $item.file
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Missing installer: $($item.file)"
+            }
+            $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $item.sha256) {
+              throw "Installer SHA-256 mismatch: $($item.file)"
+            }
+          }
+
+      - name: Test installer lifecycle
+        shell: pwsh
+        run: |
+          $installerRoot = Join-Path $env:RUNNER_TEMP "soda-commercial\installers"
+          $statusPath = Join-Path $installerRoot "WINDOWS_LIFECYCLE_STATUS.json"
+          ./deploy/windows-installer/test-lifecycle.ps1 `
+            -InstallerRoot $installerRoot `
+            -StatusPath $statusPath
+          Get-Content -LiteralPath $statusPath -Raw -Encoding UTF8
+
+      - name: Upload unsigned installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: soda-prompt-hub-windows-1.1.1-stable-${{ github.sha }}
+          path: ${{ runner.temp }}/soda-commercial/installers/*
+          if-no-files-found: error
+          retention-days: 7
