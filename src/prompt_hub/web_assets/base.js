@@ -6,6 +6,7 @@
     let currentResults = [];
     let currentCharacters = [];
     let archivePage = 1;
+    let archiveTotal = 0;
     const archivePageSize = 12;
     let remoteDeviceName = __PROMPT_HUB_DEVICE_NAME_JSON__;
     let tagDisplayLanguage = 'zh';
@@ -356,16 +357,14 @@
     }
 
     function renderPromptPage() {
-      const pageCount = Math.max(1, Math.ceil(currentResults.length / archivePageSize));
+      const pageCount = Math.max(1, Math.ceil(archiveTotal / archivePageSize));
       archivePage = Math.min(Math.max(archivePage, 1), pageCount);
-      const start = (archivePage - 1) * archivePageSize;
-      const pageItems = currentResults.slice(start, start + archivePageSize);
-      $('#archivePagination').hidden = currentResults.length <= archivePageSize;
+      $('#archivePagination').hidden = archiveTotal <= archivePageSize;
       $('#archivePageStatus').textContent = `第 ${archivePage} / ${pageCount} 页 · 每页 ${archivePageSize} 条`;
       $('#archivePreviousPage').disabled = archivePage <= 1;
       $('#archiveNextPage').disabled = archivePage >= pageCount;
-      $('#results').innerHTML = pageItems.map((item, index) => `
-        <article class="card ${item.favorite ? 'is-favorite' : ''}" data-result-index="${start + index}" style="animation-delay:${Math.min(index * 25, 250)}ms">
+      $('#results').innerHTML = currentResults.map((item, index) => `
+        <article class="card ${item.favorite ? 'is-favorite' : ''}" data-result-index="${index}" style="animation-delay:${Math.min(index * 25, 250)}ms">
           ${visualMarkup(item)}
           <div class="card-meta">
             <span class="badge signal">${escapeHtml(kindLabels[item.kind] || '资料')}</span>
@@ -380,15 +379,21 @@
         </article>`).join('');
     }
 
-    async function searchPrompts() {
+    async function searchPrompts(resetPage = true) {
       $('#status').textContent = '正在查找…';
       $('#results').classList.remove('character-results');
-      const params = new URLSearchParams({query: $('#query').value, kind: $('#kind').value, safety: $('#safety').value, source_id: $('#source').value, favorites_only: $('#favoritesOnly').getAttribute('aria-pressed'), has_visual: $('#onlyWithVisuals').getAttribute('aria-pressed'), category: $('#animadexCopyright').value, hair_color: $('#animadexHair').value, eye_color: $('#animadexEyes').value, limit: '30'});
+      if (resetPage) archivePage = 1;
+      const params = new URLSearchParams({query: $('#query').value, kind: $('#kind').value, safety: $('#safety').value, source_id: $('#source').value, favorites_only: $('#favoritesOnly').getAttribute('aria-pressed'), has_visual: $('#onlyWithVisuals').getAttribute('aria-pressed'), category: $('#animadexCopyright').value, hair_color: $('#animadexHair').value, eye_color: $('#animadexEyes').value, limit: String(archivePageSize), offset: String((archivePage - 1) * archivePageSize)});
       const data = await fetch('/api/search?' + params).then(r => r.json());
       currentResults = data.results;
-      archivePage = 1;
+      archiveTotal = data.total ?? data.count;
+      const pageCount = Math.max(1, Math.ceil(archiveTotal / archivePageSize));
+      if (archivePage > pageCount) {
+        archivePage = pageCount;
+        return searchPrompts(false);
+      }
       await ensureTagLabels(data.results.flatMap(tagValuesFromItem));
-      $('#status').textContent = `找到 ${data.count} 条`;
+      $('#status').textContent = `找到 ${archiveTotal} 条`;
       if (!data.results.length) {
         $('#archivePagination').hidden = true;
         $('#results').innerHTML = '<div class="empty"><strong>没有找到对应资料</strong><span>换一个词，或放宽类型与内容分级。</span></div>';
@@ -603,7 +608,7 @@
       Object.assign(item, await response.json());
       $('#status').textContent = '收藏和备注已保存';
       await loadStats();
-      await searchPrompts();
+      await searchPrompts(false);
     }
 
     async function rebuild() {
@@ -802,8 +807,8 @@
     $('#source').addEventListener('change', () => handleSourceChange().catch(error => { $('#status').textContent = error.message; }));
     ['#animadexCopyright', '#animadexHair', '#animadexEyes'].forEach(selector => $(selector).addEventListener('change', searchPrompts));
     $('#ocWorld').addEventListener('change', searchCharacters);
-    $('#archivePreviousPage').addEventListener('click', () => { if (archivePage <= 1) return; archivePage -= 1; renderPromptPage(); $('#archivePagination').scrollIntoView({block:'nearest'}); });
-    $('#archiveNextPage').addEventListener('click', () => { if (archivePage * archivePageSize >= currentResults.length) return; archivePage += 1; renderPromptPage(); $('#archivePagination').scrollIntoView({block:'nearest'}); });
+    $('#archivePreviousPage').addEventListener('click', async () => { if (archivePage <= 1) return; archivePage -= 1; await searchPrompts(false); $('#archivePagination').scrollIntoView({block:'nearest'}); });
+    $('#archiveNextPage').addEventListener('click', async () => { if (archivePage * archivePageSize >= archiveTotal) return; archivePage += 1; await searchPrompts(false); $('#archivePagination').scrollIntoView({block:'nearest'}); });
     $('#appNavToggle').addEventListener('click', event => setNavMenu(event.currentTarget.getAttribute('aria-expanded') !== 'true'));
     document.addEventListener('keydown', event => { if (event.key === 'Escape') setNavMenu(false); });
     document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
