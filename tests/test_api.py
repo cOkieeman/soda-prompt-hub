@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from prompt_hub import __version__, api, local_model
 from prompt_hub.api import create_app
 from prompt_hub.creative import CreativeStore
-from prompt_hub.database import PromptDatabase
+from prompt_hub.database import EntryInput, PromptDatabase
 from prompt_hub.importers import import_all
 from prompt_hub.model_connections import ModelConnection
 
@@ -344,6 +344,52 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
         assert "data-creative-add" in page.text
 
 
+def test_api_search_reports_total_and_supports_offsets(settings) -> None:
+    database = PromptDatabase(settings.database_path)
+    database.initialize()
+    with database.connect() as connection:
+        database.upsert_source(
+            source_id="pagination-test",
+            name="Pagination Test",
+            source_type="test",
+            url="",
+            local_path="",
+            commit_hash="test",
+            license_name="MIT",
+            notes="",
+            connection=connection,
+        )
+        database.replace_source_entries(
+            "pagination-test",
+            [
+                EntryInput(
+                    "pagination-test",
+                    f"entry:{index:02d}",
+                    "tag",
+                    f"Pagination entry {index:02d}",
+                    "pagination regression",
+                )
+                for index in range(31)
+            ],
+            connection=connection,
+        )
+        connection.commit()
+
+    with TestClient(create_app(settings)) as client:
+        page = client.get(
+            "/api/search",
+            params={"source_id": "pagination-test", "limit": 12, "offset": 24},
+        )
+
+    assert page.status_code == 200
+    assert page.json()["count"] == 7
+    assert page.json()["total"] == 31
+    assert page.json()["offset"] == 24
+    assert [item["external_id"] for item in page.json()["results"]] == [
+        f"entry:{index:02d}" for index in range(6, -1, -1)
+    ]
+
+
 def test_openapi_reports_public_release_version(settings) -> None:
     with TestClient(create_app(settings)) as client:
         assert client.get("/openapi.json").json()["info"]["version"] == __version__
@@ -447,6 +493,8 @@ def test_page_paginates_long_lists_and_loads_model_tabs_on_demand(settings) -> N
     for marker in (
         'id="archivePagination"',
         "archivePageSize = 12",
+        "archiveTotal",
+        "offset: String((archivePage - 1) * archivePageSize)",
         "renderPromptPage()",
         "pageSize: 24",
         "workspacePageSize()",

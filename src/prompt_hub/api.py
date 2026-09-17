@@ -490,8 +490,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         hair_color: str = "",
         eye_color: str = "",
         limit: Annotated[int, Query(ge=1, le=50)] = 20,
+        offset: Annotated[int, Query(ge=0)] = 0,
     ) -> dict[str, Any]:
-        results = database.search(
+        results, total = database.search_page(
             query,
             kind=kind,
             source_id=source_id,
@@ -503,9 +504,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             hair_color=hair_color,
             eye_color=eye_color,
             limit=limit,
+            offset=offset,
         )
         _attach_visual_urls(results, safety)
-        return {"query": query, "count": len(results), "results": results}
+        return {
+            "query": query,
+            "count": len(results),
+            "total": total,
+            "offset": offset,
+            "results": results,
+        }
 
     @application.put("/api/marks")
     def save_mark(update: MarkUpdate) -> dict[str, Any]:
