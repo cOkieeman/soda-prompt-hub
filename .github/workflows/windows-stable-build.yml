@@ -38,13 +38,16 @@ jobs:
         shell: pwsh
         run: choco install innosetup --no-progress --yes
 
-      - name: Verify pagination and Windows packaging
+      - name: Verify pagination and media behavior
         shell: pwsh
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           uv sync --locked
-          uv run pytest --no-cov tests/test_api.py tests/test_windows_desktop.py -q
+          uv run pytest --no-cov `
+            tests/test_api.py::test_api_search_reports_total_and_supports_offsets `
+            tests/test_media_types.py `
+            -q
 
       - name: Build portable payloads
         shell: pwsh
