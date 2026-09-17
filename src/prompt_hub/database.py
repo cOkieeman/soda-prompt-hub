@@ -184,7 +184,39 @@ class PromptDatabase(DatabaseOCMixin):
         eye_color: str = "",
         limit: int = 20,
     ) -> list[dict[str, Any]]:
+        results, _total = self.search_page(
+            query,
+            kind=kind,
+            source_id=source_id,
+            model_family=model_family,
+            safety=safety,
+            favorites_only=favorites_only,
+            has_visual=has_visual,
+            category=category,
+            hair_color=hair_color,
+            eye_color=eye_color,
+            limit=limit,
+        )
+        return results
+
+    def search_page(
+        self,
+        query: str = "",
+        *,
+        kind: str = "",
+        source_id: str = "",
+        model_family: str = "",
+        safety: str = "",
+        favorites_only: bool = False,
+        has_visual: bool = False,
+        category: str = "",
+        hair_color: str = "",
+        eye_color: str = "",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
         safe_limit = min(max(limit, 1), 50)
+        safe_offset = max(offset, 0)
         filters, values = _search_filters(
             kind=kind,
             source_id=source_id,
@@ -202,32 +234,62 @@ class PromptDatabase(DatabaseOCMixin):
 
         with self.connect() as connection:
             rows: list[sqlite3.Row] = []
+            total = 0
             fts_query = _to_fts_query(query)
             if fts_query:
                 try:
-                    rows = connection.execute(
+                    total = int(
+                        connection.execute(
+                            f"""
+                            SELECT COUNT(*)
+                            FROM entries_fts
+                            JOIN entries e ON e.id = entries_fts.rowid
+                            JOIN sources s ON s.source_id = e.source_id
+                            LEFT JOIN user_marks um
+                              ON um.source_id = e.source_id AND um.external_id = e.external_id
+                            WHERE entries_fts MATCH ? {where}
+                            """,
+                            [fts_query, *values],
+                        ).fetchone()[0]
+                    )
+                    if total:
+                        rows = connection.execute(
+                            f"""
+                            SELECT e.*, s.name AS source_name,
+                                   COALESCE(um.favorite, 0) AS favorite,
+                                   um.rating AS user_rating,
+                                   COALESCE(um.note, '') AS user_note,
+                                   bm25(entries_fts, 4.0, 1.0, 1.5) AS relevance
+                            FROM entries_fts
+                            JOIN entries e ON e.id = entries_fts.rowid
+                            JOIN sources s ON s.source_id = e.source_id
+                            LEFT JOIN user_marks um
+                              ON um.source_id = e.source_id AND um.external_id = e.external_id
+                            WHERE entries_fts MATCH ? {where}
+                            ORDER BY COALESCE(um.favorite, 0) DESC, um.rating DESC,
+                                     relevance, e.rating DESC, e.id DESC
+                            LIMIT ? OFFSET ?
+                            """,
+                            [fts_query, *values, safe_limit, safe_offset],
+                        ).fetchall()
+                except sqlite3.OperationalError:
+                    rows = []
+                    total = 0
+            if query and not total:
+                like_value = f"%{query.strip()}%"
+                total = int(
+                    connection.execute(
                         f"""
-                        SELECT e.*, s.name AS source_name,
-                               COALESCE(um.favorite, 0) AS favorite,
-                               um.rating AS user_rating,
-                               COALESCE(um.note, '') AS user_note,
-                               bm25(entries_fts, 4.0, 1.0, 1.5) AS relevance
-                        FROM entries_fts
-                        JOIN entries e ON e.id = entries_fts.rowid
+                        SELECT COUNT(*)
+                        FROM entries e
                         JOIN sources s ON s.source_id = e.source_id
                         LEFT JOIN user_marks um
                           ON um.source_id = e.source_id AND um.external_id = e.external_id
-                        WHERE entries_fts MATCH ? {where}
-                        ORDER BY COALESCE(um.favorite, 0) DESC, um.rating DESC,
-                                 relevance, e.rating DESC, e.id DESC
-                        LIMIT ?
+                        WHERE (e.title LIKE ? OR e.content LIKE ? OR e.category LIKE ?) {where}
                         """,
-                        [fts_query, *values, safe_limit],
-                    ).fetchall()
-                except sqlite3.OperationalError:
-                    rows = []
-            if query and not rows:
-                like_value = f"%{query.strip()}%"
+                        [like_value, like_value, like_value, *values],
+                    ).fetchone()[0]
+                )
                 rows = connection.execute(
                     f"""
                     SELECT e.*, s.name AS source_name,
@@ -242,11 +304,24 @@ class PromptDatabase(DatabaseOCMixin):
                     WHERE (e.title LIKE ? OR e.content LIKE ? OR e.category LIKE ?) {where}
                     ORDER BY COALESCE(um.favorite, 0) DESC, um.rating DESC,
                              e.rating DESC, e.id DESC
-                    LIMIT ?
+                    LIMIT ? OFFSET ?
                     """,
-                    [like_value, like_value, like_value, *values, safe_limit],
+                    [like_value, like_value, like_value, *values, safe_limit, safe_offset],
                 ).fetchall()
             elif not query:
+                total = int(
+                    connection.execute(
+                        f"""
+                        SELECT COUNT(*)
+                        FROM entries e
+                        JOIN sources s ON s.source_id = e.source_id
+                        LEFT JOIN user_marks um
+                          ON um.source_id = e.source_id AND um.external_id = e.external_id
+                        WHERE 1=1 {where}
+                        """,
+                        values,
+                    ).fetchone()[0]
+                )
                 rows = connection.execute(
                     f"""
                     SELECT e.*, s.name AS source_name,
@@ -261,11 +336,11 @@ class PromptDatabase(DatabaseOCMixin):
                     WHERE 1=1 {where}
                     ORDER BY COALESCE(um.favorite, 0) DESC, um.rating DESC,
                              e.rating DESC, e.id DESC
-                    LIMIT ?
+                    LIMIT ? OFFSET ?
                     """,
-                    [*values, safe_limit],
+                    [*values, safe_limit, safe_offset],
                 ).fetchall()
-        return [_row_to_dict(row) for row in rows]
+        return [_row_to_dict(row) for row in rows], total
 
     def source_facets(self, source_id: str) -> dict[str, list[str]]:
         with self.connect() as connection:
