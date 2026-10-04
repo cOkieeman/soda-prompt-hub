@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 
 from PIL import Image, ImageOps
 
+from prompt_hub.style_explorers import style_media_root
+
 if TYPE_CHECKING:
     from prompt_hub.config import Settings
 
@@ -107,6 +109,12 @@ def _media_request(
         return settings.git_sources_root / "clio-style-preview", Path(*relative.parts), ".jpg"
     if source_id == _ANIMADEX_SOURCE_ID and variant in {"original", "thumbnail"}:
         return _animadex_media_request(settings, relative)
+    if variant in {"original", "thumbnail"}:
+        snapshot = relative.parts[:1] == ("snapshot",)
+        image_relative = PurePosixPath(*relative.parts[1:]) if snapshot else relative
+        style_root = style_media_root(settings, source_id, snapshot=snapshot)
+        if style_root is not None and image_relative.parts[:1] == ("images",):
+            return style_root, Path(*image_relative.parts), ".webp"
     return None
 
 

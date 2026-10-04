@@ -74,3 +74,15 @@ Prompt Hub 不自动运行正式训练，也不管理 CUDA、Torch 或训练器�
 
 仍可在 Mac 查资料、写 Prompt、导入 OC、复盘既有结果、整理数据集、运行 WD14、冻结交付版本。
 远程出图、刷新 Windows 模型清单和把交付包复制到共享盘，需要等 Windows 再次开机。
+
+## 场景八：拉取画风图库
+
+Prompt Hub 内置 Krea2、Anima 和 Illustrious / NoobAI Style Explorer 的 GitHub URL，与原有五个来源共用拉取和更新入口。首次使用在首页或资料管理点击“拉取”，已有仓库使用“检查并更新”。三套仓库保存到资料目录的 `sources/git`，拉取后自动重建索引，可使用来源筛选、检索、本地预览、收藏、备注和“加入创作”。无需额外配置文件即可拉取。
+
+若远端图片缺失，可选地在 `sources/style-explorers.json` 登记历史图片备份。配置格式为 `soda-style-explorers-v1`，`libraries` 可包含 `krea2-style-explorer`、`anima-style-explorer`、`illustrious-style-explorer`。每项的 `path` 是备份绝对路径，`revision` 是完整 40 位 Git revision。目录需包含 `app/data.js` 和 `images`。该配置只提供备用预览，不改变 GitHub 来源及其拉取目录。
+
+预览优先使用当前 Git 仓库的图片，缺失时按画风提示词或画师名称精确匹配历史备份，不按可能变化的条目 ID 错配图片。使用历史预览时来源说明会提示版本限制，条目 metadata 记录图片版本。备份不参与 Git 更新，也不会被覆盖；个人收藏仍保存在 Hub 的资料目录。
+
+导入器只解析 `const galleryData = [...]` 的 JSON 数据，不执行第三方 JavaScript。图片通过现有受路径和扩展名限制的 `/media` 接口读取；缺失的图片不会生成虚假的预览链接。图片未有明确分级时记为“尚未分级”。
+
+Krea2 保留自然语言画风描述，Anima 和 Illustrious 保留原有画师文字；不同底模的画风效果需分别测试。仓库拉取不保证仓库之外的 CDN 图片或完整数据集也可用；AnimaDex 完整导出和 Krea 完整 CSV 仍属于单独的数据下载。

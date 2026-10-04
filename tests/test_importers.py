@@ -53,6 +53,9 @@ def test_missing_source_directories_are_reported_not_silently_ignored(settings) 
         "sd-wildcards",
         "kisegaeningyou",
         "animadex",
+        "krea2-style-explorer",
+        "anima-style-explorer",
+        "illustrious-style-explorer",
     }
     assert report["failed"] == []
 
@@ -106,5 +109,8 @@ def test_discover_sources_uses_expected_roots(settings) -> None:
         "sd-wildcards",
         "kisegaeningyou",
         "animadex",
+        "krea2-style-explorer",
+        "anima-style-explorer",
+        "illustrious-style-explorer",
     }
     assert all(spec.path.is_relative_to(settings.git_sources_root) for spec in specs)

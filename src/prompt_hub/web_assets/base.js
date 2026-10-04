@@ -12,6 +12,7 @@
     let tagDisplayLanguage = 'zh';
     const tagLabelCache = new Map();
     let homeMissingSources = [];
+    let sourceDetails = new Map();
     const sourceSetupSkipKey = 'soda-prompt-hub-source-setup-skipped';
     const sourceSyncUi = {busy:false,rebuilding:false,sources:[],jobs:[],job:null,loadSerial:0,localMessage:false,epoch:0};
     const viewLabels = {home:'首页', creative:'创作台', prompts:'提示词库', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'Windows 出图', management:'资料管理', remote:'设备连接'};
@@ -181,6 +182,7 @@
     async function loadStats() {
       const selectedSource = $('#source').value;
       const [stats, sources, version] = await Promise.all([fetch('/api/stats').then(r => r.json()), fetch('/api/sources').then(r => r.json()), fetch('/api/system/version').then(r => r.json())]);
+      sourceDetails = new Map(sources.map(source => [source.source_id, source]));
       $('#entryCount').textContent = formatNumber(stats.entries);
       $('#sourceCount').textContent = formatNumber(stats.sources);
       $('#styleCount').textContent = formatNumber(stats.kinds?.style);
@@ -380,6 +382,9 @@
     }
 
     async function searchPrompts(resetPage = true) {
+      const selectedSource = sourceDetails.get($('#source').value);
+      if (selectedSource?.source_id.endsWith('-style-explorer')) $('#archiveNotice').innerHTML = `<strong>${escapeHtml(selectedSource.name)}：</strong>${escapeHtml(selectedSource.notes)}`;
+      else $('#archiveNotice').innerHTML = '<strong>提示词与视觉资料库：</strong>输入服装、动作、构图、场景或画风关键词。找到合适内容后可以收藏并记录实测备注。';
       $('#status').textContent = '正在查找…';
       $('#results').classList.remove('character-results');
       if (resetPage) archivePage = 1;

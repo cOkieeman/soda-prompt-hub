@@ -15,6 +15,7 @@ from urllib.parse import quote
 from prompt_hub.config import Settings
 from prompt_hub.database import EntryInput, PromptDatabase
 from prompt_hub.media import build_kisega_thumbnails
+from prompt_hub.style_explorers import discover_style_explorers, load_style_entries
 
 
 class SourceVersionError(RuntimeError):
@@ -30,6 +31,8 @@ class SourceSpec:
     license_name: str
     notes: str
     importer: str
+    backup_path: Path | None = None
+    backup_revision: str = ""
 
 
 _ADULT_TAGS = {
@@ -103,7 +106,7 @@ _ANIMADEX_EYE_COLORS = {
 
 def discover_sources(settings: Settings) -> list[SourceSpec]:
     root = settings.git_sources_root
-    return [
+    sources = [
         SourceSpec(
             source_id="clio-style-preview",
             name="Clio Style Library",
@@ -154,6 +157,21 @@ def discover_sources(settings: Settings) -> list[SourceSpec]:
             importer="animadex",
         ),
     ]
+    sources.extend(
+        SourceSpec(
+            source_id=source.source_id,
+            name=source.name,
+            url=f"https://github.com/ThetaCursed/{source.repository}",
+            path=source.path,
+            license_name="See upstream LICENSE; image and artist references",
+            notes=source.notes,
+            importer="style-explorer",
+            backup_path=source.backup_path,
+            backup_revision=source.backup_revision,
+        )
+        for source in discover_style_explorers(settings)
+    )
+    return sources
 
 
 def import_all(settings: Settings, database: PromptDatabase) -> dict[str, int]:
@@ -242,6 +260,16 @@ def _error_message(error: Exception) -> str:
 
 
 def _load_entries(spec: SourceSpec, commit_hash: str) -> list[EntryInput]:
+    if spec.importer == "style-explorer":
+        return load_style_entries(
+            spec.source_id,
+            spec.path,
+            spec.url,
+            commit_hash,
+            backup=(spec.backup_path, spec.backup_revision)
+            if spec.backup_path is not None
+            else None,
+        )
     loaders = {
         "clio": _load_clio,
         "krea": _load_krea,
