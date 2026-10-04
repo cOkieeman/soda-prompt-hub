@@ -12,6 +12,7 @@
     let tagDisplayLanguage = 'zh';
     const tagLabelCache = new Map();
     let homeMissingSources = [];
+    let sourceDetails = new Map();
     const sourceSetupSkipKey = 'soda-prompt-hub-source-setup-skipped';
     const sourceSyncUi = {busy:false,rebuilding:false,sources:[],jobs:[],job:null,loadSerial:0,localMessage:false,epoch:0};
     const viewLabels = {home:'首页', creative:'创作台', prompts:'提示词库', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'Windows 出图', management:'资料管理', remote:'设备连接'};
@@ -181,6 +182,7 @@
     async function loadStats() {
       const selectedSource = $('#source').value;
       const [stats, sources, version] = await Promise.all([fetch('/api/stats').then(r => r.json()), fetch('/api/sources').then(r => r.json()), fetch('/api/system/version').then(r => r.json())]);
+      sourceDetails = new Map(sources.map(source => [source.source_id, source]));
       $('#entryCount').textContent = formatNumber(stats.entries);
       $('#sourceCount').textContent = formatNumber(stats.sources);
       $('#styleCount').textContent = formatNumber(stats.kinds?.style);
@@ -208,10 +210,9 @@
         return;
       }
       const selected = $('#source').value;
-      const visualSources = sources.filter(item => Number(item.visual_count || 0) > 0);
       $('#sourceQuickFilters').innerHTML = [
         {source_id:'', name:'全部来源'},
-        ...visualSources,
+        ...sources,
       ].map(item => `<button type="button" class="source-quick-filter" data-source-quick="${escapeHtml(item.source_id)}" aria-pressed="${String(selected === item.source_id)}">${escapeHtml(item.name)}</button>`).join('');
       $('#sourceQuickFilters').querySelectorAll('[data-source-quick]').forEach(button => button.addEventListener('click', async () => {
         $('#source').value = button.dataset.sourceQuick;
@@ -303,16 +304,16 @@
       $('#sourceSyncMessage').textContent = message;
       $('#sourceSyncMessage').dataset.tone = active ? 'busy' : job.status !== 'completed' || job.result?.failed || job.result?.index_failed?.length ? 'error' : 'success';
       const results = job.result?.sources || [];
-      const labels = {updated:'已更新',unchanged:'已是最新',cloned:'已安装',missing:'尚未安装',failed:'更新失败',skipped_dirty:'本地有修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
+      const labels = {skipped_local:'本地资料已复用',updated:'已更新',unchanged:'已是最新',cloned:'已安装',missing:'尚未安装',failed:'更新失败',skipped_dirty:'本地有修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
       $('#sourceSyncDetails').innerHTML = results.length ? `<details open><summary>本次各资料库结果 · ${results.length} 个</summary><ul>${results.map(item => `<li><strong>${escapeHtml(item.name || item.source_id)}</strong>：${escapeHtml(labels[item.status] || item.status)}${item.message ? ` — ${escapeHtml(item.message)}` : ''}</li>`).join('')}${(job.result?.index_failed || []).map(item => `<li><strong>${escapeHtml(item.name || item.source_id)}</strong>：索引失败 — ${escapeHtml(item.message)}</li>`).join('')}</ul></details>` : '';
       lockSourceActions();
     }
 
     function renderSourceRows() {
-      const labels = {ready:'可检查更新（尚未联网）',dirty:'本地有修改，禁止覆盖',no_upstream:'没有上游',missing:'尚未安装',not_git:'不是 Git 仓库',failed:'本地检查失败'};
+      const labels = {local:'本地只读映射',ready:'可检查更新（尚未联网）',dirty:'本地有修改，禁止覆盖',no_upstream:'没有上游',missing:'尚未安装',not_git:'不是 Git 仓库',failed:'本地检查失败'};
       const history = new Map();
       sourceSyncUi.jobs.forEach(job => (job.result?.sources || []).forEach(item => { if(!history.has(item.source_id)) history.set(item.source_id,{...item,time:job.finished_at || job.updated_at}); }));
-      const resultLabels = {updated:'已更新',unchanged:'已是最新',cloned:'已安装',failed:'更新失败',missing:'尚未安装',skipped_dirty:'有本地修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
+      const resultLabels = {skipped_local:'本地资料已复用',updated:'已更新',unchanged:'已是最新',cloned:'已安装',failed:'更新失败',missing:'尚未安装',skipped_dirty:'有本地修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
       $('#sourceSyncList').innerHTML = sourceSyncUi.sources.map(item => {
         const last = history.get(item.source_id);
         const action = item.status === 'missing' ? `<button class="source-sync-fetch" data-clone-source="${escapeHtml(item.source_id)}">拉取</button>` : item.status === 'ready' ? `<button class="source-sync-fetch" data-update-source="${escapeHtml(item.source_id)}">${last?.status === 'failed' ? '重试更新' : '检查并更新'}</button>` : '';
@@ -380,6 +381,9 @@
     }
 
     async function searchPrompts(resetPage = true) {
+      const selectedSource = sourceDetails.get($('#source').value);
+      if (selectedSource?.source_id.endsWith('-style-explorer')) $('#archiveNotice').innerHTML = `<strong>${escapeHtml(selectedSource.name)}：</strong>${escapeHtml(selectedSource.notes)}`;
+      else $('#archiveNotice').innerHTML = '<strong>提示词与视觉资料库：</strong>输入服装、动作、构图、场景或画风关键词。找到合适内容后可以收藏并记录实测备注。';
       $('#status').textContent = '正在查找…';
       $('#results').classList.remove('character-results');
       if (resetPage) archivePage = 1;

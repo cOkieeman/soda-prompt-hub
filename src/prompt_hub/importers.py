@@ -1,20 +1,23 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 import shutil
 import subprocess
 import tomllib
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 from prompt_hub.config import Settings
 from prompt_hub.database import EntryInput, PromptDatabase
+from prompt_hub.local_sources import local_source_mapping, mapped_catalogue_path, mapped_source_path
 from prompt_hub.media import build_kisega_thumbnails
+from prompt_hub.style_explorers import discover_style_explorers, load_style_entries
 
 
 class SourceVersionError(RuntimeError):
@@ -30,6 +33,11 @@ class SourceSpec:
     license_name: str
     notes: str
     importer: str
+    backup_path: Path | None = None
+    backup_revision: str = ""
+    local_only: bool = False
+    local_error: str = ""
+    data_path: Path | None = None
 
 
 _ADULT_TAGS = {
@@ -103,7 +111,7 @@ _ANIMADEX_EYE_COLORS = {
 
 def discover_sources(settings: Settings) -> list[SourceSpec]:
     root = settings.git_sources_root
-    return [
+    sources = [
         SourceSpec(
             source_id="clio-style-preview",
             name="Clio Style Library",
@@ -153,7 +161,81 @@ def discover_sources(settings: Settings) -> list[SourceSpec]:
             ),
             importer="animadex",
         ),
+        SourceSpec(
+            source_id="neons-style-explorer",
+            name="Neons Style Explorer",
+            url="https://github.com/Neon-Sparks/ComfyUI-NeonsStyleExplorer",
+            path=root / "ComfyUI-NeonsStyleExplorer",
+            license_name="MIT; see THIRD-PARTY-NOTICES.md",
+            notes=(
+                "Style, format and finish text catalog only; no ComfyUI code is executed. "
+                "Extra entries imported from Krea2 are excluded to avoid duplicates. "
+                "No previews bundled; model compatibility requires testing."
+            ),
+            importer="neons_styles",
+        ),
     ]
+    sources.extend(
+        SourceSpec(
+            source_id=source.source_id,
+            name=source.name,
+            url=f"https://github.com/ThetaCursed/{source.repository}",
+            path=source.path,
+            license_name="See upstream LICENSE; image and artist references",
+            notes=source.notes,
+            importer="style-explorer",
+            backup_path=source.backup_path,
+            backup_revision=source.backup_revision,
+        )
+        for source in discover_style_explorers(settings)
+    )
+    mappings, error = local_source_mapping(settings)
+    return [
+        replace(
+            spec,
+            path=mapped_source_path(settings, spec.source_id, spec.path),
+            local_only=True,
+            data_path=mapped_catalogue_path(settings, spec.source_id),
+            local_error=error or _mapping_error(mappings.get(spec.source_id)),
+            notes=spec.notes + " 本地只读映射。刷新仅重建索引。" + error,
+        )
+        if error or spec.source_id in mappings
+        else spec
+        for spec in sources
+    ]
+
+
+def _mapping_error(details: object) -> str:
+    if (
+        not isinstance(details, dict)
+        or not isinstance(details.get("path"), str)
+        or not Path(details["path"]).expanduser().is_absolute()
+    ):
+        return "本地映射需要绝对路径。已禁止自动拉取资料。"
+    return ""
+
+
+def _local_revision(spec: SourceSpec) -> str:
+    # Hash catalogue text only. Large preview libraries stay in place.
+    patterns = {
+        "style-explorer": ["app/data.js"],
+        "neons_styles": ["styles/*.json"],
+        "clio": ["styles.json"],
+        "krea": ["*.json"],
+        "wildcards": ["**/*.txt"],
+        "kisega": ["images*/*.desc.txt"],
+        "animadex": ["samples/*.csv", "config.toml"],
+    }
+    digest = hashlib.sha256()
+    for pattern in patterns[spec.importer]:
+        for path in sorted(spec.path.glob(pattern)):
+            if path.is_file() and path.resolve().is_relative_to(spec.path.resolve()):
+                digest.update(path.relative_to(spec.path).as_posix().encode())
+                digest.update(path.read_bytes())
+    if spec.data_path is not None:
+        for name in ("characters.csv", "artists.csv"):
+            digest.update((spec.data_path / "import" / name).read_bytes())
+    return "local:" + digest.hexdigest()
 
 
 def import_all(settings: Settings, database: PromptDatabase) -> dict[str, int]:
@@ -193,12 +275,18 @@ def _import_one(spec: SourceSpec, database: PromptDatabase, previous_count: int)
         "previous_count": previous_count,
         "count": 0,
     }
+    if spec.local_error:
+        return {**outcome, "status": "load_error", "message": spec.local_error}
     if not spec.path.is_dir():
         return {**outcome, "status": "missing", "message": "本地资料目录不存在，本次未重建这个来源"}
     try:
-        commit_hash = _git_commit(spec.path)
-    except SourceVersionError as error:
-        return {**outcome, "status": "not_git", "message": _error_message(error)}
+        commit_hash = _local_revision(spec) if spec.local_only else _git_commit(spec.path)
+    except (SourceVersionError, OSError) as error:
+        return {
+            **outcome,
+            "status": "not_git" if isinstance(error, SourceVersionError) else "load_error",
+            "message": _error_message(error),
+        }
     try:
         entries = _load_entries(spec, commit_hash)
     except (OSError, ValueError, KeyError, TypeError) as error:
@@ -216,7 +304,7 @@ def _import_one(spec: SourceSpec, database: PromptDatabase, previous_count: int)
         database.upsert_source(
             source_id=spec.source_id,
             name=spec.name,
-            source_type="git",
+            source_type="local" if spec.local_only else "git",
             url=spec.url,
             local_path=str(spec.path),
             commit_hash=commit_hash,
@@ -242,14 +330,101 @@ def _error_message(error: Exception) -> str:
 
 
 def _load_entries(spec: SourceSpec, commit_hash: str) -> list[EntryInput]:
+    if spec.importer == "style-explorer":
+        return load_style_entries(
+            spec.source_id,
+            spec.path,
+            spec.url,
+            commit_hash,
+            backup=(spec.backup_path, spec.backup_revision)
+            if spec.backup_path is not None
+            else None,
+        )
     loaders = {
         "clio": _load_clio,
         "krea": _load_krea,
         "wildcards": _load_wildcards,
         "kisega": _load_kisega,
         "animadex": _load_animadex,
+        "neons_styles": _load_neons_styles,
     }
     return loaders[spec.importer](spec, commit_hash)
+
+
+def _required_style_text(item: dict[str, Any], key: str) -> str:
+    value = item.get(key)
+    if not isinstance(value, str) or not value.strip():
+        msg = f"Invalid style field: {key}"
+        raise ValueError(msg)
+    return value.strip()
+
+
+def _read_neons_catalog(path: Path) -> list[dict[str, Any]]:
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(data, dict) or data.get("schema") != 1:
+        msg = f"Unsupported Neons catalog schema: {path.name}"
+        raise ValueError(msg)
+    styles = data.get("styles")
+    if not isinstance(styles, list) or any(not isinstance(item, dict) for item in styles):
+        msg = f"Invalid Neons styles list: {path.name}"
+        raise TypeError(msg)
+    if data.get("family") == "Extra":
+        return []
+    return [item for item in styles if item.get("family") != "Extra"]
+
+
+def _load_neons_styles(spec: SourceSpec, commit_hash: str) -> list[EntryInput]:
+    entries = []
+    seen: set[str] = set()
+    paths = sorted((spec.path / "styles").glob("*.json"))
+    if not paths:
+        msg = "Neons styles/*.json catalog is missing"
+        raise ValueError(msg)
+    for path in paths:
+        # Upstream's Extra pack copies ThetaCursed's Krea2 catalog.
+        if path.name == "10_other.json":
+            continue
+        for item in _read_neons_catalog(path):
+            style_id = _required_style_text(item, "id")
+            if style_id in seen:
+                msg = f"Duplicate Neons style id: {style_id}"
+                raise ValueError(msg)
+            seen.add(style_id)
+            axis = _required_style_text(item, "axis")
+            if axis not in {"style", "format", "finish"}:
+                msg = f"Unknown Neons style axis: {axis}"
+                raise ValueError(msg)
+            relative_path = path.relative_to(spec.path).as_posix()
+            entries.append(
+                EntryInput(
+                    source_id=spec.source_id,
+                    external_id=f"style:{style_id}",
+                    kind="style" if axis == "style" else "modifier",
+                    title=_required_style_text(item, "name"),
+                    content=_required_style_text(item, "nl"),
+                    negative_content=str(item.get("negative", "")),
+                    category=(
+                        f"{'composition' if axis == 'format' else axis}/"
+                        f"{_required_style_text(item, 'family')}"
+                    ),
+                    model_family="",
+                    safety="unrated",
+                    source_path=relative_path,
+                    source_url=_blob_url(spec, commit_hash, relative_path),
+                    metadata={
+                        "axis": axis,
+                        "medium": item.get("medium", ""),
+                        "tags": item.get("tags", []),
+                        "tags_negative": item.get("tags_negative", []),
+                        "aliases": item.get("aliases", []),
+                        "prompt_syntax": "natural_language",
+                        "compatibility": "untested",
+                        "image_paths": [],
+                        "image_refs": [],
+                    },
+                )
+            )
+    return entries
 
 
 def _load_clio(spec: SourceSpec, commit_hash: str) -> list[EntryInput]:
@@ -431,7 +606,7 @@ def _load_kisega(spec: SourceSpec, commit_hash: str) -> list[EntryInput]:
 
 
 def _load_animadex(spec: SourceSpec, commit_hash: str) -> list[EntryInput]:
-    catalogue_root, csv_root, image_prefix = _animadex_catalogue_paths(spec.path)
+    catalogue_root, csv_root, image_prefix = _animadex_catalogue_paths(spec.path, spec.data_path)
     characters_path = csv_root / "characters.csv"
     artists_path = csv_root / "artists.csv"
     if not characters_path.is_file() or not artists_path.is_file():
@@ -545,7 +720,11 @@ def _load_animadex(spec: SourceSpec, commit_hash: str) -> list[EntryInput]:
     return entries
 
 
-def _animadex_catalogue_paths(repo_root: Path) -> tuple[Path, Path, str]:
+def _animadex_catalogue_paths(
+    repo_root: Path, mapped_data: Path | None = None
+) -> tuple[Path, Path, str]:
+    if mapped_data is not None:
+        return mapped_data, mapped_data / "import", "catalogue/"
     data_root = repo_root.parent / "animadex-data"
     config_path = repo_root / "config.toml"
     if config_path.is_file():
@@ -633,6 +812,8 @@ def _git_commit(path: Path) -> str:
 
 
 def _blob_url(spec: SourceSpec, commit_hash: str, relative_path: str) -> str:
+    if spec.local_only:
+        return spec.url
     return f"{spec.url}/blob/{commit_hash}/{quote(relative_path, safe='/')}"
 
 

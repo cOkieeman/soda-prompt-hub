@@ -4,7 +4,7 @@ Soda Prompt Hub 是一套本机优先的 AI 绘图创作与数据集整理工具
 保存提示词、视觉参照、OC、创作项目、结果图、Caption、审核记录和冻结版本；Windows Worker 可以把
 经过确认的任务交给本机 ComfyUI，也可以与另一台设备配合。LoRA 正式训练仍在 Windows 的训练工具中完成。
 
-当前源码版本为 `1.1.1`。2026-09-14 第一版桌面安装包以 **Pre-release** 发布，
+当前源码版本为 `1.1.1`。2026-10-05 画风来源与本地映射构建以 **Pre-release** 发布，
 未正式平台签名；软件里显示的 stable 不代表这批安装包已经完成原生人工验收。
 版本与构建标识的区别见[正式版本体系](docs/RELEASES.md)。
 
@@ -12,8 +12,8 @@ Soda Prompt Hub 是一套本机优先的 AI 绘图创作与数据集整理工具
 
 | 使用方式 | 下载 | 要运行的应用 |
 | --- | --- | --- |
-| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
-| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-windows-standalone-20260914) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
+| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-style-refresh-20261005) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
+| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-style-refresh-20261005) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
 
 Mac 包面向 Apple Silicon（arm64），Windows 包面向 x64。下载 Release 的 Assets 中的 DMG / Setup，
 不是 GitHub 自动生成的 Source code ZIP。每套附有 `SHA256SUMS` 和手动验收说明。
@@ -64,6 +64,7 @@ Windows 单机用“退出并停止本机服务”。只退出启动器可以保
 - 从灵感、OC 或参考图建立绘图项目，并输出 Anima tags 与 Krea 2 自然语言 Prompt。
 - 检索本地提示词库、视觉参照、网页收藏和 OC Manager JSON；可按来源快速切换，并只查看带图资料。
 - 使用 AnimaDex 的角色、画师和作品缩略图作视觉参照；完整目录仍由用户使用自己的导出 token 下载到本机。
+- 导入 Krea2、Anima、Illustrious Style Explorer 与 Neons 资料；支持只读本地图库映射；见[画风资料来源](docs/STYLE_SOURCES.md)。
 - 使用 LM Studio 或可选的 OpenAI-compatible 模型辅助整理；模型结果先作为建议或草稿。
 - 使用 WD14 生成 Anima 标签草稿，人工审核后冻结为带哈希的版本化数据集。
 - 通过 Windows 本机 Worker 运行 ComfyUI、回收图片，并同步 LoRA/底模只读清单；Mac 双机模式使用 SMB 交换任务。

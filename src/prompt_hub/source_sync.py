@@ -93,6 +93,14 @@ class SourceSyncService:
         return list(self._sources) if self._sources is not None else discover_sources(self.settings)
 
     def _source_status(self, spec: SourceSpec) -> dict[str, Any]:
+        if spec.local_error:
+            return _result(spec, "failed", message=spec.local_error)
+        if spec.local_only:
+            return _result(
+                spec,
+                "local" if spec.path.is_dir() else "missing",
+                message="本地只读映射。不会联网拉取或修改资料目录。",
+            )
         if not spec.path.is_dir():
             return _result(spec, "missing", message="本地仓库不存在")
         if not (spec.path / ".git").exists():
@@ -125,6 +133,13 @@ class SourceSyncService:
         return self._clone_one(spec)
 
     def _clone_one(self, spec: SourceSpec) -> dict[str, Any]:
+        if spec.local_only:
+            return _result(
+                spec, "skipped_local", message="本地映射不会下载。请检查共享目录是否已挂载。"
+            )
+        return self._clone_git(spec)
+
+    def _clone_git(self, spec: SourceSpec) -> dict[str, Any]:
         root = self.settings.git_sources_root
         if not spec.path.is_relative_to(root):
             return _result(spec, "failed", message="资料源路径不在本地来源目录内，已拒绝拉取")
@@ -160,6 +175,21 @@ class SourceSyncService:
 
     def _sync_one(self, spec: SourceSpec, *, clone_missing: bool = False) -> dict[str, Any]:
         current = self._source_status(spec)
+        if spec.local_only:
+            return (
+                current
+                if current["status"] in {"failed", "missing"}
+                else {
+                    **current,
+                    "status": "skipped_local",
+                    "message": "已复用本地资料。仅重建索引。",
+                }
+            )
+        return self._sync_git(spec, current, clone_missing=clone_missing)
+
+    def _sync_git(
+        self, spec: SourceSpec, current: dict[str, Any], *, clone_missing: bool
+    ) -> dict[str, Any]:
         if current["status"] == "missing" and clone_missing:
             return self._clone_one(spec)
         if current["status"] in {"missing", "not_git", "failed"}:
