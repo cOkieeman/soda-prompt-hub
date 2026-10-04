@@ -117,13 +117,14 @@ ZIP 内文件时间和权限使用固定值；同一提交、同一工具链重�
 
 ### 2026-10-05：画风来源与本地映射构建
 
-[下载本次构建](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-style-refresh-20261005)。
-产品与 Worker 版本仍为 `1.1.1`，以独立构建标签区分，不修改已有 `v1.1.1` 标签或附件。
-Mac 仅 ad-hoc 签名、未 notarize；Windows Setup 未作 Authenticode 产品签名，GitHub 标记为 Pre-release。
+本次仅提交 PR，未合并、未创建发布标签，也未上传新的 GitHub Release。
+产品与 Worker 版本仍为 `1.1.1`，本机构建标识为 `style-refresh-20261005`，不修改已有 `v1.1.1` 标签或附件。
+Mac 仅 ad-hoc 签名、未 notarize；Windows Setup 未作 Authenticode 产品签名。
+未来若授权发布，须使用独立构建标签并公开验收范围，不直接替换已有正式附件。
 Linux 适配源码保留为实验性，本次不新增 Linux 发行附件。
 
 本次已在 Mac Apple Silicon 和 Windows x64 上验证安装、包内 Python、Core health、来源筛选、
 桌面快捷方式、双机桥接与 Windows 本机 Worker。只读扫描并完成两端模型 / LoRA 清单导入，
-未执行新一轮真实图像生成、训练或全面原生升级 / 回滚组合验收。测试范围与附件哈希随 Release 发布。
+未执行新一轮真实图像生成、训练或全面原生升级 / 回滚组合验收。测试范围与附件哈希已在维护者本机记录；附件尚未公开。
 九套来源的目录映射、公共图库、ComfyUI 模型和 LoRA 权重均不随安装包分发；须在使用者设备上另行配置。
 安装器不默认清空个人资料。本次维护者的全新初始化是另行授权的部署操作。

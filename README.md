@@ -4,16 +4,18 @@ Soda Prompt Hub 是一套本机优先的 AI 绘图创作与数据集整理工具
 保存提示词、视觉参照、OC、创作项目、结果图、Caption、审核记录和冻结版本；Windows Worker 可以把
 经过确认的任务交给本机 ComfyUI，也可以与另一台设备配合。LoRA 正式训练仍在 Windows 的训练工具中完成。
 
-当前源码版本为 `1.1.1`。2026-10-05 画风来源与本地映射构建以 **Pre-release** 发布，
+当前源码版本为 `1.1.1`。2026-09-14 第一版桌面安装包以 **Pre-release** 发布，
 未正式平台签名；软件里显示的 stable 不代表这批安装包已经完成原生人工验收。
 版本与构建标识的区别见[正式版本体系](docs/RELEASES.md)。
+
+2026-10-05 画风来源与本地映射构建已完成本机验证，目前仅提交 PR，尚未合并或发布新的安装包。
 
 ## 下载：先选使用方式
 
 | 使用方式 | 下载 | 要运行的应用 |
 | --- | --- | --- |
-| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-style-refresh-20261005) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
-| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-style-refresh-20261005) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
+| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
+| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-windows-standalone-20260914) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
 
 Mac 包面向 Apple Silicon（arm64），Windows 包面向 x64。下载 Release 的 Assets 中的 DMG / Setup，
 不是 GitHub 自动生成的 Source code ZIP。每套附有 `SHA256SUMS` 和手动验收说明。

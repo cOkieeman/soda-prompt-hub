@@ -12,7 +12,7 @@
 - 三套 Style Explorer 支持本地预览和按同名正文匹配的可选历史图片；历史配置损坏不影响有效的当前文字。
 - 来源解析失败或扫描为空时保留已有索引；媒体路径拒绝越界和图片符号链接。
 - 来源快捷筛选展示所有来源，文字来源不再因缺少预览图而被隐藏。
-- 同版本独立构建标签为 `v1.1.1-style-refresh-20261005`。发布 Mac arm64 DMG、Windows x64 Desktop / Compute Worker Setup 与哈希清单。
+- 已准备 Mac arm64 DMG、Windows x64 Desktop / Compute Worker Setup 与哈希清单。本轮仅提交 PR；暂不合并、创建发布标签或上传 GitHub Release。
 - 构建升级本身保留个人资料和原始素材。此次维护者实机初始化另行明确授权，不是安装器的默认行为。
 
 ### Linux 支持（实验性，非官方构建）
