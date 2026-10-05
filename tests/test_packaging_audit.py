@@ -211,6 +211,8 @@ def test_windows_installer_verifies_payload_before_copying_or_resealing() -> Non
 
 
 def test_windows_payload_verifier_native_regressions_when_powershell_is_available() -> None:
+    if sys.platform != "win32":
+        pytest.skip("Windows-native payload path rules require a Windows host")
     powershell = shutil.which("pwsh") or shutil.which("powershell")
     if powershell is None:
         pytest.skip("PowerShell is unavailable; native verifier has a staged Windows test runner")
@@ -221,10 +223,11 @@ def test_windows_payload_verifier_native_regressions_when_powershell_is_availabl
             "-File",
             str(_repository() / "tests/installer-payload-regression/run.ps1"),
         ],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+    assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads(result.stdout)
     assert report == {"status": "passed", "cases": 12, "installation_performed": False}
 
