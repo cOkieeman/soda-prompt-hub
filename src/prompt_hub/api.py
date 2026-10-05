@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, Literal
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from prompt_hub import __version__
@@ -18,6 +18,7 @@ from prompt_hub.comfy_routes import create_comfy_router
 from prompt_hub.compute_bridge import compute_contract
 from prompt_hub.config import DEFAULT_TAGGER_MODEL_ID, TAGGER_MODELS, Settings
 from prompt_hub.creative import (
+    CreativeProjectConflictError,
     CreativeStore,
     apply_iteration_suggestions,
     apply_result_review,
@@ -32,6 +33,8 @@ from prompt_hub.dataset_routes import create_dataset_router
 from prompt_hub.dataset_workspace import ARCHIVE_JOB_TYPE, DatasetWorkspaceStore
 from prompt_hub.embedding_index import EmbeddingIndexStore
 from prompt_hub.embedding_routes import create_embedding_router
+from prompt_hub.gallery import GalleryStore
+from prompt_hub.gallery_routes import create_gallery_router
 from prompt_hub.hybrid_search import HybridSearchService
 from prompt_hub.importers import import_report
 from prompt_hub.local_model import (
@@ -64,6 +67,8 @@ from prompt_hub.remote_nodes import RemoteNodeStore
 from prompt_hub.remote_routes import create_remote_router
 from prompt_hub.result_assets import find_result_asset
 from prompt_hub.result_media import ResultImageError, resolve_result_image, store_result_image
+from prompt_hub.scene_planning import ScenePlanStore
+from prompt_hub.scene_routes import create_scene_router
 from prompt_hub.search_routes import create_search_router
 from prompt_hub.source_routes import create_source_router
 from prompt_hub.source_sync import SourceSyncService
@@ -116,6 +121,7 @@ class CreativeProjectInput(BaseModel):
 
 
 class CreativeProjectUpdate(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
     title: str | None = Field(default=None, max_length=160)
     brief_zh: str | None = Field(default=None, max_length=6000)
     safety_mode: Literal["sfw", "suggestive", "adult", "explicit-adult"] | None = None
@@ -167,12 +173,16 @@ class CreativeImageAnalysisInput(BaseModel):
     model: str = Field(min_length=1, max_length=400)
 
 
-class CreativeReviewApplyInput(BaseModel):
+class CreativeRevisionInput(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
+
+
+class CreativeReviewApplyInput(CreativeRevisionInput):
     analysis: dict[str, Any]
     fill_empty_slots: bool = False
 
 
-class CreativeReviewBranchInput(BaseModel):
+class CreativeReviewBranchInput(CreativeRevisionInput):
     analysis: dict[str, Any]
 
 
@@ -222,6 +232,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     database = PromptDatabase(active_settings.database_path)
     creative_store = CreativeStore(active_settings.database_path)
+    scene_store = ScenePlanStore(active_settings.database_path)
+    gallery_store = GalleryStore(active_settings)
     job_store = BackgroundJobStore(active_settings.database_path)
     workspace_store = DatasetWorkspaceStore(active_settings)
     curation_store = DatasetCurationStore(
@@ -246,6 +258,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         comfy_store,
         remote_store,
         web_capture,
+        gallery_store,
     )
     visual_config = VisualModelConfigStore(active_settings.library_root / "visual-model.json")
     bundled_model_root = active_settings.models_root / "clip" / "clip-vit-base-patch32"
@@ -269,6 +282,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         {
             "dataset_scan": workspace_store.scan_job,
             "comfy_scan": comfy_store.scan_job,
+            "gallery_scan": lambda payload, context: gallery_store.scan_root(
+                str(payload["root_id"]), context=context
+            ),
             ARCHIVE_JOB_TYPE: workspace_store.import_archive_job,
             "dataset_wd14": curation_store.tag_job,
             "dataset_krea2_vlm": curation_store.krea2_vlm_job,
@@ -287,6 +303,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         model_connections.initialize()
         database.initialize()
         creative_store.initialize()
+        scene_store.initialize()
+        gallery_store.initialize()
         job_store.initialize()
         workspace_store.initialize()
         curation_store.initialize()
@@ -309,6 +327,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="Local-first prompt, style, tag, dataset, and workflow hub.",
         lifespan=lifespan,
     )
+
+    @application.middleware("http")
+    async def reject_cross_origin_mutations(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            origin = request.headers.get("origin")
+            if request.headers.get("sec-fetch-site") == "cross-site" or (
+                origin is not None and not _same_origin(origin, str(request.url))
+            ):
+                return JSONResponse(status_code=403, content={"detail": "不允许跨站修改本机资料"})
+        return await call_next(request)
+
     application.include_router(
         create_dataset_router(active_settings, creative_store, model_connections)
     )
@@ -331,6 +362,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(create_search_router(hybrid_search))
     application.include_router(create_remote_router(remote_store))
     application.include_router(create_model_router(model_connections))
+    application.include_router(
+        create_gallery_router(
+            active_settings, gallery_store, creative_store, job_runner, model_connections
+        )
+    )
+    application.include_router(
+        create_scene_router(
+            active_settings,
+            scene_store,
+            creative_store,
+            remote_store,
+            workflow_store,
+            gallery_store,
+            model_connections,
+        )
+    )
     application.include_router(create_optional_model_router(optional_models, job_runner))
     application.include_router(create_source_router(source_sync, job_runner, web_capture))
     application.include_router(
@@ -546,14 +593,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return iteration_context(project, parent)
 
     @application.post("/api/creative/projects/{project_id}/iteration/apply")
-    def apply_creative_iteration(project_id: str) -> dict[str, Any]:
+    def apply_creative_iteration(
+        project_id: str, payload: CreativeRevisionInput | None = None
+    ) -> dict[str, Any]:
         project = creative_store.get_project(project_id)
         if project is None:
             raise HTTPException(status_code=404, detail="Creative project not found")
+        _check_creative_revision(project, payload.expected_revision if payload else None)
         proposal = apply_iteration_suggestions(project)
         applied_slots = proposal.pop("applied_slots")
         if applied_slots:
-            project = creative_store.update_project(project_id, proposal)
+            try:
+                project = creative_store.update_project(
+                    project_id, proposal, expected_revision=project["revision"]
+                )
+            except CreativeProjectConflictError as error:
+                raise HTTPException(status_code=409, detail=str(error)) from error
         parent_id = str(project.get("lineage", {}).get("parent_project_id", "")).strip()
         parent = creative_store.get_project(parent_id) if parent_id else None
         return {
@@ -569,11 +624,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         values = {
             key: value
-            for key, value in payload.model_dump(exclude_unset=True).items()
+            for key, value in payload.model_dump(
+                exclude_unset=True, exclude={"expected_revision"}
+            ).items()
             if value is not None
         }
         try:
-            return creative_store.update_project(project_id, values, preserve_results=True)
+            return creative_store.update_project(
+                project_id,
+                values,
+                preserve_results=True,
+                expected_revision=payload.expected_revision,
+            )
+        except CreativeProjectConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Creative project not found") from error
 
@@ -594,10 +658,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         project_id: str,
         request: Request,
         filename: Annotated[str, Query(min_length=1, max_length=180)] = "result.png",
+        expected_revision: Annotated[int | None, Query(ge=1)] = None,
     ) -> dict[str, Any]:
         project = creative_store.get_project(project_id)
         if project is None:
             raise HTTPException(status_code=404, detail="Creative project not found")
+        _check_creative_revision(project, expected_revision)
         try:
             asset = store_result_image(
                 active_settings,
@@ -613,7 +679,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         assets = list(current_assets) if isinstance(current_assets, list) else []
         assets.append(asset)
         generation["result_assets"] = assets
-        updated = creative_store.update_project(project_id, {"generation": generation})
+        try:
+            updated = creative_store.update_project(
+                project_id, {"generation": generation}, expected_revision=project["revision"]
+            )
+        except CreativeProjectConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         return {"asset": asset, "project": updated}
 
     @application.post("/api/creative/projects/{project_id}/results/{asset_id}/analyze")
@@ -655,6 +726,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         project = creative_store.get_project(project_id)
         if project is None:
             raise HTTPException(status_code=404, detail="Creative project not found")
+        _check_creative_revision(project, payload.expected_revision)
         if find_result_asset(project, asset_id) is None:
             raise HTTPException(status_code=404, detail="Result image not found")
         values = apply_result_review(
@@ -662,7 +734,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             payload.analysis,
             fill_empty_slots=payload.fill_empty_slots,
         )
-        return creative_store.update_project(project_id, values)
+        try:
+            return creative_store.update_project(
+                project_id, values, expected_revision=project["revision"]
+            )
+        except CreativeProjectConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
 
     @application.post(
         "/api/creative/projects/{project_id}/results/{asset_id}/branch",
@@ -676,6 +753,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         project = creative_store.get_project(project_id)
         if project is None:
             raise HTTPException(status_code=404, detail="Creative project not found")
+        _check_creative_revision(project, payload.expected_revision)
         asset = find_result_asset(project, asset_id)
         if asset is None:
             raise HTTPException(status_code=404, detail="Result image not found")
@@ -835,6 +913,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "imported", **report, "stats": database.stats()}
 
     return application
+
+
+def _same_origin(origin: str, request_url: str) -> bool:
+    try:
+        source = urlsplit(origin)
+        target = urlsplit(request_url)
+        if (
+            source.scheme not in {"http", "https"}
+            or not source.hostname
+            or source.username is not None
+            or source.password is not None
+            or source.path not in {"", "/"}
+            or source.query
+            or source.fragment
+        ):
+            return False
+        matches = (
+            source.scheme,
+            source.hostname,
+            source.port or (443 if source.scheme == "https" else 80),
+        ) == (
+            target.scheme,
+            target.hostname,
+            target.port or (443 if target.scheme == "https" else 80),
+        )
+    except ValueError:
+        return False
+    return matches
+
+
+def _check_creative_revision(project: Mapping[str, Any], expected_revision: int | None) -> None:
+    if expected_revision is not None and project["revision"] != expected_revision:
+        raise HTTPException(status_code=409, detail="项目已改变, 请重新读取后再确认操作")
 
 
 def _visual_urls(result: dict[str, Any], safety_filter: str = "") -> list[dict[str, str]]:

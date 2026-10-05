@@ -1,9 +1,18 @@
+    /* windows_local 与 linux_local 都属于本机模式：只隐藏另一种模式的区块。 */
     html[data-usage-mode="windows_local"] [data-usage-only="mac_remote"],
+    html[data-usage-mode="windows_local"] [data-usage-only="linux_local"],
+    html[data-usage-mode="linux_local"] [data-usage-only="mac_remote"],
+    html[data-usage-mode="linux_local"] [data-usage-only="windows_local"],
     html[data-usage-mode="mac_remote"] [data-usage-only="windows_local"],
+    html[data-usage-mode="mac_remote"] [data-usage-only="linux_local"],
     html[data-usage-mode="windows_local"] #pairingEntry,
     html[data-usage-mode="windows_local"] #pairingDialog,
+    html[data-usage-mode="linux_local"] #pairingEntry,
+    html[data-usage-mode="linux_local"] #pairingDialog,
     html[data-usage-mode="windows_local"] #remoteNodeGrid .remote-form,
-    html[data-usage-mode="windows_local"] #remoteNodeGrid .remote-actions { display: none !important; }
+    html[data-usage-mode="windows_local"] #remoteNodeGrid .remote-actions,
+    html[data-usage-mode="linux_local"] #remoteNodeGrid .remote-form,
+    html[data-usage-mode="linux_local"] #remoteNodeGrid .remote-actions { display: none !important; }
     :root {
       --ink: #171815;
       --paper: #ece8dc;
@@ -62,7 +71,7 @@
       margin-bottom: 18px;
       display: flex;
       align-items: stretch;
-      justify-content: space-between;
+      justify-content: flex-start;
       background: var(--paper);
       box-shadow: var(--shadow);
       border: 1px solid rgba(255,255,255,.18);
@@ -107,18 +116,27 @@
     }
     .app-nav-button:hover { color: var(--ink); background: #e2dccd; }
     .app-nav-button[aria-current="page"] { background: var(--signal); color: #fff8eb; }
-    .tag-language-button { color: var(--ink); background: var(--acid); }
-    .ui-language-control {
-      min-width: 128px;
-      display: grid;
-      align-content: center;
-      gap: 3px;
-      border-left: 1px solid var(--line);
-      padding: 7px 12px;
-      background: #f5f0e4;
+    .language-settings-button { min-width: 88px; color: var(--ink); background: var(--acid); }
+    .language-settings {
+      position: fixed;
+      z-index: 100;
+      width: min(300px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+      padding: 18px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      box-shadow: var(--shadow);
     }
-    .ui-language-control span { color: var(--muted); font: 800 8px/1 monospace; letter-spacing: .08em; }
-    .ui-language-control select { width: 100%; border: 0; background: transparent; color: var(--ink); font: 800 10px/1.2 monospace; cursor: pointer; }
+    .language-settings[hidden] { display: none; }
+    .language-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .language-settings-head h2 { margin: 0; font-size: 17px; }
+    .language-settings-head button { width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); background: transparent; font-size: 20px; cursor: pointer; }
+    .ui-language-control, .tag-language-control { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 10px; margin-top: 12px; }
+    .ui-language-control span, .tag-language-control span { color: var(--muted); font: 700 11px/1.4 monospace; }
+    .ui-language-control select, .tag-language-button { width: 100%; min-height: 38px; padding: 7px 10px; border: 1px solid var(--line); color: var(--ink); background: #f5f0e4; font: 700 11px/1.3 monospace; cursor: pointer; }
+    .tag-language-button { background: var(--acid); }
+    .language-settings p { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
     html[lang="en"] [data-remote-device-name] { margin-inline: .25em; }
     .home-page {
       display: grid;
@@ -646,7 +664,6 @@
       .app-brand { width: 100%; min-height: 58px; border-right: 0; }
       .app-nav-items { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; }
       .app-nav-button { min-width: 0; min-height: 46px; padding: 0 8px; border-bottom: 1px solid var(--line); }
-      .ui-language-control { min-height: 46px; border-bottom: 1px solid var(--line); }
       .archive-header, .workspace, .home-page { grid-template-columns: 1fr; }
       aside { position: static; }
       .stats-panel { min-height: 220px; }
@@ -661,7 +678,6 @@
       .app-nav-items { display: none; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .app-nav[data-menu-open="true"] .app-nav-items { display: grid; }
       .app-nav-button { min-height: 48px; padding: 0 12px; }
-      .ui-language-control { min-height: 48px; border-bottom: 1px solid var(--line); }
       .home-lead, .home-guide { padding: 28px 22px; }
       .home-lead h1 { font-size: 58px; }
       .home-actions { display: grid; }
@@ -686,3 +702,48 @@
       html { scroll-behavior: auto !important; }
       *, *::before, *::after { animation: none !important; transition: none !important; translate: none !important; }
     }
+
+    #managementPage .archive-header { grid-template-columns: minmax(0,1fr) minmax(300px,1fr); }
+    #managementPage .masthead { padding: 24px; }
+    #managementPage .masthead h1 { font-size: 36px; line-height: 1.05; }
+    #managementPage .stamp { display: none; }
+    #managementPage .stats-panel { padding: 24px; }
+    #managementPage .stat strong { font-size: 28px; }
+    #managementPage .management-sources { padding: 24px; }
+    #managementPage .source-sync-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 24px; }
+    #managementPage .source-sync-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 16px 0; }
+    #managementPage .source-sync-row > div { flex-basis: 100%; }
+    #managementPage .source-sync-row small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+    #managementPage .source-sync-status { gap: 8px; font-size: 11px; }
+    #managementPage .source-sync-fetch { padding: 7px 9px; font-size: 10px; }
+    .source-row-details { flex-basis: 100%; font-size: 11px; color: var(--muted); }
+    .source-row-details > summary { cursor: pointer; }
+    .source-row-details code { display: block; padding: 8px 0; white-space: normal; overflow-wrap: anywhere; }
+    .source-mapping-editor { margin: 14px 0; border: 1px solid var(--line); padding: 14px; background: #f3eee2; }
+    .source-mapping-editor > summary { cursor: pointer; font-size: 12px; font-weight: 700; }
+    #sourceMappingForm { display: grid; gap: 12px; margin-top: 16px; max-width: 680px; }
+    #sourceMappingForm label { display: grid; gap: 6px; font-size: 12px; }
+    #sourceMappingForm input, #sourceMappingForm select { padding: 10px; border: 1px solid var(--line); min-width: 0; width: 100%; background: var(--paper); }
+    #sourceMappingForm p { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+    #sourceMappingForm button { width: fit-content; padding: 10px 18px; background: var(--ink); color: var(--paper); font-weight: 700; }
+    #sourceMappingDataWrap[hidden] { display: none; }
+    #managementPage .source-center-grid { display: flex; flex-direction: column; }
+    #managementPage .source-center-heading { font-size: 24px; }
+    #managementPage .source-capture-panel > summary { cursor: pointer; font-size: 14px; font-weight: 700; }
+    @media (max-width:900px) { #managementPage .archive-header { grid-template-columns: 1fr; } }
+    @media (max-width:680px) { #managementPage .source-sync-list { grid-template-columns: 1fr; } }
+    .app-settings-menu { position: relative; align-self: stretch; display: flex; align-items: center; flex: 0 0 auto; }
+    .app-settings-menu > summary { cursor: pointer; list-style: none; padding: 20px; font-size: 12px; font-weight: 700; }
+    .app-settings-items { position: absolute; top: 100%; right: 0; min-width: 180px; display: grid; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 10px 20px rgba(39,32,22,.15); z-index: 100; }
+    .app-settings-items .app-nav-button { width: 100%; min-width: 0; padding: 16px; text-align: left; border-bottom: 1px solid var(--line); }
+    @media (max-width:620px) { .app-settings-menu > summary { padding: 16px; } .app-settings-items { right: auto; left: 0; } }
+    .app-nav-items { overflow: visible; flex: 1; min-width: 0; }
+    @media (min-width:901px) {
+      .app-brand { flex-shrink: 0; }
+      .app-nav-items > .app-nav-button { flex: 1; min-width: 0; padding: 0 clamp(6px, .8vw, 15px); }
+    }
+    .app-settings-menu:has([aria-current="page"]) > summary { color: white; background: var(--signal); }
+    #managementPage .source-center-grid > [hidden] { display: none; }
+    #managementPage .source-backup-panel > summary { cursor: pointer; font-size: 14px; font-weight: 700; }
+
+    #sourceMappingForm [hidden] { display: none; }

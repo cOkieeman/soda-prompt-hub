@@ -1,2 +1,8 @@
 # Keep CMD batch files byte-for-byte CRLF so GitHub source downloads also run correctly.
 deploy/windows-worker/*.bat -text whitespace=cr-at-eol
+
+# Linux shell scripts and systemd units must stay LF: a CRLF shebang or unit file
+# breaks on Linux/WSL even though it looks fine on Windows (core.autocrlf=true).
+*.sh text eol=lf
+deploy/linux/* text eol=lf
+deploy/linux/*.png binary -eol

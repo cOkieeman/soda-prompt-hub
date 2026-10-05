@@ -13,6 +13,11 @@ from urllib.parse import quote
 
 from prompt_hub.release_info import worker_compatibility
 from prompt_hub.remote_nodes_support import _read_json
+from prompt_hub.usage_modes import (
+    is_local_platform,
+    local_service_manager,
+    platform_usage_mode,
+)
 
 HEARTBEAT_MAX_AGE = 25
 MAX_CLOCK_SKEW = 15
@@ -22,7 +27,9 @@ if TYPE_CHECKING:
 
 
 def connection_summary(store: RemoteNodeStore, node_id: str | None = None) -> dict[str, Any]:  # noqa: PLR0911, C901
-    local = sys.platform == "win32"
+    local = is_local_platform(sys.platform)
+    mode = platform_usage_mode(sys.platform)
+    manager = local_service_manager(mode)
     nodes = [node for node in store.list_nodes() if node.get("role") == "compute_5060ti"]
     if node_id is not None:
         nodes = [node for node in nodes if node.get("node_id") == node_id]
@@ -32,7 +39,7 @@ def connection_summary(store: RemoteNodeStore, node_id: str | None = None) -> di
     result: dict[str, Any] = {
         "state": "not_configured",
         "label": "本机服务尚未配置" if local else "未配置计算设备",
-        "detail": "请在 Windows 启动器启动本机服务，无需配对其他设备。"
+        "detail": f"请先启动本机服务（{manager}），无需配对其他设备。"
         if local
         else "本机资料库可以独立使用，需要计算时再添加设备。",
         "device": str((node or {}).get("label", "计算设备")),
@@ -41,7 +48,7 @@ def connection_summary(store: RemoteNodeStore, node_id: str | None = None) -> di
         "can_compute": False,
         "checked_at": datetime.now(UTC).isoformat(),
         "heartbeat_age_seconds": None,
-        "mode": "windows_local" if local else "mac_remote",
+        "mode": mode if local else "mac_remote",
         "reconnect_url": "" if local else reconnect_url(node or {}),
     }
     if not node:
@@ -51,7 +58,7 @@ def connection_summary(store: RemoteNodeStore, node_id: str | None = None) -> di
             **result,
             "state": "disabled",
             "label": "设备未启用",
-            "detail": "请在 Windows 启动器启动本机服务后再检查。"
+            "detail": f"请先启动本机服务（{manager}）后再检查。"
             if local
             else "在设备设置中启用这台设备后再检查。",
         }
@@ -64,18 +71,21 @@ def connection_summary(store: RemoteNodeStore, node_id: str | None = None) -> di
     }
     if local:
         messages = {
-            "not_configured": ("本机配置未完成", "请重新打开 Windows 启动器，完成本机服务初始化。"),
+            "not_configured": (
+                "本机配置未完成",
+                f"请重新启动本机服务（{manager}），完成初始化。",
+            ),
             "mount_missing": (
                 "本机任务目录不可用",
-                "请检查启动器中的服务状态及本机任务目录是否存在。",
+                f"请检查本机服务（{manager}）的运行状态及本机任务目录是否存在。",
             ),
             "mount_ready_bridge_unprepared": (
                 "本机任务目录待准备",
-                "请在 Windows 启动器启动本机服务，自动准备任务目录。",
+                f"请先启动本机服务（{manager}），会自动准备任务目录。",
             ),
             "bridge_read_only": (
                 "本机任务目录不可写",
-                "请核对启动器使用的本机任务目录，确认当前账号有写入权限。",
+                f"请核对本机任务目录（由 {manager} 使用），确认当前账号有写入权限。",
             ),
         }
     result["share_connected"] = diagnostic["mount_exists"]
@@ -88,7 +98,7 @@ def connection_summary(store: RemoteNodeStore, node_id: str | None = None) -> di
             **result,
             "state": "unconfirmed",
             "label": "本机 Worker 待确认" if local else "共享已连接 · Worker 待确认",
-            "detail": "尚未收到本机 Worker 心跳，请检查 Windows 启动器中的本机服务。"
+            "detail": f"尚未收到本机 Worker 心跳，请检查本机服务（{manager}）。"
             if local
             else "未收到实时心跳，请启动支持连接状态的新版 Worker。",
         }
@@ -103,16 +113,18 @@ def connection_summary(store: RemoteNodeStore, node_id: str | None = None) -> di
             **result,
             "state": "stale",
             "label": "Worker 连接中断",
-            "detail": "本机 Worker 心跳已过期，请检查启动器中的本机服务；电脑刚唤醒时可稍后刷新。"
-            if local
-            else "心跳已过期，请检查 Windows 是否休眠、Worker 是否仍在运行。",
+            "detail": (
+                f"本机 Worker 心跳已过期，请检查本机服务（{manager}）；电脑刚唤醒时可稍后刷新。"
+                if local
+                else "心跳已过期，请检查 Windows 是否休眠、Worker 是否仍在运行。"
+            ),
         }
     if heartbeat.get("running") is not True:
         return {
             **result,
             "state": "stopped",
             "label": "Worker 已停止",
-            "detail": "请在 Windows 启动器中启动本机服务，无需另开独立 Worker。"
+            "detail": f"请先启动本机服务（{manager}），无需另开独立 Worker。"
             if local
             else "共享目录仍可访问，在 Windows 启动 Worker 即可恢复。",
         }

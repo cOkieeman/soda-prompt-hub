@@ -1,0 +1,140 @@
+name: Linux
+
+# 本工作流是 Linux 侧的独立质量闸门：
+#   1) lint 作业：按主任务书 §13 执行项目**既有**的格式 / lint / 类型检查命令
+#      （不引入任何新工具；上游 ci.yml 在 ubuntu-latest 上也跑同样的命令）
+#   2) tests 作业：Ubuntu 22.04 与 24.04 上的完整测试 + deploy/linux 部署冒烟
+#   3) systemd 用户服务作业：runner 支持时执行真实安装 / 状态 / 健康检查 / 卸载
+
+on:
+  push:
+    branches: ["main", "linux/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: 格式 / Lint / 类型检查
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run ty check src/
+
+  tests:
+    name: Tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-22.04", "ubuntu-24.04"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 测试套件里有 13 个用例依赖 Node；缺 Node 时会有 1 个硬失败而不是跳过。
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Test
+        run: uv run pytest -q
+
+      - name: Deployment smoke (无 systemd 路径)
+        run: |
+          set -Eeuo pipefail
+          ./deploy/linux/install.sh --no-service --port 8899 --library-root "$RUNNER_TEMP/library"
+          ./deploy/linux/start.sh
+          curl -fsS http://127.0.0.1:8899/api/health
+          ./deploy/linux/status.sh
+          ./deploy/linux/stop.sh
+          test -f "$RUNNER_TEMP/library/database/prompt-library.sqlite"
+          test -x "$HOME/.local/bin/soda-prompt-hub"
+
+  systemd-user-service:
+    name: systemd 用户服务
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare user session
+        run: |
+          set -Eeuo pipefail
+          sudo loginctl enable-linger "$USER" || true
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >>"$GITHUB_ENV"
+
+      - name: Probe systemd user session
+        id: probe
+        run: |
+          set -Eeuo pipefail
+          if systemctl --user list-units >/dev/null 2>&1; then
+            echo "available=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "available=false" >>"$GITHUB_OUTPUT"
+            echo "::warning::runner 没有 systemd 用户会话，跳过服务级验收；该路径已在 WSL2 Ubuntu 24.04 本地完成验收"
+          fi
+
+      - name: Install service, verify, uninstall
+        if: steps.probe.outputs.available == 'true'
+        run: |
+          set -Eeuo pipefail
+          ./deploy/linux/install.sh
+          systemctl --user status soda-prompt-hub --no-pager
+          curl -fsS http://127.0.0.1:8765/api/health
+          ./deploy/linux/status.sh
+          ./deploy/linux/uninstall.sh
+          # 卸载默认保留用户数据
+          test -f "$HOME/.local/share/soda-prompt-hub/library/database/prompt-library.sqlite"

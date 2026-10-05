@@ -119,7 +119,7 @@
     computeDetail: "CUDA device",
     comfyState: "CHECKING",
     comfyDetail: "127.0.0.1:8188",
-    version: "1.1.1",
+    version: "1.2.0",
     releaseChannel: "Stable · protocol v2",
     primaryCommand: "startWorker",
   } : {
@@ -134,7 +134,7 @@
     computeDetail: product === "desktop" ? "可以稍后启用本机 Worker" : "可以稍后连接 Windows",
     comfyState: "",
     comfyDetail: "",
-    version: "1.1.1",
+    version: "1.2.0",
     releaseChannel: "Stable · Local first",
     canOpenWorkspace: false,
     primaryCommand: "openWorkspace",

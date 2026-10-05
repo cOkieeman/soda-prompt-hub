@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterator, Mapping
@@ -83,6 +84,10 @@ CREATE TABLE IF NOT EXISTS creative_recipes (
 CREATE INDEX IF NOT EXISTS idx_creative_recipes_updated
 ON creative_recipes(updated_at DESC);
 """
+
+
+class CreativeProjectConflictError(ValueError):
+    pass
 
 
 class CreativeStore:
@@ -184,6 +189,7 @@ class CreativeStore:
         values: Mapping[str, Any],
         *,
         preserve_results: bool = False,
+        expected_revision: int | None = None,
     ) -> dict[str, Any]:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -194,6 +200,8 @@ class CreativeStore:
             if row is None:
                 raise KeyError(project_id)
             current = _project_from_row(row)
+            if expected_revision is not None and current["revision"] != expected_revision:
+                raise CreativeProjectConflictError("项目在确认期间已改变，请重新读取后再采用建议")
             merged = {**current, **values}
             if preserve_results and "generation" in values:
                 # Result imports/reviews have dedicated APIs; an old editor snapshot is not truth.
@@ -362,6 +370,16 @@ def next_iteration_values(
         },
         "safety_warning": str(analysis.get("safety_warning", "")).strip(),
     }
+    if isinstance(analysis.get("suggested_slots"), Mapping):
+        review["suggested_slots"] = {
+            slot: str(analysis["suggested_slots"].get(slot, "")).strip() for slot in SLOT_ORDER
+        }
+        for slot, value in review["suggested_slots"].items():
+            if value and not normalized["slot_locks"].get(slot, False):
+                normalized["slots"][slot] = value
+        generation.pop("scene_plan", None)
+        checks = analysis.get("scene_checks", [])
+        review["scene_checks"] = checks if isinstance(checks, list) else []
     lineage = {
         "iteration": iteration,
         "root_project_id": root_project_id,
@@ -400,7 +418,7 @@ def iteration_context(
     lineage = current["lineage"]
     review_value = lineage.get("review", {})
     review = review_value if isinstance(review_value, Mapping) else {}
-    observed_value = review.get("observed_slots", {})
+    observed_value = review.get("suggested_slots", review.get("observed_slots", {}))
     observed = observed_value if isinstance(observed_value, Mapping) else {}
     normalized_parent = normalize_project(parent) if parent is not None else None
     changes = []
@@ -451,7 +469,7 @@ def apply_iteration_suggestions(project: Mapping[str, Any]) -> dict[str, Any]:
     normalized = normalize_project(project)
     review_value = normalized["lineage"].get("review", {})
     review = review_value if isinstance(review_value, Mapping) else {}
-    observed_value = review.get("observed_slots", {})
+    observed_value = review.get("suggested_slots", review.get("observed_slots", {}))
     observed = observed_value if isinstance(observed_value, Mapping) else {}
     slots = dict(normalized["slots"])
     applied_slots = []
@@ -474,7 +492,55 @@ def compile_prompt(project: Mapping[str, Any], profile_id: str | None = None) ->
     profile = profile_id or normalized["target_profile"]
     if profile not in PROFILE_IDS:
         raise ValueError(f"Unknown creative profile: {profile}")
-    return _compile_anima(normalized) if profile == "anima" else _compile_krea2(normalized)
+    output = _compile_anima(normalized) if profile == "anima" else _compile_krea2(normalized)
+    scene = normalized["generation"].get("scene_plan")
+    if not isinstance(scene, Mapping):
+        return output
+    if scene.get("input_fingerprint") != scene_input_fingerprint(normalized):
+        output["warnings"].append("画面方案已过期；创作意图、槽位或生成设置已改变，请重新设计。")
+        output["ready"] = False
+        output["scene_plan_stale"] = True
+        return output
+    if not scene.get("prompt_usable", False):
+        output["warnings"].append(
+            "部分已有或锁定槽位与画面方案不同，当前使用槽位编译，请重新设计完整方案。"
+        )
+        return output
+    prompts = scene.get("prompts", {})
+    positive = prompts.get(profile, "") if isinstance(prompts, Mapping) else ""
+    if not isinstance(positive, str) or not positive.strip() or _contains_cjk(positive):
+        output["warnings"].append("画面方案缺少有效英文 Prompt，请重新设计。")
+        output["ready"] = False
+        return output
+    output["positive"] = positive.strip()
+    output["output_language"] = "en"
+    output["ready"] = True
+    output["scene_plan_id"] = str(scene.get("plan_id", ""))
+    output["warnings"] = [
+        warning for warning in output["warnings"] if "中文创作想法未自动拼入" not in warning
+    ]
+    return output
+
+
+def scene_input_fingerprint(project: Mapping[str, Any]) -> str:
+    normalized = normalize_project(project)
+    generation = normalized["generation"]
+    payload = {
+        key: normalized[key]
+        for key in (
+            "brief_zh",
+            "safety_mode",
+            "target_profile",
+            "character_id",
+            "slots",
+            "slot_locks",
+            "references",
+        )
+    }
+    payload["canvas"] = {key: generation.get(key) for key in ("width", "height")}
+    payload["workflow_controls"] = generation.get("workflow_controls", {})
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode()).hexdigest()
 
 
 def export_project(project: Mapping[str, Any]) -> dict[str, Any]:
@@ -489,6 +555,7 @@ def export_project(project: Mapping[str, Any]) -> dict[str, Any]:
                 "title",
                 "brief_zh",
                 "safety_mode",
+                "target_profile",
                 "character_id",
                 "slots",
                 "slot_locks",
@@ -516,7 +583,7 @@ def apply_result_review(
 ) -> dict[str, Any]:
     normalized = normalize_project(project)
     slots = dict(normalized["slots"])
-    observed = analysis.get("observed_slots", {})
+    observed = analysis.get("suggested_slots", analysis.get("observed_slots", {}))
     observed_slots = observed if isinstance(observed, Mapping) else {}
     if fill_empty_slots:
         for slot in SLOT_ORDER:

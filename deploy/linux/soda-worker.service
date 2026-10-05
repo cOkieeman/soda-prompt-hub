@@ -1,0 +1,30 @@
+# Soda Prompt Hub — Compute Worker 的 systemd 用户服务模板
+#
+# 这是模板：install.sh --with-worker 会把 __SPH_*__ 占位符替换成实际路径后，
+# 写入 ${XDG_CONFIG_HOME:-~/.config}/systemd/user/soda-worker.service
+#
+# 默认**不启用**（ComfyUI 地址需要先按你的环境改好）：
+#   systemctl --user enable --now soda-worker
+#
+# Worker 以当前用户运行、不使用 root；它只读写桥接目录，
+# 并访问配置里的 comfyui_url。
+
+[Unit]
+Description=Soda Prompt Hub Compute Worker（Linux）
+Documentation=https://github.com/cOkieeman/soda-prompt-hub
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=__SPH_REPO__
+ExecStart=__SPH_WORKER_PYTHON__ -m prompt_hub.windows_worker --config __SPH_WORKER_CONFIG__
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGINT
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

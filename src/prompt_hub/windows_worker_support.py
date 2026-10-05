@@ -147,7 +147,7 @@ class WorkerConfig:
         role = str(raw.get("role", TARGET_ROLE)).strip()
         comfyui_url = str(raw.get("comfyui_url", "")).strip().rstrip("/")
         if not root_value or not Path(root_value).is_absolute():
-            raise WorkerError("bridge_root 必须是 Windows 绝对路径")
+            raise WorkerError("bridge_root 必须是绝对路径")
         if not worker_id or any(
             char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
             for char in worker_id
@@ -156,8 +156,8 @@ class WorkerConfig:
         if role != TARGET_ROLE:
             raise WorkerError(f"role 必须是 {TARGET_ROLE}")
         parsed = urllib.parse.urlsplit(comfyui_url)
-        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-            raise WorkerError("comfyui_url 必须指向本机 HTTP 地址")
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise WorkerError("comfyui_url 必须是带主机名的 http(s) 地址")
         lora_roots = _parse_lora_roots(raw.get("lora_roots", []))
         model_roots = _parse_model_roots(raw.get("model_roots", []))
         return cls(

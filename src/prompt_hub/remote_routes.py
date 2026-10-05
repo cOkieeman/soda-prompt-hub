@@ -233,9 +233,9 @@ def create_remote_router(store: RemoteNodeStore) -> APIRouter:
     def search_windows_loras(
         query: str = "",
         limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
     ) -> dict[str, Any]:
-        results = store.search_loras(query, limit=limit)
-        return {"query": query, "count": len(results), "results": results}
+        return {"query": query, **store.search_lora_page(query, limit=limit, offset=offset)}
 
     @router.get(
         "/api/windows-loras/previews/{snapshot_id}/{lora_id}/{filename}",
@@ -301,13 +301,15 @@ def create_remote_router(store: RemoteNodeStore) -> APIRouter:
         asset_type: str = "",
         model_family: str = "",
         limit: Annotated[int, Query(ge=1, le=2000)] = 200,
+        offset: Annotated[int, Query(ge=0)] = 0,
     ) -> dict[str, Any]:
         try:
-            results = store.search_models(
+            page = store.search_model_page(
                 query,
                 asset_type=asset_type,
                 model_family=model_family,
                 limit=limit,
+                offset=offset,
             )
         except RemoteNodeError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
@@ -315,8 +317,7 @@ def create_remote_router(store: RemoteNodeStore) -> APIRouter:
             "query": query,
             "asset_type": asset_type,
             "model_family": model_family,
-            "count": len(results),
-            "results": results,
+            **page,
         }
 
     @router.post("/api/windows-loras/import", status_code=status.HTTP_201_CREATED)

@@ -155,7 +155,7 @@ def test_windows_shell_release_package_has_manifests_and_no_private_config(
         "desktop-ui/desktop.js": b"js",
         "worker/prompt_hub_worker.py": b"worker",
         "worker/__pycache__/prompt_hub_worker.cpython-312.pyc": b"cache",
-        "worker/RELEASE.json": b"{}",
+        "worker/RELEASE.json": json.dumps({"worker_version": __version__}).encode(),
         "worker/worker-config.json": b"private",
         "worker/debug.pdb": b"debug",
         "校验桌面包.ps1": b"verify",

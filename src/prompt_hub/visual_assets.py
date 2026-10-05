@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from prompt_hub.creative import CreativeStore
     from prompt_hub.database import PromptDatabase
     from prompt_hub.dataset_workspace import DatasetWorkspaceStore
+    from prompt_hub.gallery import GalleryStore
     from prompt_hub.remote_nodes import RemoteNodeStore
     from prompt_hub.web_capture import WebCaptureService
 
@@ -34,6 +35,7 @@ VISUAL_ASSET_TYPES = {
     "lora_preview",
     "model_preview",
     "web_visual",
+    "gallery_image",
 }
 
 
@@ -66,6 +68,7 @@ class VisualAssetCatalog:
         comfy_store: ComfyResultStore,
         remote_store: RemoteNodeStore,
         web_capture: WebCaptureService,
+        gallery_store: GalleryStore | None = None,
     ) -> None:
         self.settings = settings
         self.database = database
@@ -74,6 +77,7 @@ class VisualAssetCatalog:
         self.comfy_store = comfy_store
         self.remote_store = remote_store
         self.web_capture = web_capture
+        self.gallery_store = gallery_store
 
     def discover(  # noqa: C901 - per-collector checkpoints share one bounded progress callback
         self,
@@ -92,6 +96,7 @@ class VisualAssetCatalog:
             ("lora_preview", self._lora_previews),
             ("model_preview", self._model_previews),
             ("web_visual", self._web_visuals),
+            ("gallery_image", self._gallery_images),
         )
         last_update = 0.0
 
@@ -118,6 +123,36 @@ class VisualAssetCatalog:
                     if max_items and len(assets) >= max_items:
                         return list(assets.values())
         return sorted(assets.values(), key=lambda item: (item.asset_type, item.asset_id))
+
+    def _gallery_images(self, progress: Callable[[str], None]) -> Iterator[VisualAsset]:
+        if self.gallery_store is None:
+            return
+        for item in self.gallery_store.iter_assets():
+            progress("正在检查画廊图片")
+            asset_id = str(item["asset_id"])
+            path = self.gallery_store.resolve_asset_path(asset_id)
+            if path is None:
+                continue
+            yield _asset(
+                "gallery_image",
+                f"gallery:{asset_id}",
+                path,
+                {
+                    "title": item["title"],
+                    "source_label": "我的作品" if item["kind"] == "work" else "收集参考",
+                    "source_url": item.get("source_url", ""),
+                    "safety": item.get("safety", "unrated"),
+                    "media_url": item["thumbnail_url"],
+                    "original_url": item["original_url"],
+                    "project_id": item.get("project_id", ""),
+                    "gallery_asset_id": asset_id,
+                    "gallery_kind": item["kind"],
+                    "albums": item.get("albums", []),
+                    "note": item.get("note", ""),
+                },
+                known_hash=str(item["sha256"]),
+                progress=progress,
+            )
 
     def _prompt_visuals(self, progress: Callable[[str], None]) -> Iterator[VisualAsset]:
         seen_paths: set[Path] = set()
@@ -263,7 +298,7 @@ class VisualAssetCatalog:
                     path,
                     {
                         "title": item.get("filename", result_id),
-                        "source_label": "Windows 出图结果",
+                        "source_label": "出图结果",
                         "source_url": "",
                         "safety": "unrated",
                         "media_url": item.get("thumbnail_url", ""),

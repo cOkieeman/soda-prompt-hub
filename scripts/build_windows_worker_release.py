@@ -33,6 +33,7 @@ WORKER_SOURCE_FILES = (
 STANDALONE_PREAMBLE = """from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os

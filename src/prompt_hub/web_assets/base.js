@@ -1,5 +1,5 @@
     const $ = (selector) => document.querySelector(selector);
-    window.isPromptHubLocal = document.documentElement.dataset.usageMode === 'windows_local';
+    window.isPromptHubLocal = ['windows_local','linux_local'].includes(document.documentElement.dataset.usageMode);
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
     const formatNumber = (value) => new Intl.NumberFormat('zh-CN').format(value || 0);
     let currentMode = 'home';
@@ -7,14 +7,16 @@
     let currentCharacters = [];
     let archivePage = 1;
     let archiveTotal = 0;
+    let archiveSearchRun = 0, navigationRun = 0;
     const archivePageSize = 12;
     let remoteDeviceName = __PROMPT_HUB_DEVICE_NAME_JSON__;
     let tagDisplayLanguage = 'zh';
     const tagLabelCache = new Map();
     let homeMissingSources = [];
+    let sourceDetails = new Map();
     const sourceSetupSkipKey = 'soda-prompt-hub-source-setup-skipped';
     const sourceSyncUi = {busy:false,rebuilding:false,sources:[],jobs:[],job:null,loadSerial:0,localMessage:false,epoch:0};
-    const viewLabels = {home:'首页', creative:'创作台', prompts:'提示词库', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'Windows 出图', management:'资料管理', remote:'设备连接'};
+    const viewLabels = {home:'首页', creative:'创作台', prompts:'提示词库', gallery:'画廊', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'出图', management:'资料管理', remote:'设备连接'};
 
     function setPromptHubDeviceName(value) {
       remoteDeviceName = String(value || '').trim() || 'Windows 绘图设备';
@@ -33,6 +35,20 @@
       toggle.querySelector('small').textContent = open ? '收起菜单' : '打开菜单';
     }
 
+    function setLanguageSettings(open, restoreFocus = false) {
+      const panel = $('#languageSettings');
+      const toggle = $('#languageSettingsToggle');
+      panel.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(Boolean(open)));
+      if (open) {
+        const anchor = toggle.getBoundingClientRect();
+        const panelBounds = panel.getBoundingClientRect();
+        panel.style.left = `${Math.max(12, Math.min(anchor.right - panelBounds.width, window.innerWidth - panelBounds.width - 12))}px`;
+        panel.style.top = `${Math.max(12, Math.min(anchor.bottom + 8, window.innerHeight - panelBounds.height - 12))}px`;
+        $('#uiLanguageSelect').focus();
+      } else if (restoreFocus) toggle.focus();
+    }
+
     function displayCanonicalTag(tag) {
       const value = String(tag || '').trim();
       const item = tagLabelCache.get(value.toLowerCase());
@@ -48,8 +64,8 @@
       const timer = setTimeout(() => controller.abort(new Error('请求超时，请重试')), timeoutMs);
       try {
         const response = await fetch(url, {...options, signal:controller.signal});
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail || `请求失败：${response.status}`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(promptHubErrorMessage(payload,response.status));
         return payload;
       } finally {
         clearTimeout(timer);
@@ -57,6 +73,32 @@
       }
     }
     window.fetchJsonWithTimeout = fetchJsonWithTimeout;
+
+    function promptHubErrorMessage(payload, status) {
+      let detail = typeof payload.detail === 'string' ? payload.detail : Array.isArray(payload.detail) ? payload.detail.map(item => item.msg).filter(Boolean).join('；') : '';
+      if (!detail) detail = `请求失败（${status}），请稍后重试`;
+      return status === 409 ? `${detail}；当前编辑仍保留，请核对最新项目后再保存` : detail;
+    }
+    window.promptHubErrorMessage = promptHubErrorMessage;
+
+    async function loadPromptHubResourceCatalog(url, {limit = 500, read = fetchJsonWithTimeout} = {}) {
+      const [path, query = ''] = url.split('?'), params = new URLSearchParams(query);
+      params.set('limit', String(limit));
+      const results = [];
+      let offset = 0, snapshotId, page;
+      do {
+        params.set('offset', String(offset));
+        page = await read(`${path}?${params}`);
+        if (snapshotId !== undefined && page.snapshot_id !== snapshotId) throw new Error('加载期间资源清单已更新，请重新读取');
+        snapshotId = page.snapshot_id;
+        const items = page.results || [];
+        results.push(...items); offset += items.length;
+        // Older Core versions have no total/offset contract: never repeat their first page.
+        if (!items.length || !Number.isFinite(page.total) || offset >= page.total) break;
+      } while (true);
+      return {...page, results, count: results.length};
+    }
+    window.loadPromptHubResourceCatalog = loadPromptHubResourceCatalog;
 
     async function ensureTagLabels(tags, options = {}) {
       const values = tags.map(value => String(value || '').trim()).filter(Boolean);
@@ -181,6 +223,7 @@
     async function loadStats() {
       const selectedSource = $('#source').value;
       const [stats, sources, version] = await Promise.all([fetch('/api/stats').then(r => r.json()), fetch('/api/sources').then(r => r.json()), fetch('/api/system/version').then(r => r.json())]);
+      sourceDetails = new Map(sources.map(source => [source.source_id, source]));
       $('#entryCount').textContent = formatNumber(stats.entries);
       $('#sourceCount').textContent = formatNumber(stats.sources);
       $('#styleCount').textContent = formatNumber(stats.kinds?.style);
@@ -199,6 +242,8 @@
       $('#source').innerHTML = '<option value="">全部来源</option>' + sources.map(s => `<option value="${escapeHtml(s.source_id)}">${escapeHtml(s.name)}</option>`).join('');
       if ([...$('#source').options].some(option => option.value === selectedSource)) $('#source').value = selectedSource;
       renderSourceQuickFilters(sources);
+      sourceSyncUi.indexed = sources;
+      if(sourceSyncUi.sources.length) renderSourceRows();
       $('#sourceList').innerHTML = '<p class="section-label">资料来源</p>' + sources.map(s => `<div class="source-row"><span>${escapeHtml(s.name)}</span><span>${formatNumber(s.entry_count)}</span></div>`).join('');
     }
 
@@ -208,10 +253,9 @@
         return;
       }
       const selected = $('#source').value;
-      const visualSources = sources.filter(item => Number(item.visual_count || 0) > 0);
       $('#sourceQuickFilters').innerHTML = [
         {source_id:'', name:'全部来源'},
-        ...visualSources,
+        ...sources,
       ].map(item => `<button type="button" class="source-quick-filter" data-source-quick="${escapeHtml(item.source_id)}" aria-pressed="${String(selected === item.source_id)}">${escapeHtml(item.name)}</button>`).join('');
       $('#sourceQuickFilters').querySelectorAll('[data-source-quick]').forEach(button => button.addEventListener('click', async () => {
         $('#source').value = button.dataset.sourceQuick;
@@ -258,7 +302,7 @@
     }
 
     function renderHomeSourceSetup(sources) {
-      homeMissingSources = sources.filter(item => item.status === 'missing');
+      homeMissingSources = sources.filter(item => item.status === 'missing' && !item.local_only);
       const setup = $('#homeSourceSetup');
       if (!homeMissingSources.length) {
         setup.hidden = true;
@@ -275,7 +319,7 @@
 
     function lockSourceActions() {
       const locked = sourceSyncUi.busy || sourceSyncUi.rebuilding || sourceJobActive();
-      document.querySelectorAll('#sourceSyncButton, #importButton, #homeSourceInstall, [data-clone-source], [data-update-source]').forEach(button => { button.disabled = locked; });
+      document.querySelectorAll('#sourceSyncButton, #importButton, #homeSourceInstall, #sourceMappingSave, [data-map-source], [data-clone-source], [data-update-source]').forEach(button => { button.disabled = locked; });
     }
 
     function sourceSyncResultMessage(result) {
@@ -303,27 +347,53 @@
       $('#sourceSyncMessage').textContent = message;
       $('#sourceSyncMessage').dataset.tone = active ? 'busy' : job.status !== 'completed' || job.result?.failed || job.result?.index_failed?.length ? 'error' : 'success';
       const results = job.result?.sources || [];
-      const labels = {updated:'已更新',unchanged:'已是最新',cloned:'已安装',missing:'尚未安装',failed:'更新失败',skipped_dirty:'本地有修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
+      const labels = {skipped_local:'本地资料已复用',updated:'已更新',unchanged:'已是最新',cloned:'已安装',missing:'尚未安装',failed:'更新失败',skipped_dirty:'本地有修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
       $('#sourceSyncDetails').innerHTML = results.length ? `<details open><summary>本次各资料库结果 · ${results.length} 个</summary><ul>${results.map(item => `<li><strong>${escapeHtml(item.name || item.source_id)}</strong>：${escapeHtml(labels[item.status] || item.status)}${item.message ? ` — ${escapeHtml(item.message)}` : ''}</li>`).join('')}${(job.result?.index_failed || []).map(item => `<li><strong>${escapeHtml(item.name || item.source_id)}</strong>：索引失败 — ${escapeHtml(item.message)}</li>`).join('')}</ul></details>` : '';
       lockSourceActions();
     }
 
     function renderSourceRows() {
-      const labels = {ready:'可检查更新（尚未联网）',dirty:'本地有修改，禁止覆盖',no_upstream:'没有上游',missing:'尚未安装',not_git:'不是 Git 仓库',failed:'本地检查失败'};
+      const labels = {local:'本地只读映射',ready:'可检查更新（尚未联网）',dirty:'本地有修改，禁止覆盖',no_upstream:'没有上游',missing:'尚未安装',not_git:'不是 Git 仓库',failed:'本地检查失败'};
       const history = new Map();
       sourceSyncUi.jobs.forEach(job => (job.result?.sources || []).forEach(item => { if(!history.has(item.source_id)) history.set(item.source_id,{...item,time:job.finished_at || job.updated_at}); }));
-      const resultLabels = {updated:'已更新',unchanged:'已是最新',cloned:'已安装',failed:'更新失败',missing:'尚未安装',skipped_dirty:'有本地修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
+      const resultLabels = {skipped_local:'本地资料已复用',updated:'已更新',unchanged:'已是最新',cloned:'已安装',failed:'更新失败',missing:'尚未安装',skipped_dirty:'有本地修改，已跳过',skipped_no_upstream:'没有上游，已跳过',not_git:'不是 Git 仓库，已跳过'};
+      window.promptHubPresetSourceIds = new Set(sourceSyncUi.sources.map(item=>item.source_id));
       $('#sourceSyncList').innerHTML = sourceSyncUi.sources.map(item => {
-        const last = history.get(item.source_id);
-        const action = item.status === 'missing' ? `<button class="source-sync-fetch" data-clone-source="${escapeHtml(item.source_id)}">拉取</button>` : item.status === 'ready' ? `<button class="source-sync-fetch" data-update-source="${escapeHtml(item.source_id)}">${last?.status === 'failed' ? '重试更新' : '检查并更新'}</button>` : '';
-        const previous = last ? `<small>上次操作：${escapeHtml(resultLabels[last.status] || last.status)} · ${escapeHtml(new Date(last.time).toLocaleString())}</small>` : '<small>尚无更新记录</small>';
-        return `<div class="source-sync-row"><div><strong>${escapeHtml(item.name)}</strong>${previous}</div><span class="source-sync-status"><span class="source-sync-state ${escapeHtml(item.status)}">${escapeHtml(labels[item.status] || item.status)}</span>${action}</span><code>${escapeHtml(item.branch || '—')} · ${escapeHtml((item.before || '').slice(0,10) || '暂无版本')}${item.message ? `<br>${escapeHtml(item.message)}` : ''}</code></div>`;
+        const last = history.get(item.source_id), indexed = (sourceSyncUi.indexed || []).find(source=>source.source_id===item.source_id);
+        const action = !item.local_only && item.status === 'missing' ? `<button class="source-sync-fetch" data-clone-source="${escapeHtml(item.source_id)}">下载资料库</button>` : !item.local_only && item.status === 'ready' ? `<button class="source-sync-fetch" data-update-source="${escapeHtml(item.source_id)}">检查更新</button>` : '';
+        const mapping = `<button class="source-sync-fetch" data-map-source="${escapeHtml(item.source_id)}">选择来源</button>`;
+        const label = item.local_only && item.status === 'missing' ? '映射目录未连接' : labels[item.status] || item.status;
+        const time = indexed?.updated_at ? `最近读取：${new Date(indexed.updated_at).toLocaleString()}` : '尚未建立索引';
+        return `<article class="source-sync-row"><div><strong>${escapeHtml(item.name)}</strong><small>${formatNumber(indexed?.entry_count || 0)} 条资料 · ${escapeHtml(time)}</small></div><span class="source-sync-status"><span class="source-sync-state ${escapeHtml(item.status)}">${escapeHtml(label)}</span>${mapping}${action}<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">来源 ↗</a></span><details class="source-row-details"><summary>路径与详情</summary><code>${escapeHtml(item.path)}</code>${item.data_path?`<code>${escapeHtml(item.data_path)}</code>`:''}<p>${escapeHtml(item.message)}</p>${last?`<small>上次操作：${escapeHtml(resultLabels[last.status]||last.status)}</small>`:''}</details></article>`;
       }).join('');
+      $('#sourceSyncButton').hidden = sourceSyncUi.sources.length > 0 && sourceSyncUi.sources.every(item=>item.local_only);
+      const mappingSelect = $('#sourceMappingSource'), oldSelection = mappingSelect.value;
+      mappingSelect.innerHTML = sourceSyncUi.sources.map(item=>`<option value="${escapeHtml(item.source_id)}">${escapeHtml(item.name)}</option>`).join('');
+      if(oldSelection) mappingSelect.value=oldSelection;
+      else fillMappingForm();
+      $('#sourceSyncList').querySelectorAll('[data-map-source]').forEach(button=>button.addEventListener('click',()=>{
+        mappingSelect.value=button.dataset.mapSource; fillMappingForm(); $('#sourceMappingEditor').open=true; $('#sourceMappingMode').focus();
+      }));
       $('#sourceSyncList').querySelectorAll('[data-clone-source]').forEach(button => button.addEventListener('click',() => cloneSource(button.dataset.cloneSource,button)));
       $('#sourceSyncList').querySelectorAll('[data-update-source]').forEach(button => button.addEventListener('click',() => syncPublicSources(button.dataset.updateSource,button)));
       lockSourceActions();
     }
 
+    function fillMappingForm() {
+      const item=sourceSyncUi.sources.find(source=>source.source_id===$('#sourceMappingSource').value);
+      $('#sourceMappingMode').value=item?.local_only?'local':'remote';
+      $('#sourceMappingPath').value=item?.mapping_path || (item?.local_only?item.path:'');
+      $('#sourceMappingDataPath').value=item?.mapping_data_path || item?.data_path || '';
+      $('#sourceMappingUrl').textContent=`GitHub URL：${item?.url || ''}`;
+      updateSourceModeFields();
+      $('#sourceMappingMessage').textContent='';
+    }
+    function updateSourceModeFields() {
+      const local=$('#sourceMappingMode').value==='local';
+      $('#sourceMappingPathWrap').hidden=!local;
+      $('#sourceMappingPath').required=local;
+      $('#sourceMappingDataWrap').hidden=!local || $('#sourceMappingSource').value!=='animadex';
+    }
     async function loadSourceSyncStatus() {
       const serial = ++sourceSyncUi.loadSerial;
       const epoch = sourceSyncUi.epoch;
@@ -335,7 +405,7 @@
         renderHomeSourceSetup(sources);
         renderSourceRows();
         const count = status => sources.filter(item => item.status === status).length;
-        $('#sourceSyncSummary').textContent = `本地状态：${count('ready')} 个可检查更新，${count('missing')} 个尚未安装，${count('dirty')} 个有本地修改。此状态检查不联网，不代表上游有新版本。`;
+        $('#sourceSyncSummary').textContent = `本地映射 ${sources.filter(item=>item.local_only).length} 个 · 可检查更新 ${count('ready')} 个 · 未连接或未安装 ${count('missing')} 个${count('failed')?` · 异常 ${count('failed')} 个`:''}`;
         if(!sourceSyncUi.busy && !sourceSyncUi.rebuilding && !sourceSyncUi.localMessage) {
           sourceSyncUi.job = jobs.find(sourceJobActive) || jobs[0] || null;
           renderSourceJob(sourceSyncUi.job);
@@ -380,11 +450,16 @@
     }
 
     async function searchPrompts(resetPage = true) {
+      const run = ++archiveSearchRun;
+      const selectedSource = sourceDetails.get($('#source').value);
+      if (selectedSource?.source_id.endsWith('-style-explorer')) $('#archiveNotice').innerHTML = `<strong>${escapeHtml(selectedSource.name)}：</strong>${escapeHtml(selectedSource.notes)}`;
+      else $('#archiveNotice').innerHTML = '<strong>提示词与视觉资料库：</strong>输入服装、动作、构图、场景或画风关键词。找到合适内容后可以收藏并记录实测备注。';
       $('#status').textContent = '正在查找…';
       $('#results').classList.remove('character-results');
       if (resetPage) archivePage = 1;
       const params = new URLSearchParams({query: $('#query').value, kind: $('#kind').value, safety: $('#safety').value, source_id: $('#source').value, favorites_only: $('#favoritesOnly').getAttribute('aria-pressed'), has_visual: $('#onlyWithVisuals').getAttribute('aria-pressed'), category: $('#animadexCopyright').value, hair_color: $('#animadexHair').value, eye_color: $('#animadexEyes').value, limit: String(archivePageSize), offset: String((archivePage - 1) * archivePageSize)});
-      const data = await fetch('/api/search?' + params).then(r => r.json());
+      const data = await fetchJsonWithTimeout('/api/search?' + params);
+      if (run !== archiveSearchRun || currentMode === 'characters') return;
       currentResults = data.results;
       archiveTotal = data.total ?? data.count;
       const pageCount = Math.max(1, Math.ceil(archiveTotal / archivePageSize));
@@ -393,6 +468,7 @@
         return searchPrompts(false);
       }
       await ensureTagLabels(data.results.flatMap(tagValuesFromItem));
+      if (run !== archiveSearchRun || currentMode === 'characters') return;
       $('#status').textContent = `找到 ${archiveTotal} 条`;
       if (!data.results.length) {
         $('#archivePagination').hidden = true;
@@ -403,10 +479,12 @@
     }
 
     async function searchCharacters() {
+      const run = ++archiveSearchRun;
       $('#status').textContent = '正在查找角色…';
       $('#results').classList.add('character-results');
       const params = new URLSearchParams({query: $('#query').value, world: $('#ocWorld').value, limit: '30'});
-      const data = await fetch('/api/oc-manager/characters?' + params).then(r => r.json());
+      const data = await fetchJsonWithTimeout('/api/oc-manager/characters?' + params);
+      if (run !== archiveSearchRun || currentMode !== 'characters') return;
       currentCharacters = data.results;
       $('#archivePagination').hidden = true;
       $('#status').textContent = `找到 ${data.count} 个角色`;
@@ -422,6 +500,7 @@
     }
 
     async function setMode(mode) {
+      const run = navigationRun;
       currentMode = mode;
       const characterMode = mode === 'characters';
       $('#promptFilters').hidden = characterMode;
@@ -439,12 +518,14 @@
       $('#query').value = '';
       if (!characterMode) await handleSourceChange();
       if (characterMode) await loadOcWorlds();
+      if (run !== navigationRun) return;
       if (characterMode) await runSearch();
     }
 
     const VIEW_MOTION_SELECTORS = {
       home: '#homePage .home-lead',
       creative: '#creativePage .creative-heading',
+      gallery: '#galleryPage .gallery-heading',
       discover: '#discoveryPage .discovery-hero',
       datasets: '#workspacePage .dataset-heading',
       lora: '#loraPage .lora-hero',
@@ -521,11 +602,15 @@
     window.playPromptHubStatusPulse = playPromptHubStatusPulse;
 
     async function setView(view) {
+      if (!Object.hasOwn(viewLabels, view)) throw new Error('这个页面暂不可用');
+      const run = ++navigationRun;
       setNavMenu(false);
+      if ($('#appSettingsMenu')) $('#appSettingsMenu').open = false;
       $('#appNavCurrent').textContent = `当前：${viewLabels[view] || '首页'}`;
       const archiveMode = view === 'prompts' || view === 'characters';
       $('#homePage').hidden = view !== 'home';
       $('#creativePage').hidden = view !== 'creative';
+      $('#galleryPage').hidden = view !== 'gallery';
       $('#discoveryPage').hidden = view !== 'discover';
       $('#workspacePage').hidden = view !== 'datasets';
       $('#loraPage').hidden = view !== 'lora';
@@ -542,13 +627,16 @@
       });
       if (archiveMode) {
         await setMode(view);
-        $('#query').focus();
+        if (run === navigationRun) $('#query').focus();
       } else if (view === 'creative' && window.ensureCreativeProject) {
         currentMode = view;
         await window.ensureCreativeProject();
       } else if (view === 'discover' && window.ensureHybridSearch) {
         currentMode = view;
         await window.ensureHybridSearch();
+      } else if (view === 'gallery' && window.loadGallery) {
+        currentMode = view;
+        await window.loadGallery();
       } else if (view === 'datasets' && window.ensureDatasetWorkspace) {
         currentMode = view;
         await window.ensureDatasetWorkspace();
@@ -569,6 +657,13 @@
       }
     }
     window.setPromptHubView = setView;
+
+    function showNavigationError(error) {
+      const targets = {creative:'#creativeSaveState', gallery:'#galleryStatus', datasets:'#datasetReviewToolsResult', remote:'#remoteTaskSummary', comfy:'#comfyStatus'};
+      const target = $(targets[currentMode] || '#appNavCurrent');
+      target.textContent = `页面读取失败：${error.message}。可以点击导航重试。`;
+      console.error(error);
+    }
 
     async function openExample() {
       await setView('prompts');
@@ -646,7 +741,7 @@
         $('#status').textContent = `重建失败：${error.message}`;
       } finally {
         button.disabled = false;
-        button.textContent = '仅重建本地索引';
+        button.textContent = '刷新本地资料';
         sourceSyncUi.rebuilding = false;
         $('#sourceSyncProgress').hidden = true;
         lockSourceActions();
@@ -811,8 +906,8 @@
     $('#archiveNextPage').addEventListener('click', async () => { if (archivePage * archivePageSize >= archiveTotal) return; archivePage += 1; await searchPrompts(false); $('#archivePagination').scrollIntoView({block:'nearest'}); });
     $('#appNavToggle').addEventListener('click', event => setNavMenu(event.currentTarget.getAttribute('aria-expanded') !== 'true'));
     document.addEventListener('keydown', event => { if (event.key === 'Escape') setNavMenu(false); });
-    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
-    document.querySelectorAll('[data-start]').forEach(button => button.addEventListener('click', () => setView(button.dataset.start)));
+    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view).catch(showNavigationError)));
+    document.querySelectorAll('[data-start]').forEach(button => button.addEventListener('click', () => setView(button.dataset.start).catch(showNavigationError)));
     $('#exampleButton').addEventListener('click', openExample);
     $('#ocFile').addEventListener('change', event => {
       const file = event.target.files[0];
@@ -821,6 +916,22 @@
       $('#ocImportMessage').textContent = '';
     });
     $('#ocImportButton').addEventListener('click', importOcFile);
+    $('#sourceMappingSource').addEventListener('change',fillMappingForm);
+    $('#sourceMappingMode').addEventListener('change',updateSourceModeFields);
+    $('#sourceMappingForm').addEventListener('submit',async event=>{
+      event.preventDefault();
+      if(sourceSyncUi.busy || sourceSyncUi.rebuilding || sourceJobActive()) return;
+      const button=$('#sourceMappingSave'), message=$('#sourceMappingMessage'); button.disabled=true;
+      try {
+        const local=$('#sourceMappingMode').value==='local';
+        const payload=local?{path:$('#sourceMappingPath').value,data_path:$('#sourceMappingSource').value==='animadex'?$('#sourceMappingDataPath').value || null:null}:{mode:'remote'};
+        await fetchJsonWithTimeout(`/api/sources/${encodeURIComponent($('#sourceMappingSource').value)}/${local?'local-mapping':'source-mode'}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        message.textContent=local?'本地映射已保存。点击“刷新本地资料”读取目录；原文件不会改变。':'已选择 GitHub URL。可下载资料库或检查更新；原映射目录与文件已保留。';
+        await loadSourceSyncStatus(); await window.ensureSourceCenter?.();
+      } catch(error) { message.textContent=`来源设置未保存：${error.message}`; }
+      finally { button.disabled=false; lockSourceActions(); }
+    });
+
     $('#favoritesOnly').addEventListener('click', event => {
       const active = event.currentTarget.getAttribute('aria-pressed') === 'true';
       event.currentTarget.setAttribute('aria-pressed', String(!active));
@@ -894,4 +1005,18 @@
       window.addEventListener('load', () => setView('remote').catch(console.error), {once: true});
     }
     $('#tagLanguageToggle').addEventListener('click', window.toggleTagDisplayLanguage);
+    document.addEventListener('click', event => { const menu=$('#appSettingsMenu'); if(menu?.open && !menu.contains(event.target) && !$('#languageSettings').contains(event.target)) menu.open=false; });
+    document.addEventListener('keydown', event => { const menu=$('#appSettingsMenu'); if(event.key==='Escape' && menu?.open && $('#languageSettings').hidden) { menu.open=false; menu.querySelector('summary').focus(); } });
+    $('#languageSettingsToggle').addEventListener('click', () => setLanguageSettings($('#languageSettings').hidden));
+    $('#closeLanguageSettings').addEventListener('click', () => setLanguageSettings(false, true));
+    document.addEventListener('pointerdown', event => {
+      if (!$('#languageSettings').hidden && !$('#languageSettings').contains(event.target) && !$('#languageSettingsToggle').contains(event.target)) setLanguageSettings(false);
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !$('#languageSettings').hidden) {
+        event.preventDefault();
+        setLanguageSettings(false, true);
+      }
+    });
+    window.addEventListener('resize', () => setLanguageSettings(false));
     Promise.all([loadStats(), loadOcWorlds(), loadSourceSyncStatus(), searchPrompts()]).catch(error => { $('#status').textContent = '读取失败，请刷新页面'; console.error(error); });

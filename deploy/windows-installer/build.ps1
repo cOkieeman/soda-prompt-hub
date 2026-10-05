@@ -7,13 +7,27 @@
     [string]$PythonEmbedArchive = "",
     [string]$UvExecutable = "",
     [string]$GitArchive = "",
-    [string]$InnoCompiler = ""
+    [string]$InnoCompiler = "",
+    [string]$VerificationOutputRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $desktopSource = (Resolve-Path -LiteralPath $DesktopPackageRoot).Path
 $workerSource = (Resolve-Path -LiteralPath $WorkerPackageRoot).Path
+$verificationOutput = $null
+if (-not [string]::IsNullOrWhiteSpace($VerificationOutputRoot)) {
+    $verificationOutput = [IO.Path]::GetFullPath($VerificationOutputRoot)
+    if (Test-Path -LiteralPath $verificationOutput) {
+        throw "验收输出目录必须是不存在的新目录：$verificationOutput"
+    }
+    foreach ($sourceRoot in @($desktopSource, $workerSource)) {
+        $sourcePrefix = $sourceRoot.TrimEnd("\") + "\"
+        if ($verificationOutput.StartsWith($sourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "验收输出目录不能位于输入 payload 内。"
+        }
+    }
+}
 $output = [IO.Path]::GetFullPath($OutputRoot)
 $stagingId = [Guid]::NewGuid().ToString("N").Substring(0, 8)
 $staging = Join-Path ([IO.Path]::GetTempPath()) ("SB-" + $stagingId)
@@ -30,13 +44,48 @@ New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
 function Assert-CleanPayload {
     param([string]$Root)
-    if (-not (Test-Path -LiteralPath (Join-Path $Root "PACKAGE_MANIFEST.sha256") -PathType Leaf)) {
+    $manifestPath = Join-Path $Root "PACKAGE_MANIFEST.sha256"
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
         throw "缺少 PACKAGE_MANIFEST.sha256：$Root"
     }
     $privateFiles = Get-ChildItem -LiteralPath $Root -Recurse -Force |
-        Where-Object { $_.Name -in @("worker-config.json", ".venv", "__pycache__") -or $_.Extension -eq ".pyc" }
+        Where-Object {
+            $_.Name -in @("worker-config.json", ".venv", "__pycache__") -or
+            $_.Extension -eq ".pyc" -or
+            ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+        }
     if ($privateFiles) {
-        throw "安装 payload 含有私有配置或缓存：$($privateFiles[0].FullName)"
+        throw "安装 payload 含有私有配置、缓存或文件链接：$($privateFiles[0].FullName)"
+    }
+    $prefix = [IO.Path]::GetFullPath($Root).TrimEnd("\") + "\"
+    $covered = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in Get-Content -LiteralPath $manifestPath -Encoding UTF8) {
+        if ($line -notmatch '^([0-9a-fA-F]{64})  (.+)$') {
+            throw "安装 payload manifest 条目无效。"
+        }
+        $expectedHash = $Matches[1].ToLowerInvariant()
+        $relative = $Matches[2]
+        if ([IO.Path]::IsPathRooted($relative)) {
+            throw "安装 payload manifest 不能使用绝对路径。"
+        }
+        $file = [IO.Path]::GetFullPath((Join-Path $Root $relative))
+        if (-not $file.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or
+            -not $covered.Add($file) -or
+            -not (Test-Path -LiteralPath $file -PathType Leaf)) {
+            throw "安装 payload manifest 路径越界、重复或不存在：$relative"
+        }
+        if (((Get-Item -LiteralPath $file).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "安装 payload 不接受指向其他文件的链接：$relative"
+        }
+        $actualHash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -ne $expectedHash) {
+            throw "安装 payload SHA-256 不匹配：$relative"
+        }
+    }
+    foreach ($file in Get-ChildItem -LiteralPath $Root -Recurse -File) {
+        if ($file.FullName -ne $manifestPath -and -not $covered.Contains($file.FullName)) {
+            throw "安装 payload 文件未出现在 manifest：$($file.FullName)"
+        }
     }
 }
 
@@ -55,6 +104,14 @@ if ($LASTEXITCODE -ne 0) { throw "Desktop Python runtime 准备失败。" }
     -PayloadRoot $workerStage -RepositoryRoot $repositoryRoot `
     -PythonEmbedArchive $PythonEmbedArchive -UvExecutable $UvExecutable
 if ($LASTEXITCODE -ne 0) { throw "Worker Python runtime 准备失败。" }
+
+Assert-CleanPayload -Root $desktopStage
+Assert-CleanPayload -Root $workerStage
+if ($null -ne $verificationOutput) {
+    New-Item -ItemType Directory -Path $verificationOutput -ErrorAction Stop | Out-Null
+    Copy-Item -LiteralPath $desktopStage -Destination (Join-Path $verificationOutput "desktop") -Recurse
+    Copy-Item -LiteralPath $workerStage -Destination (Join-Path $verificationOutput "worker") -Recurse
+}
 
 $desktopRelease = Get-Content -LiteralPath (Join-Path $desktopStage "core\RELEASE.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $workerRelease = Get-Content -LiteralPath (Join-Path $workerStage "worker\RELEASE.json") -Raw -Encoding UTF8 | ConvertFrom-Json

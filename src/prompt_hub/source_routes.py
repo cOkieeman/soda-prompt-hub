@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
@@ -25,6 +26,15 @@ class SourceSyncInput(BaseModel):
     clone_missing: bool = False
 
 
+class LocalSourceMappingInput(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
+    data_path: str | None = Field(default=None, max_length=4096)
+
+
+class SourceModeInput(BaseModel):
+    mode: Literal["remote"]
+
+
 class WebCaptureInput(BaseModel):
     url: str = Field(min_length=8, max_length=4096)
     title: str = Field(default="", max_length=300)
@@ -43,6 +53,36 @@ def create_source_router(
     @router.get("/api/sources/sync-status")
     def get_source_sync_status() -> list[dict[str, Any]]:
         return service.status()
+
+    @router.put("/api/sources/{source_id}/local-mapping")
+    def set_local_source_mapping(
+        source_id: str, payload: LocalSourceMappingInput
+    ) -> dict[str, Any]:
+        if any(
+            job["status"] in {"queued", "running"}
+            for job in job_runner.store.list_jobs(job_type="source_sync", limit=20)
+        ):
+            raise HTTPException(status_code=409, detail="资料更新正在进行。请结束后再更换目录")
+        try:
+            return service.map_local_source(
+                source_id,
+                Path(payload.path.strip()).expanduser(),
+                Path(payload.data_path.strip()).expanduser() if payload.data_path else None,
+            )
+        except (OSError, ValueError) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.put("/api/sources/{source_id}/source-mode")
+    def set_source_mode(source_id: str, _payload: SourceModeInput) -> dict[str, Any]:
+        if any(
+            job["status"] in {"queued", "running"}
+            for job in job_runner.store.list_jobs(job_type="source_sync", limit=20)
+        ):
+            raise HTTPException(status_code=409, detail="资料更新正在进行。请结束后再更换来源")
+        try:
+            return service.use_remote_source(source_id)
+        except (OSError, ValueError) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     @router.get("/api/sources/sync-jobs")
     def get_source_sync_jobs() -> list[dict[str, Any]]:

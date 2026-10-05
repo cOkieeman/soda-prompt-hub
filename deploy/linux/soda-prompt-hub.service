@@ -1,0 +1,34 @@
+# Soda Prompt Hub — systemd 用户服务模板
+#
+# 这是模板：install.sh 会把 __SPH_*__ 占位符替换成实际路径后，
+# 写入 ${XDG_CONFIG_HOME:-~/.config}/systemd/user/soda-prompt-hub.service
+#
+# 手工安装时，替换后再执行：
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now soda-prompt-hub
+#
+# 服务以当前用户运行，不使用 root，且默认只监听 127.0.0.1。
+
+[Unit]
+Description=Soda Prompt Hub（本机提示词资料库服务）
+Documentation=https://github.com/cOkieeman/soda-prompt-hub
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=__SPH_REPO__
+Environment=__SPH_LIBRARY_ENV__
+Environment=__SPH_MODELS_ENV__
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__SPH_CORE_EXEC__ serve --host __SPH_HOST__ --port __SPH_PORT__
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+# uvicorn 用 SIGINT 优雅退出
+KillSignal=SIGINT
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

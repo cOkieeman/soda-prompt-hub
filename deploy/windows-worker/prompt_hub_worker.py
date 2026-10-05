@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -152,7 +153,7 @@ class WorkerConfig:
         role = str(raw.get("role", TARGET_ROLE)).strip()
         comfyui_url = str(raw.get("comfyui_url", "")).strip().rstrip("/")
         if not root_value or not Path(root_value).is_absolute():
-            raise WorkerError("bridge_root 必须是 Windows 绝对路径")
+            raise WorkerError("bridge_root 必须是绝对路径")
         if not worker_id or any(
             char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
             for char in worker_id
@@ -161,8 +162,8 @@ class WorkerConfig:
         if role != TARGET_ROLE:
             raise WorkerError(f"role 必须是 {TARGET_ROLE}")
         parsed = urllib.parse.urlsplit(comfyui_url)
-        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-            raise WorkerError("comfyui_url 必须指向本机 HTTP 地址")
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise WorkerError("comfyui_url 必须是带主机名的 http(s) 地址")
         lora_roots = _parse_lora_roots(raw.get("lora_roots", []))
         model_roots = _parse_model_roots(raw.get("model_roots", []))
         return cls(
@@ -969,7 +970,7 @@ class WorkerLock(AbstractContextManager["WorkerLock"]):
 
 class ComfyUIClient:
     def __init__(self, base_url: str, *, timeout: float) -> None:
-        self.base_url = base_url.rstrip("/")
+        self.base_url, self._authorization = _split_credentials(base_url)
         self.timeout = timeout
 
     def system_stats(self) -> dict[str, Any]:
@@ -1039,10 +1040,15 @@ class ComfyUIClient:
         payload: dict[str, Any] | None = None,
     ) -> bytes:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
+        headers: dict[str, str] = {}
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+        if self._authorization:
+            headers["Authorization"] = self._authorization
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=data,
-            headers={"Content-Type": "application/json"} if data is not None else {},
+            headers=headers,
             method=method,
         )
         try:
@@ -1050,6 +1056,27 @@ class ComfyUIClient:
                 return response.read()
         except (urllib.error.URLError, TimeoutError, OSError) as error:
             raise WorkerError(f"无法访问 ComfyUI：{error}") from error
+
+
+def _split_credentials(base_url: str) -> tuple[str, str]:
+    """Split ``http(s)://user:password@host`` into a clean URL and an Authorization value.
+
+    A ComfyUI behind a reverse proxy (or simply on another machine) is often protected by
+    HTTP Basic auth. Keeping the credentials inside ``comfyui_url`` avoids a second
+    configuration field, and urllib itself would not send them.
+    """
+    parts = urllib.parse.urlsplit(base_url)
+    if not parts.username:
+        return base_url.rstrip("/"), ""
+    credentials = (
+        f"{urllib.parse.unquote(parts.username)}:{urllib.parse.unquote(parts.password or '')}"
+    )
+    host = parts.hostname or ""
+    if parts.port:
+        host = f"{host}:{parts.port}"
+    clean = urllib.parse.urlunsplit((parts.scheme, host, parts.path.rstrip("/"), "", ""))
+    token = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
+    return clean, f"Basic {token}"
 
 
 class WindowsWorker:

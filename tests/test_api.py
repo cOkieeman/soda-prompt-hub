@@ -328,7 +328,7 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
                 "导入失败:",
                 "保存失败:",
                 "读取失败:",
-                "暂无版本",
+                "路径与详情",
                 "!Drawing Desk",
                 "!>LOCKED<",
                 "!>UNLOCKED<",

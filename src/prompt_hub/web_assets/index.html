@@ -19,16 +19,24 @@ __PROMPT_HUB_BASE_STYLES__  </style>
         <button class="app-nav-button" data-view="creative">创作台</button>
         <button class="app-nav-button" data-view="prompts">提示词库</button>
         <button class="app-nav-button" data-view="discover">智能检索</button>
+        <button class="app-nav-button" data-view="comfy">出图</button>
+        <button class="app-nav-button" data-view="gallery">画廊</button>
         <button class="app-nav-button" data-view="characters">角色库</button>
         <button class="app-nav-button" data-view="datasets">数据集</button>
         <button class="app-nav-button" data-view="lora">LoRA 项目</button>
-        <button class="app-nav-button" data-view="comfy">Windows 出图</button>
+        <details class="app-settings-menu" id="appSettingsMenu"><summary>设置 ▾</summary><div class="app-settings-items">
         <button class="app-nav-button" data-view="management">资料管理</button>
         <button class="app-nav-button" data-view="remote">设备连接</button>
-        <button class="app-nav-button tag-language-button" id="tagLanguageToggle" type="button">标签：中英</button>
-        <label class="ui-language-control"><span>界面语言</span><select id="uiLanguageSelect" aria-label="界面语言"><option value="zh-CN" data-i18n-ignore>简体中文</option><option value="zh-TW" data-i18n-ignore>繁體中文</option><option value="en" data-i18n-ignore>English</option></select></label>
+        <button class="app-nav-button language-settings-button" id="languageSettingsToggle" type="button" aria-haspopup="dialog" aria-controls="languageSettings" aria-expanded="false">语言 ▾</button>
+        </div></details>
       </div>
     </nav>
+    <section class="language-settings" id="languageSettings" role="dialog" aria-labelledby="languageSettingsTitle" hidden>
+      <div class="language-settings-head"><h2 id="languageSettingsTitle">语言设置</h2><button id="closeLanguageSettings" type="button" aria-label="关闭语言设置">×</button></div>
+      <label class="ui-language-control"><span>界面语言</span><select id="uiLanguageSelect" aria-label="界面语言"><option value="zh-CN" data-i18n-ignore>简体中文</option><option value="zh-TW" data-i18n-ignore>繁體中文</option><option value="en" data-i18n-ignore>English</option></select></label>
+      <div class="tag-language-control"><span>标签显示</span><button class="tag-language-button" id="tagLanguageToggle" type="button">标签：中英</button></div>
+      <p>只改变显示，不改写 Prompt。</p>
+    </section>
 
     <section class="home-page" id="homePage">
       <div class="home-lead">
@@ -38,9 +46,10 @@ __PROMPT_HUB_BASE_STYLES__  </style>
         <div class="home-actions">
           <button class="home-primary" data-start="creative">新建或继续绘图项目 →</button>
           <button class="home-secondary" data-start="prompts">浏览提示词与视觉参考</button>
+          <button class="home-secondary" data-start="comfy">查看出图结果</button>
+          <button class="home-secondary" data-start="gallery">浏览我的作品与参考图</button>
           <button class="home-secondary" data-start="characters">从 OC 角色开始</button>
           <button class="home-secondary" data-start="lora">准备 LoRA 数据集</button>
-          <button class="home-secondary" data-start="comfy">查看 Windows 出图结果</button>
         </div>
         <button class="home-example" id="exampleButton">试一个真实示例：维多利亚军装 × 黄昏图书馆 ↗</button>
         <div class="home-targets">
@@ -73,6 +82,7 @@ __PROMPT_HUB_BASE_STYLES__  </style>
           <div class="home-first-guide-step"><b>03</b><strong>整理两种 Prompt</strong><span>同一份创作意图分别检查 Anima 标签和 Krea 2 自然语言版本。</span></div>
           <div class="home-first-guide-step" data-usage-only="mac_remote"><b>04</b><strong>需要时交给 Windows 出图</strong><span>Windows 开机并运行 Worker 后再发送；离线时可以继续整理本地内容。</span></div>
           <div class="home-first-guide-step" data-usage-only="windows_local"><b>04</b><strong>连接本机 ComfyUI 出图</strong><span>Worker 随启动器自动运行；在启动器设置中填写 ComfyUI 地址，无需配对其他设备。</span></div>
+          <div class="home-first-guide-step" data-usage-only="linux_local"><b>04</b><strong>连接本机 ComfyUI 出图</strong><span>Compute Worker 通过本地桥接目录领取任务；把 worker-config.json 的 comfyui_url 指向本机 ComfyUI 即可，无需配对其他设备。</span></div>
           <div class="home-first-guide-step"><b>05</b><strong>精选、打标并交付数据集</strong><span>结果图导入后人工筛选，检查 WD14 草稿，最后冻结并导出版本。</span></div>
         </div>
       </details>
@@ -93,6 +103,7 @@ __PROMPT_HUB_BASE_STYLES__  </style>
         <p><strong id="homeReleaseIdentity">Soda Prompt Hub：</strong>创作、资料引用、双格式输出、远程出图、结果回流与数据集交付已经形成完整闭环。</p>
         <p data-usage-only="mac_remote"><strong>设备分工：</strong>Mac 负责整理、审核与保存记录； <span data-remote-device-name data-i18n-ignore>__PROMPT_HUB_DEVICE_NAME_HTML__</span> 的 ComfyUI 负责生成与测试。</p>
         <p data-usage-only="windows_local"><strong>Windows 单机模式：</strong>创作、审核与数据保存都在这台电脑完成；启动器自动管理 Worker，只需连接本机 ComfyUI。</p>
+        <p data-usage-only="linux_local"><strong>Linux 本机模式：</strong>创作、审核与数据保存都在这台电脑完成；Compute Worker 通过本地桥接目录交换任务，只需连接本机 ComfyUI。</p>
       </div>
     </section>
 
@@ -115,13 +126,16 @@ __PROMPT_HUB_BASE_STYLES__  </style>
             </div>
             <div class="personal-summary">我的收藏 <strong id="favoriteCount">0</strong> 条 <span class="divider">·</span> 已导入角色 <strong id="ocCount">0</strong> 个</div>
           </div>
-          <div class="sync-actions"><button class="sync-button" id="sourceSyncButton">↻ 更新公共提示词库</button><button class="sync-button" id="importButton" aria-describedby="sourceIndexHelp">仅重建本地索引</button></div>
+          <div class="sync-actions"><button class="sync-button" id="sourceSyncButton">↻ 更新公共提示词库</button><button class="sync-button" id="importButton" aria-describedby="sourceIndexHelp">刷新本地资料</button></div>
         </section>
       </header>
       <section class="management-sources">
-        <p class="section-label">已经可以检索的来源</p>
-        <div class="source-list" id="sourceList"></div>
-        <p class="source-sync-help" id="sourceIndexHelp">更新公共提示词库：联网检查已安装的资料库，有新版本才下载；未安装的资料库请单独“拉取”。仅重建本地索引：重新读取已下载的资料并更新搜索条目和部分缩略图，不联网、不调用 AI，不修改原资料文件。</p>
+        <p class="section-label">资料来源</p>
+        <div class="source-list" id="sourceList" hidden></div>
+        <details class="source-mapping-editor" id="sourceMappingEditor"><summary>选择 GitHub URL / 本地映射</summary>
+          <form id="sourceMappingForm"><label>资料库<select id="sourceMappingSource" required></select></label><label>读取方式<select id="sourceMappingMode"><option value="remote">GitHub URL</option><option value="local">本地映射</option></select></label><p id="sourceMappingUrl"></p><label id="sourceMappingPathWrap">本地目录<input id="sourceMappingPath" required maxlength="4096" placeholder="例如 /Volumes/共享盘/画风库/Krea2-Style-Explorer"></label><label id="sourceMappingDataWrap" hidden>AnimaDex 外部资料目录（可选）<input id="sourceMappingDataPath" maxlength="4096" placeholder="包含 import/characters.csv 与 artists.csv 的目录"></label><p>每个库可单独选择。GitHub 资料下载到 Hub 管理的目录；本地映射只读、不复制大图。切换保留已填写路径和原文件，保存后按所选方式下载或刷新索引。</p><button type="submit" id="sourceMappingSave">保存来源设置</button><p id="sourceMappingMessage" role="status" aria-live="polite"></p></form>
+        </details>
+        <p class="source-sync-help" id="sourceIndexHelp">刷新本地资料：重新读取已有目录，更新搜索索引，不修改原文件。使用已下载仓库时，可以单独检查更新或下载尚未安装的资料库。</p>
         <div class="source-sync-summary"><p id="sourceSyncSummary">正在读取本地资料源状态…</p><button class="source-sync-fetch" id="sourceSyncRefresh" type="button">刷新状态</button></div>
         <div class="source-sync-message" id="sourceSyncMessage" role="status" aria-live="polite">尚未检查上游更新。</div>
         <progress class="source-sync-progress" id="sourceSyncProgress" aria-label="资料更新步骤进度" value="0" max="1" hidden></progress>

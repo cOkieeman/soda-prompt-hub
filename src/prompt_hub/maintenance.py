@@ -35,6 +35,7 @@ PERSONAL_ROOTS = (
     "exports",
     "remote-nodes",
     "workflow-profiles",
+    "gallery",
 )
 REBUILDABLE_CACHE_ROOTS = (
     "remote-nodes/lora-previews",
@@ -77,6 +78,8 @@ class BackupManager:
     ) -> dict[str, Any]:
         target = destination or self._default_destination()
         target = target.expanduser().resolve()
+        if target.is_relative_to(self.settings.library_root.resolve()):
+            raise MaintenanceError("备份目标不能位于资料库内，请选择资料库外的新目录")
         if target.exists():
             raise MaintenanceError("备份目标已存在，请使用新的目录")
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -159,6 +162,8 @@ class BackupManager:
     def restore_to_new_directory(self, backup_path: Path, destination: Path) -> dict[str, Any]:
         source = backup_path.expanduser().resolve()
         target = destination.expanduser().resolve()
+        if target.is_relative_to(source):
+            raise MaintenanceError("恢复目标不能位于备份目录内，请选择独立的新目录")
         verification = verify_backup(source)
         if not verification["ok"]:
             raise MaintenanceError("备份校验失败，拒绝恢复")

@@ -57,7 +57,7 @@ COMFY_STYLES = r"""
 COMFY_HTML = r"""
 <section class="comfy-page" id="comfyPage" hidden>
   <section class="comfy-hero">
-    <div class="comfy-hero-copy"><span class="eyebrow">从 <span data-remote-device-name>__PROMPT_HUB_DEVICE_NAME_HTML__</span> 导入资料库</span><h1>Windows<br>出图结果</h1><p>在这里导入 ComfyUI 生成的图片，并读取图片中实际保存的工作流和生成参数。没有参数的图片也能保存，但系统不会猜测或补写。</p></div>
+    <div class="comfy-hero-copy"><span class="eyebrow">从 <span data-remote-device-name>__PROMPT_HUB_DEVICE_NAME_HTML__</span> 导入资料库</span><h1>出图结果</h1><p>在这里导入 ComfyUI 生成的图片，并读取图片中实际保存的工作流和生成参数。没有参数的图片也能保存，但系统不会猜测或补写。</p></div>
     <aside class="comfy-flow"><span class="section-label">处理顺序</span><ol><li>选择一张图片，或扫描已经挂载的结果目录</li><li>核对模型、LoRA、提示词和生成参数</li><li>选择这张图属于哪个创作项目</li><li>决定作为参考、数据集候选、失败记录或下一版起点</li></ol></aside>
   </section>
   <section class="comfy-controls">
@@ -177,7 +177,7 @@ COMFY_SCRIPT = r"""
   async function act(resultId, action) { const projectId=$('#comfyProject').value; if(action==='remove') { if(!confirm('把这张图移出 Prompt Hub 结果库？\n\n源目录里的原图不会删除；Prompt Hub 管理副本会进入内部回收区。')) return; await api(`/api/comfy-results/${encodeURIComponent(resultId)}`,{method:'DELETE'}); status('已移出结果库；源图片未删除，管理副本已进入内部回收区。'); }
     else if(action!=='failed'&&!projectId) return status('请先在上方选择这张图所属的创作项目。'); else if(action==='failed') { await api(`/api/comfy-results/${encodeURIComponent(resultId)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({disposition:'failed_test'})}); status('已记录为失败测试；图片没有进入任何训练集。'); }
     else if(action==='branch') { const child=await api(`/api/comfy-results/${encodeURIComponent(resultId)}/branch/${encodeURIComponent(projectId)}`,{method:'POST'}); status(`已建立 ${child.title}；来源工作流和参数已经保存在版本记录中。`); }
-    else { const endpoint=action==='candidate'?'candidate':'attach'; await api(`/api/comfy-results/${encodeURIComponent(resultId)}/${endpoint}/${encodeURIComponent(projectId)}`,{method:'POST'}); status(action==='candidate'?'已关联并加入数据集候选；仍需在创作台确认图片说明。':'已关联项目；图片尚未进入数据集。'); }
+    else { const endpoint=action==='candidate'?'candidate':'attach'; await api(`/api/comfy-results/${encodeURIComponent(resultId)}/${endpoint}/${encodeURIComponent(projectId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expected_revision:state.projects.find(project=>project.project_id===projectId)?.revision})}); status(action==='candidate'?'已关联并加入数据集候选；仍需在创作台确认图片说明。':'已关联项目；图片尚未进入数据集。'); }
     await load(); }
   $('#comfyFile').addEventListener('change',event=>{ const file=event.target.files[0]; $('#comfyFileName').textContent=file?`${file.name} · ${(file.size/1024/1024).toFixed(2)} MiB`:'尚未选择图片'; });
   $('#comfyFileForm').addEventListener('submit',event=>importFile(event).catch(error=>status(error.message)));

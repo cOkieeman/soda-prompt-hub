@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Protocol
 
 from prompt_hub.importers import SourceSpec, discover_sources, import_report
+from prompt_hub.local_sources import local_source_mapping, save_local_source_mapping
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,7 +39,17 @@ class SourceSyncService:
         self._reindexer = reindexer
 
     def status(self) -> list[dict[str, Any]]:
-        return [self._source_status(spec) for spec in self._configured_sources()]
+        mappings, _ = local_source_mapping(self.settings)
+        rows = []
+        for spec in self._configured_sources():
+            row = self._source_status(spec)
+            saved = mappings.get(spec.source_id, {})
+            if isinstance(saved, dict):
+                row["mapping_path"] = saved.get("path", "")
+                row["mapping_data_path"] = saved.get("data_path", "")
+            row["source_mode"] = "local" if spec.local_only else "remote"
+            rows.append(row)
+        return rows
 
     def job(self, payload: Mapping[str, Any], context: SyncProgress) -> dict[str, Any]:
         selected_value = payload.get("source_ids", [])
@@ -89,10 +100,69 @@ class SourceSyncService:
     def configured_source_ids(self) -> set[str]:
         return {spec.source_id for spec in self._configured_sources()}
 
+    def map_local_source(
+        self, source_id: str, path: Path, data_path: Path | None = None
+    ) -> dict[str, Any]:
+        spec = next(
+            (item for item in self._configured_sources() if item.source_id == source_id), None
+        )
+        if spec is None:
+            message = "资料源不在预设清单中"
+            raise ValueError(message)
+        if not path.is_absolute() or not path.is_dir():
+            message = "请选择当前电脑能访问的绝对目录；共享目录请先挂载"
+            raise ValueError(message)
+        if data_path is not None and (
+            spec.importer != "animadex" or not data_path.is_absolute() or not data_path.is_dir()
+        ):
+            message = "外部资料目录仅用于 AnimaDex，且必须是可访问的绝对目录"
+            raise ValueError(message)
+        patterns = {
+            "style-explorer": ("app/data.js",),
+            "neons_styles": ("styles/*.json",),
+            "clio": ("styles.json",),
+            "krea": ("*.json",),
+            "wildcards": ("**/*.txt",),
+            "kisega": ("images*/*.desc.txt",),
+            "animadex": ("samples/*.csv", "config.toml", "import/characters.csv"),
+        }
+        if not any(
+            candidate.is_file()
+            for pattern in patterns[spec.importer]
+            for candidate in path.glob(pattern)
+        ):
+            message = "目录中没有找到这个资料库的数据文件，请选择资料库本身的目录"
+            raise ValueError(message)
+        if spec.importer == "clio" and not (path / "gallery/manifest.json").is_file():
+            message = "Clio 目录缺少 gallery/manifest.json。请使用完整资料库目录"
+            raise ValueError(message)
+        if data_path is not None and not all(
+            (data_path / "import" / name).is_file() for name in ("characters.csv", "artists.csv")
+        ):
+            message = "AnimaDex 外部目录缺少 import/characters.csv 或 import/artists.csv"
+            raise ValueError(message)
+        save_local_source_mapping(self.settings, source_id, path, data_path)
+        return {"source_id": source_id, "path": str(path), "saved": True}
+
+    def use_remote_source(self, source_id: str) -> dict[str, Any]:
+        if source_id not in self.configured_source_ids():
+            message = "资料源不在预设清单中"
+            raise ValueError(message)
+        save_local_source_mapping(self.settings, source_id, None, mode="remote")
+        return {"source_id": source_id, "source_mode": "remote", "saved": True}
+
     def _configured_sources(self) -> list[SourceSpec]:
         return list(self._sources) if self._sources is not None else discover_sources(self.settings)
 
     def _source_status(self, spec: SourceSpec) -> dict[str, Any]:
+        if spec.local_error:
+            return _result(spec, "failed", message=spec.local_error)
+        if spec.local_only:
+            return _result(
+                spec,
+                "local" if spec.path.is_dir() else "missing",
+                message="本地只读映射。不会联网拉取或修改资料目录。",
+            )
         if not spec.path.is_dir():
             return _result(spec, "missing", message="本地仓库不存在")
         if not (spec.path / ".git").exists():
@@ -125,6 +195,13 @@ class SourceSyncService:
         return self._clone_one(spec)
 
     def _clone_one(self, spec: SourceSpec) -> dict[str, Any]:
+        if spec.local_only:
+            return _result(
+                spec, "skipped_local", message="本地映射不会下载。请检查共享目录是否已挂载。"
+            )
+        return self._clone_git(spec)
+
+    def _clone_git(self, spec: SourceSpec) -> dict[str, Any]:
         root = self.settings.git_sources_root
         if not spec.path.is_relative_to(root):
             return _result(spec, "failed", message="资料源路径不在本地来源目录内，已拒绝拉取")
@@ -160,6 +237,21 @@ class SourceSyncService:
 
     def _sync_one(self, spec: SourceSpec, *, clone_missing: bool = False) -> dict[str, Any]:
         current = self._source_status(spec)
+        if spec.local_only:
+            return (
+                current
+                if current["status"] in {"failed", "missing"}
+                else {
+                    **current,
+                    "status": "skipped_local",
+                    "message": "已复用本地资料。仅重建索引。",
+                }
+            )
+        return self._sync_git(spec, current, clone_missing=clone_missing)
+
+    def _sync_git(
+        self, spec: SourceSpec, current: dict[str, Any], *, clone_missing: bool
+    ) -> dict[str, Any]:
         if current["status"] == "missing" and clone_missing:
             return self._clone_one(spec)
         if current["status"] in {"missing", "not_git", "failed"}:
@@ -237,6 +329,8 @@ def _result(
         "source_id": spec.source_id,
         "name": spec.name,
         "path": str(spec.path),
+        "local_only": spec.local_only,
+        "data_path": str(spec.data_path) if spec.data_path is not None else "",
         "status": status,
         "message": message,
         "before": before,

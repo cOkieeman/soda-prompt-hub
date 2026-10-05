@@ -139,7 +139,7 @@ PAIRING_SCRIPT = r"""
   $('#pairingPrepare').addEventListener('click',()=>run(async()=>{await api(`/api/remote-nodes/${encodeURIComponent(nodeId)}/prepare`,{method:'POST'});await verify();}));
   $('#pairingDone').addEventListener('click',()=>dialog.close());
   $('#pairingUrl').addEventListener('input',()=>{$('#pairingMount').value='';$('#pairingNotice').textContent='连接地址已修改，挂载路径将按新共享名生成；自定义路径可在高级选项中填写。';});
-  api('/api/desktop/connection').then(summary=>{ $('#pairingEntry').hidden=summary.mode==='windows_local'; }).catch(()=>{});
+  api('/api/desktop/connection').then(summary=>{ $('#pairingEntry').hidden=['windows_local','linux_local'].includes(summary.mode); }).catch(()=>{});
 })();
 </script>
 """

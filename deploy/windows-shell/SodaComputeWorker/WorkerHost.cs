@@ -55,7 +55,7 @@ internal sealed class WorkerHost : IDisposable
     internal async Task<Dictionary<string, object?>> GetStatusAsync()
     {
         var release = ReadObject(Path.Combine(WorkerRoot, "RELEASE.json"));
-        var version = GetString(release, "worker_version", "1.1.1");
+        var version = GetString(release, "worker_version", BundledVersion);
         var channel = GetString(release, "release_channel", "stable");
         var protocol = GetString(release, "protocol_version", ExpectedProtocol);
         var configResult = ReadConfig();
@@ -470,7 +470,7 @@ internal sealed class WorkerHost : IDisposable
         var archive = DiagnosticBundle.Create(
             "Soda-Compute-Worker",
             "Soda Compute Worker",
-            Convert.ToString(status["version"], CultureInfo.InvariantCulture) ?? "1.1.1",
+            Convert.ToString(status["version"], CultureInfo.InvariantCulture) ?? BundledVersion,
             File.Exists(Path.Combine(AppRoot, "INSTALL_MODE.json")),
             status,
             LogsRoot,
@@ -497,6 +497,8 @@ internal sealed class WorkerHost : IDisposable
         }
         Process.Start(new ProcessStartInfo("notepad.exe", $"\"{ConfigPath}\"") { UseShellExecute = true });
     }
+
+    private static string BundledVersion => typeof(WorkerHost).Assembly.GetName().Version?.ToString(3) ?? "unknown";
 
     internal Dictionary<string, object?> GetEditableConfig()
     {

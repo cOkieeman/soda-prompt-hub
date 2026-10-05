@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Soda Prompt Hub
+Name[zh_CN]=Soda Prompt Hub
+Comment=Open the local AI creation and dataset workspace
+Comment[zh_CN]=打开本机 AI 创作与数据集工作台
+Exec=__SPH_LAUNCHER_EXEC__ open
+Icon=soda-prompt-hub
+Terminal=false
+Categories=Graphics;
+Keywords=AI;Prompt;Dataset;ComfyUI;
+StartupNotify=true
+X-GNOME-UsesNotifications=true

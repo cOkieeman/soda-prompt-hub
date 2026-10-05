@@ -1,0 +1,12 @@
+{
+  "bridge_root": "__SPH_WORKER_BRIDGE_ROOT__",
+  "comfyui_url": "http://127.0.0.1:8188",
+  "worker_id": "linux-worker",
+  "role": "compute_5060ti",
+  "poll_interval_seconds": 2,
+  "history_poll_seconds": 1,
+  "task_timeout_seconds": 1800,
+  "http_timeout_seconds": 30,
+  "lora_roots": [],
+  "model_roots": []
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # standalone-bundle: omit-start
+import base64
 import json
 import os
 import socket
@@ -100,7 +101,7 @@ class WorkerLock(AbstractContextManager["WorkerLock"]):
 
 class ComfyUIClient:
     def __init__(self, base_url: str, *, timeout: float) -> None:
-        self.base_url = base_url.rstrip("/")
+        self.base_url, self._authorization = _split_credentials(base_url)
         self.timeout = timeout
 
     def system_stats(self) -> dict[str, Any]:
@@ -170,10 +171,15 @@ class ComfyUIClient:
         payload: dict[str, Any] | None = None,
     ) -> bytes:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
+        headers: dict[str, str] = {}
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+        if self._authorization:
+            headers["Authorization"] = self._authorization
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=data,
-            headers={"Content-Type": "application/json"} if data is not None else {},
+            headers=headers,
             method=method,
         )
         try:
@@ -181,6 +187,27 @@ class ComfyUIClient:
                 return response.read()
         except (urllib.error.URLError, TimeoutError, OSError) as error:
             raise WorkerError(f"无法访问 ComfyUI：{error}") from error
+
+
+def _split_credentials(base_url: str) -> tuple[str, str]:
+    """Split ``http(s)://user:password@host`` into a clean URL and an Authorization value.
+
+    A ComfyUI behind a reverse proxy (or simply on another machine) is often protected by
+    HTTP Basic auth. Keeping the credentials inside ``comfyui_url`` avoids a second
+    configuration field, and urllib itself would not send them.
+    """
+    parts = urllib.parse.urlsplit(base_url)
+    if not parts.username:
+        return base_url.rstrip("/"), ""
+    credentials = (
+        f"{urllib.parse.unquote(parts.username)}:{urllib.parse.unquote(parts.password or '')}"
+    )
+    host = parts.hostname or ""
+    if parts.port:
+        host = f"{host}:{parts.port}"
+    clean = urllib.parse.urlunsplit((parts.scheme, host, parts.path.rstrip("/"), "", ""))
+    token = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
+    return clean, f"Basic {token}"
 
 
 class WindowsWorker:
