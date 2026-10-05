@@ -199,7 +199,14 @@ def discover_sources(settings: Settings) -> list[SourceSpec]:
             local_error=error or _mapping_error(mappings.get(spec.source_id)),
             notes=spec.notes + " 本地只读映射。刷新仅重建索引。" + error,
         )
-        if error or spec.source_id in mappings
+        if error
+        or (
+            spec.source_id in mappings
+            and (
+                not isinstance(mappings[spec.source_id], dict)
+                or mappings[spec.source_id].get("mode") != "remote"
+            )
+        )
         else spec
         for spec in sources
     ]

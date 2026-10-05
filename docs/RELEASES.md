@@ -86,6 +86,14 @@ ZIP 内文件时间和权限使用固定值；同一提交、同一工具链重�
 
 正式版本使用 `v<版本>` 标签，例如 `v1.1.0`。已发布标签和附件不移动、不覆盖；通常后续修复使用新的修订版本。
 
+### 2026-10-05：1.2.0 验收构建
+
+[1.2.0 Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0) 包含 Mac arm64 DMG、Windows x64 Desktop / Compute Worker Setup，以及统一校验清单和依赖库存。产品和 Worker 版本均为 `1.2.0`。
+
+本次安装包保留 **Pre-release**，不改变原有 Latest：双端运行与维护者界面验收已完成，但 Windows Setup 的完整安装生命周期和正式平台签名尚未完成。测试范围见[发行验证](acceptance/release-1.2.0-20261005.md)。
+
+附件来自已验收的冻结源码；发布提交只补充文档与验证范围，不改运行代码。`BUILD_PROVENANCE.json` 记录冻结源码与附件哈希，已有附件不覆盖。此次不新增 Linux 安装包。
+
 ### 2026-09-14：1.1.1 第一版预发布候选
 
 源码、Core、Mac 启动器、Windows Desktop 和 Windows Worker 的产品版本统一为 `1.1.1`。第一批安装包

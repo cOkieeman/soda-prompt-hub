@@ -31,7 +31,9 @@ def test_system_version_reports_code_schema_and_worker(settings) -> None:
         "background_jobs": 1,
         "creative_store": 2,
         "danbooru_tags": 1,
+        "gallery": 2,
         "prompt_database": 1,
+        "scene_plan_store": 1,
         "tag_locale": 1,
     }
     assert version["worker"]["bundled_version"] == __version__

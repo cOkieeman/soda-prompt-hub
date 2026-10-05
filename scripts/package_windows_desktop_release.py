@@ -46,6 +46,11 @@ class DesktopVersionMismatchError(WindowsDesktopPackageError):
         super().__init__("Desktop release version does not match project version")
 
 
+class PublishedVersionMismatchError(WindowsDesktopPackageError):
+    def __init__(self, relative: str, expected: str) -> None:
+        super().__init__(f"Published release metadata {relative} does not match version {expected}")
+
+
 def package_release(
     repository_root: Path,
     published_root: Path,
@@ -61,6 +66,7 @@ def package_release(
     for relative in REQUIRED_PATHS:
         if not (published / relative).is_file():
             raise MissingPublishedFileError(relative)
+    _validate_published_versions(published, version)
 
     package_name = f"Soda-Prompt-Hub-Desktop-{version}-{runtime}"
     package_root = output / package_name
@@ -139,6 +145,19 @@ def _validate_release_version(repository: Path, version: str) -> None:
     release = json.loads((repository / "RELEASE.json").read_text(encoding="utf-8"))
     if release.get("product_version") != version:
         raise DesktopVersionMismatchError
+
+
+def _validate_published_versions(published: Path, version: str) -> None:
+    for relative, field in (
+        ("core/RELEASE.json", "product_version"),
+        ("worker/RELEASE.json", "worker_version"),
+    ):
+        try:
+            payload = json.loads((published / relative).read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise PublishedVersionMismatchError(relative, version) from error
+        if not isinstance(payload, dict) or payload.get(field) != version:
+            raise PublishedVersionMismatchError(relative, version)
 
 
 def _project_version(path: Path) -> str:

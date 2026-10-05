@@ -28,6 +28,26 @@ else {
 $release = Get-Content -LiteralPath $releasePath -Raw -Encoding UTF8 | ConvertFrom-Json
 $version = if ($Product -eq "desktop") { $release.product_version } else { $release.worker_version }
 
+function Remove-RuntimeBuildArtifacts {
+    param([string]$Payload, [string]$SitePackages)
+    # pip's local wheel provenance can include the private temporary build path.
+    foreach ($metadata in Get-ChildItem -LiteralPath $SitePackages -Filter "direct_url.json" -Recurse -File) {
+        if ($metadata.Directory.Name.EndsWith(".dist-info", [StringComparison]::OrdinalIgnoreCase)) {
+            $provenance = Get-Content -LiteralPath $metadata.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+            $sourceUrl = [string]$provenance.url
+            if ($sourceUrl.StartsWith("file:", [StringComparison]::OrdinalIgnoreCase)) {
+                Remove-Item -LiteralPath $metadata.FullName -Force
+            }
+        }
+    }
+    # Keep the final payload clean even when an earlier installer supplied caches.
+    Get-ChildItem -LiteralPath $Payload -Filter "*.pyc" -Recurse -File |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+    Get-ChildItem -LiteralPath $Payload -Filter "__pycache__" -Recurse -Directory |
+        Sort-Object { $_.FullName.Length } -Descending |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+}
+
 try {
     if ($Product -eq "desktop") {
         & (Join-Path $PSScriptRoot "prepare-git.ps1") -PayloadRoot $payload -GitArchive $GitArchive
@@ -105,13 +125,13 @@ try {
             $builder = Get-Command py.exe -ErrorAction SilentlyContinue
             if ($null -ne $builder) {
                 & $builder.Source -3.12 -m pip install --disable-pip-version-check `
-                    --no-deps --only-binary=:all: --requirement $requirements `
+                    --no-deps --no-compile --only-binary=:all: --requirement $requirements `
                     $projectWheels[0].FullName --target $sitePackages
             }
             else {
                 $builder = Get-Command python.exe -ErrorAction Stop
                 & $builder.Source -m pip install --disable-pip-version-check `
-                    --no-deps --only-binary=:all: --requirement $requirements `
+                    --no-deps --no-compile --only-binary=:all: --requirement $requirements `
                     $projectWheels[0].FullName --target $sitePackages
             }
             $pipExitCode = $LASTEXITCODE
@@ -125,15 +145,18 @@ try {
     }
 
     $embeddedPython = Join-Path $runtimeRoot "python.exe"
+    # Self-test imports must not add bytecode files after the core manifest was sealed.
     if ($Product -eq "desktop") {
-        & $embeddedPython -c "import fastapi, mcp, numpy, onnxruntime, PIL, prompt_hub, uvicorn, win32api, pathlib, sys; assert prompt_hub.__version__ == '$version'; assert pathlib.Path(prompt_hub.__file__).resolve() == pathlib.Path(sys.executable).resolve().parents[2] / 'core/src/prompt_hub/__init__.py'"
+        & $embeddedPython -B -c "import fastapi, mcp, numpy, onnxruntime, PIL, prompt_hub, uvicorn, win32api, pathlib, sys; assert prompt_hub.__version__ == '$version'; assert pathlib.Path(prompt_hub.__file__).resolve() == pathlib.Path(sys.executable).resolve().parents[2] / 'core/src/prompt_hub/__init__.py'"
     }
     else {
-        & $embeddedPython -c "import json, pathlib, urllib.request"
+        & $embeddedPython -B -c "import json, pathlib, urllib.request"
     }
     if ($LASTEXITCODE -ne 0) {
         throw "随包 Python 自检失败，exit code $LASTEXITCODE。"
     }
+
+    Remove-RuntimeBuildArtifacts -Payload $payload -SitePackages $sitePackages
 
     $installMode = [ordered]@{
         format = "soda-install-mode-v1"

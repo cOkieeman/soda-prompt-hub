@@ -52,6 +52,12 @@ def stage_source(repository_root: Path, output_root: Path) -> dict[str, object]:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
 
+    # PowerShell 5.1 decodes BOM-less UTF-8 as ANSI on Windows.
+    # Normalize before hashing so the manifest matches the transferred inputs.
+    for script in package_root.rglob("*.ps1"):
+        content = script.read_text(encoding="utf-8-sig")
+        script.write_text(content, encoding="utf-8-sig")
+
     manifest = [
         {
             "path": path.relative_to(package_root).as_posix(),

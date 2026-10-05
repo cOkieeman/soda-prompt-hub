@@ -8,11 +8,45 @@
   const safetyLabels = {sfw:'普通',suggestive:'轻度成人向',adult:'成人向','explicit-adult':'明确成人向',unrated:'尚未分级'};
   const wd14RatingLabels = {general:'普通',sensitive:'轻度成人向',questionable:'成人向',explicit:'明确成人向',unknown:'尚未判断'};
   const creativeState = {taggerConfig: null, project: null, projects: [], recipes: [], outputs: {}, profile: 'anima', tagStatus: null, tagDownloading: false, workflowProfiles: [], windowsModels: [], windowsLoras: [], workflowLoraPickerOpen: false, workflowLoraQuery: '', workflowLoraFolder: '', workflowMessage: '', workflowMessageProjectId: '', datasetProfile: 'anima', datasetMessage: '', datasetMessageProjectId: '', journey: null, journeyProjectId: '', journeyRun: 0, suggestion: null, sourcing: null, sourcingProjectId: '', sourcingRun: 0, review: null, reviewAssetId: '', reviewProjectId: '', iteration: null, iterationProjectId: '', iterationRun: 0, iterationMessage: '', iterationMessageProjectId: '', ocSeed: null, visionAvailable: false, saveTimer: null, compileTimer: null, loadedMeta: false};
+  const sceneState = {projectId:'', plans:[], selectedPlanId:'', preview:null, input:'', run:0, loading:false, generating:false, applying:false, style:null, styleProjectId:'', styleProfileId:'', stylePreview:null};
+  let creativeSaveQueue = Promise.resolve(), creativeInit = null, creativeCompileRun = 0, creativeCompiledInput = '', creativeSending = false;
+  const resultCaptionDrafts = new Map();
+
+  function setCreativeStage(stage, focus = false) {
+    if (!['design', 'generation', 'review'].includes(stage)) return;
+    hideTagDropdown();
+    document.querySelectorAll('[data-creative-panel]').forEach(panel => { panel.hidden = panel.dataset.creativePanel !== stage; });
+    document.querySelectorAll('[data-creative-stage]').forEach(button => {
+      const active = button.dataset.creativeStage === stage;
+      button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1;
+      if (active && focus) button.focus();
+    });
+    $('#creativePage').dataset.stage = stage;
+  }
+  window.openCreativeStage = stage => setCreativeStage(stage);
+  document.querySelectorAll('[data-creative-stage], [data-creative-stage-link]').forEach(button => button.addEventListener('click', () => setCreativeStage(button.dataset.creativeStage || button.dataset.creativeStageLink)));
+  document.querySelector('.creative-stage-tabs').addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const stages = ['design', 'generation', 'review'], current = stages.indexOf(document.querySelector('[data-creative-stage][aria-selected="true"]').dataset.creativeStage);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (current + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
+    setCreativeStage(stages[next], true);
+  });
+  $('#creativePreviewToggle').addEventListener('click', () => {
+    const button = $('#creativePreviewToggle'), expanded = button.getAttribute('aria-expanded') !== 'true';
+    button.setAttribute('aria-expanded', String(expanded)); $('#creativeOutputRail').classList.toggle('is-preview-open', expanded);
+  });
+
+  function creativeContentSnapshot(project = collectCreative()) {
+    const {revision, expected_revision, created_at, updated_at, ...content} = project;
+    const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value;
+    return JSON.stringify(stable(content));
+  }
 
   async function creativeJson(url, options = {}) {
     const response = await fetch(url, options);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || `Request failed: ${response.status}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(window.promptHubErrorMessage?.(data, response.status) || (typeof data.detail === 'string' ? data.detail : `请求失败（${response.status}）`));
     return data;
   }
 
@@ -31,6 +65,7 @@
     if(!journey) { grid.innerHTML='<p class="project-journey-empty">正在汇总这个项目的进度……</p>'; return; }
     grid.innerHTML=(journey.stages||[]).map((stage,index)=>`<article class="project-journey-card ${stage.state==='ready'?'ready':'pending'}"><div><span class="journey-number">0${index+1} · ${stage.state==='ready'?'已有进展':'等待继续'}</span><strong>${escapeHtml(stage.label)}</strong><span class="journey-count">${Number(stage.count)||0}</span><small>${escapeHtml(stage.detail||stage.status)}</small><small>${escapeHtml(stage.status)}</small></div><button type="button" data-journey-action="${escapeHtml(stage.stage_id)}" data-journey-view="${escapeHtml(stage.action?.view||'creative')}" data-journey-target="${escapeHtml(stage.action?.target_id||'')}">${escapeHtml(stage.action?.label||'继续')}</button></article>`).join('');
     $('#projectJourneyNote').textContent=`已汇总 ${journey.summary?.result_count||0} 张结果、${journey.summary?.selected_count||0} 张精选、${journey.summary?.workspace_count||0} 个关联工作区、${journey.summary?.delivery_count||0} 个交付版本。这里只读状态，不会自动审核。`;
+    if ($('#creativeJourneySummary')) $('#creativeJourneySummary').textContent = `项目进度 · ${journey.summary?.result_count||0} 张结果 · ${journey.summary?.selected_count||0} 张精选`;
   }
 
   async function refreshProjectJourney() {
@@ -51,7 +86,6 @@
     const existing=new Map(local.map(asset=>[asset.asset_id,asset]));
     creativeState.project.generation={...creativeState.project.generation,
       result_assets:(fresh.generation?.result_assets || []).map(asset=>existing.get(asset.asset_id)||asset)};
-    creativeState.project.revision=Math.max(creativeState.project.revision||0,fresh.revision||0);
     renderResultGallery(); await refreshProjectJourney();
   }
   window.addEventListener('prompt-hub-results-imported',event=>{
@@ -61,7 +95,7 @@
   async function syncProjectDataset() {
     if(!creativeState.project?.project_id) return;
     await saveCreative(); $('#projectJourneyNote').textContent='正在复制已手动精选的图片并建立来源档案；不会改变审核状态……';
-    const result=await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-workspace`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile_id:creativeState.datasetProfile})});
+    const result=await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-workspace`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile_id:creativeState.datasetProfile, expected_revision:creativeState.project.revision})});
     await refreshProjectJourney();
     $('#projectJourneyNote').textContent=`已新增 ${result.synced} 张、复用 ${result.existing} 张；扫描在后台进行，图片仍是未审核状态。`;
     await window.setPromptHubView?.('datasets');
@@ -69,11 +103,16 @@
   }
 
   async function openCreativeProject(projectId) {
+    if(sceneState.applying) throw new Error('正在采用方案，请稍后再切换项目');
     await ensureCreativeProject();
+    if(sceneState.applying) throw new Error('正在保存更改，请稍后再切换项目');
     if(creativeState.project?.project_id!==projectId) {
+      setCreativeApplyBusy(true);
+      try {
       clearTimeout(creativeState.saveTimer); await saveCreative();
-      creativeState.project=creativeState.projects.find(item=>item.project_id===projectId)||await creativeJson(`/api/creative/projects/${encodeURIComponent(projectId)}`);
-      creativeState.review=null; creativeState.reviewProjectId=''; renderCreativeProject();
+      const project=await creativeJson(`/api/creative/projects/${encodeURIComponent(projectId)}`);
+      creativeState.review=null; creativeState.reviewProjectId=''; acceptCreativeProject(project);
+      } finally { setCreativeApplyBusy(false); }
     }
     await window.setPromptHubView?.('creative');
   }
@@ -107,7 +146,7 @@
     });
     creativeState.profile = project.target_profile || creativeState.profile;
     document.querySelectorAll('[data-profile]').forEach(button => button.classList.toggle('active', button.dataset.profile === creativeState.profile));
-    renderCreativeReferences(); renderCreativeProjects(); renderLineageNotice(); renderIterationPanel(); renderSourcing(); renderResultGallery(); renderReviewProposal(); renderWorkflowProfiles(); renderProjectJourney(); $('#creativeSaveState').textContent = `项目已加载 · 第 ${iterationOf(project)} 版 · 修订 ${project.revision || 1}`; compileCreative().catch(showCreativeError); loadIterationContext().catch(showCreativeError); refreshProjectJourney().catch(showCreativeError);
+    renderCreativeReferences(); renderCreativeProjects(); renderLineageNotice(); renderIterationPanel(); renderSourcing(); renderResultGallery(); renderReviewProposal(); renderOutput(); renderWorkflowProfiles(); renderProjectJourney(); renderScenePlans(); renderStyleAdvice(); loadScenePlans().catch(showSceneError); $('#creativeSaveState').textContent = `项目已加载 · 第 ${iterationOf(project)} 版 · 修订 ${project.revision || 1}`; compileCreative().catch(showCreativeError); loadIterationContext().catch(showCreativeError); refreshProjectJourney().catch(showCreativeError);
   }
 
   function renderCreativeProjects() {
@@ -119,6 +158,7 @@
     if (iteration <= 1 || !lineage.parent_project_id) { notice.hidden = true; notice.textContent = ''; return; }
     const source = lineage.source_asset_filename || '上一轮结果图'; const parent = Number(lineage.parent_iteration) || iteration - 1;
     const sourceUrl = lineage.source_asset_id ? `/result-media/${encodeURIComponent(lineage.parent_project_id)}/original/${encodeURIComponent(lineage.source_asset_id)}` : '';
+    if(lineage.created_from==='scene-plan') { notice.hidden=false; notice.innerHTML=`<strong>第 ${iteration} 版</strong> · 由第 ${parent} 版的已确认场景方案创建。旧项目和旧结果图保持不变。`; return; }
     notice.hidden = false; notice.innerHTML = `<strong>第 ${iteration} 版</strong> · 基于第 ${parent} 版的 ${escapeHtml(source)} 创建。旧项目和旧结果图保持不变。${sourceUrl ? `<a href="${sourceUrl}" target="_blank" rel="noreferrer">查看来源图</a>` : ''}`;
   }
 
@@ -127,6 +167,8 @@
     if (iteration <= 1 || !project?.lineage?.parent_project_id) { panel.hidden = true; return; }
     panel.hidden = false; $('#iterationVersion').textContent = `第 ${Number(project.lineage.parent_iteration) || iteration - 1} 版 → 第 ${iteration} 版`;
     const context = creativeState.iterationProjectId === project.project_id ? creativeState.iteration : null;
+    if(project.lineage.created_from==='scene-plan'&&!project.lineage.source_asset_id&&!project.lineage.source_result_asset_id) { $('#iterationSummary').textContent='本版本由已确认场景方案创建，可以继续编辑或对照新结果复盘。'; $('#iterationSuggestions').hidden=true; $('#iterationChanges').innerHTML=''; $('#iterationStatus').textContent='此版本没有来源结果图；旧项目仍保留在最近项目中。'; $('#applyIterationSuggestions').disabled=true; $('#applyIterationSuggestions').textContent='暂无可应用建议'; return; }
+    $('#iterationSuggestions').hidden=false;
     if (!context) { $('#iterationSummary').textContent = '正在读取上一版与图片分析建议…'; $('#iterationSuggestions').innerHTML = ''; $('#iterationChanges').innerHTML = ''; $('#iterationStatus').textContent = '正在建立版本对照…'; $('#applyIterationSuggestions').disabled = true; $('#applyIterationSuggestions').textContent = '暂无可应用建议'; return; }
     const review = context.review || {}; $('#iterationSummary').textContent = review.summary_zh || '这一轮没有保存图片分析摘要。';
     $('#iterationSuggestions').innerHTML = (review.improvements || []).map(item => `<li>${escapeHtml(item)}</li>`).join('') || '<li>这一轮没有结构化改进建议。</li>';
@@ -148,7 +190,7 @@
 
   function renderCreativeReferences() {
     const refs = creativeState.project?.references || [];
-    $('#creativeReferences').innerHTML = refs.length ? refs.map((ref, index) => { const visual = ref.visuals?.[0],type=slotsMeta[ref.slot]?.[0]||'参考资料'; return `<article class="reference-card">${visual ? `<img src="${escapeHtml(visual.thumbnail_url)}" alt="${escapeHtml(ref.title)}">` : ''}<div><button class="reference-remove" data-remove-reference="${index}">移除</button><strong>${escapeHtml(ref.title || '未命名参考')}</strong><span>${escapeHtml(type)}</span></div></article>`; }).join('') : '<p class="reference-empty">还没有参考资料。去“提示词库”找到卡片后，选择槽位并点击“加入创作”。</p>';
+    $('#creativeReferences').innerHTML = refs.length ? refs.map((ref, index) => { const visual = ref.visuals?.[0]||(ref.thumbnail_url?{thumbnail_url:ref.thumbnail_url}:null),type=ref.purpose==='all'?'整体参考':slotsMeta[ref.slot]?.[0]||'参考资料'; return `<article class="reference-card">${visual ? `<img src="${escapeHtml(visual.thumbnail_url)}" alt="${escapeHtml(ref.title)}">` : ''}<div><button class="reference-remove" data-remove-reference="${index}">移除</button><strong>${escapeHtml(ref.title || '未命名参考')}</strong><span>${escapeHtml(type)}</span></div></article>`; }).join('') : '<p class="reference-empty">还没有参考资料。去“提示词库”或“画廊”选取图片，再按用途加入创作。</p>';
   }
 
   function renderResultGallery() {
@@ -166,9 +208,9 @@
   }
 
   function renderResultCard(asset, profileLabel) {
-    const selected = asset.dataset_selected === true; const captions = asset.dataset_captions || {}; const caption = captions[creativeState.datasetProfile] || '';
+    const selected = asset.dataset_selected === true; const captions = asset.dataset_captions || {}; const draftKey = `${creativeState.project.project_id}:${asset.asset_id}:${creativeState.datasetProfile}`, caption = resultCaptionDrafts.has(draftKey) ? resultCaptionDrafts.get(draftKey) : captions[creativeState.datasetProfile] || '';
     const taggerLabel=activeTaggerLabel();
-    return `<article class="result-card ${selected ? 'is-dataset-selected' : ''}"><a href="${escapeHtml(asset.original_url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(asset.thumbnail_url)}" alt="${escapeHtml(asset.filename || '本地结果图')}" loading="lazy"></a><div class="result-card-body"><strong>${escapeHtml(asset.filename || '本地结果图')}</strong><span>${Number(asset.width) || '?'} × ${Number(asset.height) || '?'} · ${escapeHtml(safetyLabels[asset.safety] || '尚未分级')}</span><button class="dataset-toggle ${selected ? 'is-selected' : ''}" data-dataset-toggle="${escapeHtml(asset.asset_id)}">${selected ? '✓ 已加入数据集' : '＋ 加入数据集'}</button><button class="wd14-run" data-wd14-tag="${escapeHtml(asset.asset_id)}">${asset.wd14_tagging ? `重新运行 ${taggerLabel}` : `用 ${taggerLabel} 生成标签`}</button>${renderWd14Review(asset)}<details class="dataset-caption"><summary>${profileLabel}说明 · 留空时使用项目输出</summary><textarea data-dataset-caption="${escapeHtml(asset.asset_id)}" maxlength="12000" placeholder="留空时采用当前项目的 ${profileLabel}正向提示词">${escapeHtml(caption)}</textarea><button data-save-caption="${escapeHtml(asset.asset_id)}">保存此图说明</button></details><button data-review-asset="${escapeHtml(asset.asset_id)}" ${creativeState.visionAvailable ? '' : 'disabled'}>${creativeState.visionAvailable ? '用所选模型分析图片' : '暂无视觉模型'}</button></div></article>`;
+    return `<article class="result-card ${selected ? 'is-dataset-selected' : ''}"><a href="${escapeHtml(asset.original_url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(asset.thumbnail_url)}" alt="${escapeHtml(asset.filename || '本地结果图')}" loading="lazy"></a><div class="result-card-body"><strong>${escapeHtml(asset.filename || '本地结果图')}</strong><span>${Number(asset.width) || '?'} × ${Number(asset.height) || '?'} · ${escapeHtml(safetyLabels[asset.safety] || '尚未分级')}</span><button class="dataset-toggle ${selected ? 'is-selected' : ''}" data-dataset-toggle="${escapeHtml(asset.asset_id)}">${selected ? '✓ 已加入数据集' : '＋ 加入数据集'}</button><button class="wd14-run" data-wd14-tag="${escapeHtml(asset.asset_id)}">${asset.wd14_tagging ? `重新运行 ${taggerLabel}` : `用 ${taggerLabel} 生成标签`}</button>${renderWd14Review(asset)}<details class="dataset-caption"><summary>${profileLabel}说明 · 留空时使用项目输出</summary><textarea data-dataset-caption="${escapeHtml(asset.asset_id)}" maxlength="12000" placeholder="留空时采用当前项目的 ${profileLabel}正向提示词">${escapeHtml(caption)}</textarea><button data-save-caption="${escapeHtml(asset.asset_id)}">保存此图说明</button></details><button data-review-asset="${escapeHtml(asset.asset_id)}" ${creativeState.visionAvailable ? '' : 'disabled'}>${creativeState.visionAvailable ? (creativeState.project?.generation?.scene_plan ? '对照画面方案复盘' : '用所选模型分析图片') : '暂无视觉模型'}</button></div></article>`;
   }
 
   function renderWd14Review(asset) {
@@ -215,8 +257,17 @@
     if (!review || creativeState.reviewProjectId !== creativeState.project?.project_id) { proposal.hidden = true; return; }
     proposal.hidden = false; $('#reviewModelName').textContent = review.model || '视觉模型'; $('#reviewSummary').textContent = review.summary_zh || '模型没有提供摘要。';
     const current = collectCreative();
-    $('#reviewSlots').innerHTML = Object.entries(slotsMeta).map(([slot, meta]) => { const value = review.observed_slots?.[slot] || ''; const state = current.slot_locks?.[slot] ? '已锁定，不写回' : current.slots?.[slot] ? '已有内容，仅展示' : '空槽位，可确认补充'; return `<article class="review-slot"><strong>${meta[0]}</strong><p>${escapeHtml(value || '未识别到明确内容')}</p><span>${state}</span></article>`; }).join('');
-    const findingMeta = [['strengths','优点'],['issues','问题'],['improvements','下一轮建议']];
+    const hasSuggestions=Object.prototype.hasOwnProperty.call(review,'suggested_slots');
+    $('#reviewSlots').innerHTML = Object.entries(slotsMeta).map(([slot, meta]) => { const value = review.observed_slots?.[slot] || ''; const state = hasSuggestions?'实际观察，仅用于对照':current.slot_locks?.[slot] ? '已锁定，不写回' : current.slots?.[slot] ? '已有内容，仅展示' : '空槽位，可确认补充'; return `<article class="review-slot"><strong>${meta[0]}</strong><p>${escapeHtml(value || '未识别到明确内容')}</p><span>${state}</span></article>`; }).join('');
+    $('#reviewNextSlots').hidden=!hasSuggestions;
+    const nextSlots=Object.entries(slotsMeta).filter(([key])=>review.suggested_slots?.[key]);
+    $('#reviewNextSlotList').innerHTML=nextSlots.length?nextSlots.map(([key,meta])=>`<article class="review-next-slot"><strong>${meta[0]}<span>${current.slot_locks?.[key]?'已锁定，建议不写入':current.slots?.[key]?'当前项目已有内容；下一版可采用':'空白项，可确认补充'}</span></strong><div><label>当前内容</label><pre>${escapeHtml(current.slots?.[key]||'—')}</pre></div><div><label>下一版建议</label><pre>${escapeHtml(review.suggested_slots[key])}</pre></div></article>`).join(''):'<p class="scene-status">没有槽位修改建议，可保存复盘备注。</p>';
+    $('#applyReviewSlots').textContent=hasSuggestions?'确认补充建议到空槽位':'补充空槽位并写入备注'; $('#branchReview').textContent=hasSuggestions?'按建议创建下一版':'由此创建下一版';
+    const checks=Array.isArray(review.scene_checks)?review.scene_checks:[];
+    $('#sceneReviewChecks').hidden=!checks.length;
+    const checkLabels={matched:'已表达',partial:'部分表达',missing:'未表达',uncertain:'无法判断',pass:'已表达',fail:'未表达'};
+    $('#sceneReviewCheckList').innerHTML=checks.map(check=>`<article class="scene-review-check"><strong>${escapeHtml(check.criterion||'画面关系')}<span>${escapeHtml(checkLabels[check.status]||check.status||'待判断')}</span></strong><div><label>原方案</label><p>${escapeHtml(check.planned||'—')}</p></div><div><label>实际观察</label><p>${escapeHtml(check.observed||'无法判断')}</p></div><div class="suggested"><label>下一轮建议</label><p>${escapeHtml(check.suggestion||'暂不调整')}</p></div></article>`).join('');
+    const findingMeta = [['strengths','观察到的优点'],['issues','观察到的问题'],['improvements','下一轮建议']];
     $('#reviewFindings').innerHTML = findingMeta.map(([key,label]) => `<section class="review-finding"><strong>${label}</strong><ul>${(review[key] || []).map(item => `<li>${escapeHtml(item)}</li>`).join('') || '<li>无</li>'}</ul></section>`).join('');
     const prompts = review.reconstructed_prompts || {};
     $('#reviewPrompts').textContent = `Anima 正向提示词\n${prompts.anima_positive || ''}\n\nAnima 负面提示词\n${prompts.anima_negative || ''}\n\nKrea 2 正向提示词\n${prompts.krea2_positive || ''}\n\nKrea 2 排除内容\n${prompts.krea2_avoid || ''}`;
@@ -251,10 +302,19 @@
   }
 
   function renderOutput() {
-    const output = creativeState.outputs[creativeState.profile] || {};
-    $('#creativePositive').textContent = output.positive || '先填写一个槽位。';
+    const current = creativeState.project && creativeCompiledInput === creativeContentSnapshot();
+    const output = current ? creativeState.outputs[creativeState.profile] || {} : {};
+    $('#creativePositive').textContent = output.positive || (current ? '先填写一个槽位。' : '正在更新当前 Prompt…');
     $('#creativeNegative').textContent = output.negative || '';
     $('#creativeWarnings').innerHTML = (output.warnings || []).map(w => `<li>${escapeHtml(w)}</li>`).join('');
+    updateWorkflowSendState();
+    document.querySelectorAll('[data-copy-output]').forEach(button => { button.disabled = !current; });
+  }
+
+  function updateWorkflowSendState() {
+    const current = creativeState.project && creativeCompiledInput === creativeContentSnapshot();
+    const output = creativeState.outputs[creativeState.profile];
+    $('#sendWorkflow').disabled = creativeSending || !selectedWorkflowProfile() || !creativeState.project?.project_id || !current || output?.ready !== true;
   }
 
   function matchingWorkflowProfiles() {
@@ -289,7 +349,21 @@
 
   function renderWorkflowControls() {
     const profile=selectedWorkflowProfile(),container=$('#workflowControlList');
-    if(!profile||!creativeState.project) { container.innerHTML='<p>请先选择一个可用的 ComfyUI 工作流。</p>'; return; }
+    container.dataset.projectId=creativeState.project?.project_id||'';
+    container.dataset.profileId=profile?.profile_id||'';
+    $('#workflowSampler').disabled=!profile; $('#workflowScheduler').disabled=!profile;
+    if(!profile||!creativeState.project) {
+      container.innerHTML='<p>请先选择一个可用的 ComfyUI 工作流。</p>';
+      $('#workflowDefaultLoras').textContent=''; $('#workflowLoraRows').innerHTML='';
+      $('#workflowSampler').innerHTML=''; $('#workflowScheduler').innerHTML='';
+      $('#workflowSampler').value=''; $('#workflowScheduler').value='';
+      $('#workflowAddLora').disabled=true; $('#workflowLoraPicker').hidden=true;
+      $('#workflowLoraResults').innerHTML=''; $('#workflowLoraFolder').innerHTML='';
+      $('#workflowLoraSearch').value=''; $('#workflowLoraPickerStatus').textContent='';
+      $('#workflowControlHint').textContent='请先选择一个可用的 ComfyUI 工作流。';
+      creativeState.workflowLoraPickerOpen=false; creativeState.workflowLoraQuery=''; creativeState.workflowLoraFolder='';
+      return;
+    }
     const stored=storedWorkflowControls(profile.profile_id),schema=profile.controls||{},models=stored.models||{};
     const modelRows=(schema.model_inputs||[]).map(control=>{ const label=escapeHtml(workflowAssetLabels[control.asset_type]||control.asset_type),select=`<label>${label}<select data-workflow-model="${escapeHtml(control.asset_type)}">${workflowModelOptions(profile,control,models[control.asset_type]||'')}</select></label>`; if(!['checkpoint','diffusion_model'].includes(control.asset_type)) return select; return `<div class="workflow-model-card">${select}${workflowModelVisual(workflowSelectedModel(profile,control,models[control.asset_type]||''))}</div>`; }).join('');
     container.innerHTML=modelRows||'<p>这个工作流没有可在这里切换的模型。</p>';
@@ -305,111 +379,157 @@
     $('#workflowControlHint').textContent=creativeState.windowsModels.length?`已读取 ${creativeState.windowsModels.length} 个模型和 ${creativeState.windowsLoras.length} 个 LoRA。可以搜索名称或按 Windows 文件夹筛选。`:'还没有同步 Windows 模型清单；仍可使用工作流原来的模型。';
   }
 
-  function saveWorkflowControlsFromForm() { const profile=selectedWorkflowProfile(); if(!profile||!creativeState.project) return; const models=Object.fromEntries([...document.querySelectorAll('[data-workflow-model]')].map(select=>[select.dataset.workflowModel,select.value]).filter(([,value])=>value)); const loras=[...document.querySelectorAll('[data-workflow-lora-row]')].map(row=>({lora_id:row.querySelector('[data-workflow-lora-id]').value,strength:Number(row.querySelector('[data-workflow-lora-strength]').value)})).filter(item=>item.lora_id); const all={...(creativeState.project.generation?.workflow_controls||{})}; all[profile.profile_id]={models,loras,sampler:$('#workflowSampler').value,scheduler:$('#workflowScheduler').value}; creativeState.project.generation={...(creativeState.project.generation||{}),workflow_controls:all}; queueCreativeSave(); }
+  function saveWorkflowControlsFromForm() { const profile=selectedWorkflowProfile(),owner=$('#workflowControlList').dataset; if(!profile||!creativeState.project||owner.projectId!==creativeState.project.project_id||owner.profileId!==profile.profile_id) return; const models=Object.fromEntries([...document.querySelectorAll('[data-workflow-model]')].map(select=>[select.dataset.workflowModel,select.value]).filter(([,value])=>value)); const loras=[...document.querySelectorAll('[data-workflow-lora-row]')].map(row=>({lora_id:row.querySelector('[data-workflow-lora-id]').value,strength:Number(row.querySelector('[data-workflow-lora-strength]').value)})).filter(item=>item.lora_id); const all={...(creativeState.project.generation?.workflow_controls||{})}; all[profile.profile_id]={models,loras,sampler:$('#workflowSampler').value,scheduler:$('#workflowScheduler').value}; creativeState.project.generation={...(creativeState.project.generation||{}),workflow_controls:all}; queueCreativeSave(); }
 
   function renderWorkflowProfiles() {
     const select = $('#workflowProfile'); const profiles = matchingWorkflowProfiles(); const previous = select.value;
     select.innerHTML = profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}">${escapeHtml(profile.label)} · ${profile.node_count} 个节点</option>`).join('');
     if (profiles.some(profile => profile.profile_id === previous)) select.value = previous;
     const selected = profiles.find(profile => profile.profile_id === select.value) || profiles[0];
-    $('#sendWorkflow').disabled = !selected || !creativeState.project?.project_id;
+    if ($('#creativeWorkflowSummary')) $('#creativeWorkflowSummary').textContent = selected ? `当前工作流：${selected.name || selected.profile_id}` : '尚未选择工作流';
+    updateWorkflowSendState();
     renderWorkflowControls();
+    renderWorkflowMessage(selected);
+  }
+
+  function renderWorkflowMessage(selected = selectedWorkflowProfile()) {
     const currentMessage = creativeState.workflowMessageProjectId === creativeState.project?.project_id ? creativeState.workflowMessage : '';
     if (currentMessage) { $('#workflowRunStatus').textContent = currentMessage; return; }
     if (!selected) { $('#workflowRunStatus').textContent = `还没有导入适用于 ${creativeState.profile === 'anima' ? 'Anima' : 'Krea 2'} 的 ComfyUI 工作流。`; return; }
+    if (creativeCompiledInput !== creativeContentSnapshot()) { $('#workflowRunStatus').textContent = '正在更新当前 Prompt，请稍后再发送。'; return; }
+    if (creativeState.outputs[creativeState.profile]?.ready !== true) { $('#workflowRunStatus').textContent = 'Prompt 尚未就绪；请查看上方提示，完成英文内容或重新确认画面方案。'; return; }
     const omitted = (selected.low_cost_omits || []).join('、');
     $('#workflowRunStatus').textContent = omitted ? `低成本模式会跳过：${omitted}。` : '使用当前项目 Prompt 与生成参数投递。';
   }
 
   async function compileCreative() {
     if (!creativeState.project) return;
-    const payload = collectCreative();
+    const payload = collectCreative(), projectId = payload.project_id, input = creativeContentSnapshot(payload), run = ++creativeCompileRun;
     const [anima, krea2] = await Promise.all(['anima','krea2'].map(profile_id => creativeJson('/api/creative/compile', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, profile_id})})));
-    creativeState.outputs = {anima, krea2}; renderOutput();
+    if (run !== creativeCompileRun || creativeState.project?.project_id !== projectId || input !== creativeContentSnapshot()) return;
+    creativeCompiledInput = input; creativeState.outputs = {anima, krea2}; renderOutput(); renderWorkflowMessage();
   }
 
   function queueCreativeSave() {
     if (!creativeState.project) return;
     creativeState.iterationMessage = ''; creativeState.iterationMessageProjectId = '';
+    if(sceneState.projectId===creativeState.project.project_id&&sceneState.plans.length&&sceneState.input!==sceneInputSnapshot()) { $('#scenePlanStatus').textContent='画面内容已经修改；采用前请重新生成方案，避免使用旧建议。'; $('#confirmScenePlan').disabled=true; }
     $('#creativeSaveState').textContent = '等待自动保存…';
+    renderOutput();
     clearTimeout(creativeState.saveTimer);
     clearTimeout(creativeState.compileTimer);
     creativeState.saveTimer = setTimeout(() => saveCreative().catch(showCreativeError), 650);
     creativeState.compileTimer = setTimeout(() => compileCreative().catch(showCreativeError), 160);
   }
 
-  async function saveCreative() {
-    if (!creativeState.project?.project_id) return;
-    $('#creativeSaveState').textContent = '正在保存到本机…';
-    creativeState.project = await creativeJson('/api/creative/projects/' + encodeURIComponent(creativeState.project.project_id), {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(collectCreative())});
-    const index = creativeState.projects.findIndex(p => p.project_id === creativeState.project.project_id);
-    if (index >= 0) creativeState.projects[index] = creativeState.project; else creativeState.projects.unshift(creativeState.project);
-    renderCreativeProjects();
-    const saveState = $('#creativeSaveState');
-    saveState.textContent = `已保存 · R${creativeState.project.revision}`;
-    window.playPromptHubStatusPulse?.(saveState);
-    await Promise.all([loadIterationContext(),refreshProjectJourney()]);
+  function saveCreative() {
+    const projectId = creativeState.project?.project_id;
+    if (!projectId) return Promise.resolve();
+    const operation = creativeSaveQueue.catch(() => {}).then(() => persistCreativeProject(projectId));
+    creativeSaveQueue = operation;
+    return operation;
+  }
+
+  async function persistCreativeProject(projectId) {
+    while (creativeState.project?.project_id === projectId) {
+      const payload = collectCreative(), input = creativeContentSnapshot(payload);
+      $('#creativeSaveState').textContent = '正在保存到本机…';
+      const saved = await creativeJson('/api/creative/projects/' + encodeURIComponent(projectId), {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, expected_revision:payload.revision})});
+      const index = creativeState.projects.findIndex(p => p.project_id === projectId);
+      if (index >= 0) creativeState.projects[index] = saved; else creativeState.projects.unshift(saved);
+      if (creativeState.project?.project_id !== projectId) return saved;
+      const current = collectCreative(), changed = input !== creativeContentSnapshot(current);
+      // Keep edits made while saving; advance only the server's revision bookkeeping.
+      creativeState.project = changed ? {...saved, ...current, revision:saved.revision, updated_at:saved.updated_at} : saved;
+      renderCreativeProjects();
+      if (changed) continue;
+      const saveState = $('#creativeSaveState'); saveState.textContent = `已保存 · R${saved.revision}`;
+      window.playPromptHubStatusPulse?.(saveState);
+      Promise.all([loadIterationContext(), refreshProjectJourney()]).catch(showCreativeError);
+      return saved;
+    }
   }
 
   async function sendWorkflowProfile() {
     if (!creativeState.project?.project_id) throw new Error('请先建立一个创作项目');
-    await saveCreative(); await compileCreative();
-    const profileId = $('#workflowProfile').value;
-    if (!profileId) throw new Error('当前模型类型还没有可用的 ComfyUI 工作流');
+    if (creativeSending || sceneState.applying) return;
+    creativeSending = true; setCreativeApplyBusy(true);
     const button = $('#sendWorkflow'); button.disabled = true; button.textContent = '正在投递…';
-    creativeState.workflowMessageProjectId = creativeState.project.project_id;
-    creativeState.workflowMessage = `正在保存生成包，并发送到 ${deviceName()}…`; renderWorkflowProfiles();
     try {
+      clearTimeout(creativeState.saveTimer); clearTimeout(creativeState.compileTimer);
+      await saveCreative(); await compileCreative();
+      const profileId = $('#workflowProfile').value, output = creativeState.outputs[creativeState.profile];
+      if (!profileId) throw new Error('当前模型类型还没有可用的 ComfyUI 工作流');
+      if (creativeCompiledInput !== creativeContentSnapshot() || output?.ready !== true) throw new Error(output?.warnings?.join('；') || '当前 Prompt 尚未就绪，请完成英文内容或重新确认画面方案');
+      creativeState.workflowMessageProjectId = creativeState.project.project_id;
+      creativeState.workflowMessage = `正在保存生成包，并发送到 ${deviceName()}…`; renderWorkflowProfiles();
       const result = await creativeJson(`/api/workflow-profiles/${encodeURIComponent(profileId)}/tasks`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id:creativeState.project.project_id, low_cost:$('#workflowLowCost').checked})});
       creativeState.workflowMessage = `已发送“${result.profile.label}”。请到“设备连接”的任务状态查看进度和回传图片。`; await refreshProjectJourney();
     } catch (error) {
       creativeState.workflowMessage = `投递失败：${error.message}`;
       throw error;
     } finally {
+      creativeSending = false; setCreativeApplyBusy(false);
       button.textContent = `发送到 ${deviceName()}`; renderWorkflowProfiles();
     }
   }
 
   async function createCreativeProject(seed = {}) {
+    if(sceneState.applying) throw new Error('正在采用方案，请稍后再建立项目');
+    setCreativeApplyBusy(true);
+    try {
     clearTimeout(creativeState.saveTimer);
     if (creativeState.project?.project_id) await saveCreative();
     const project = await creativeJson('/api/creative/projects', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...blankProject(), ...seed})});
     creativeState.project = project; creativeState.sourcing = null; creativeState.sourcingProjectId = ''; creativeState.review = null; creativeState.reviewProjectId = ''; creativeState.projects.unshift(project); renderCreativeProject(); $('#creativeSaveState').textContent = '新项目已保存到本机 · R1'; return project;
+    } finally { setCreativeApplyBusy(false); }
   }
 
   async function loadCreativeMeta() {
+    const warnings = [], optional = (request, fallback, label) => request.catch(error => { warnings.push(`${label}：${error.message}`); return fallback; });
     const modelCatalog = creativeJson('/api/models').catch(() => creativeJson('/api/local-models'));
-    const [projects, recipes, models, workflowProfiles, windowsModels, windowsLoras] = await Promise.all([creativeJson('/api/creative/projects'), creativeJson('/api/creative/recipes'), modelCatalog, creativeJson('/api/workflow-profiles'), creativeJson('/api/windows-models?limit=2000'), creativeJson('/api/windows-loras?limit=500')]);
+    const [projects, recipes, models, workflowProfiles, windowsModels, windowsLoras] = await Promise.all([creativeJson('/api/creative/projects?limit=100'), optional(creativeJson('/api/creative/recipes'), [], '配方读取失败'), optional(modelCatalog, {available:false,models:[]}, '模型服务读取失败'), optional(creativeJson('/api/workflow-profiles'), [], '工作流读取失败'), optional(window.loadPromptHubResourceCatalog('/api/windows-models',{limit:2000,read:creativeJson}), {results:[]}, '底模清单读取失败'), optional(window.loadPromptHubResourceCatalog('/api/windows-loras',{limit:500,read:creativeJson}), {results:[]}, 'LoRA 清单读取失败')]);
     creativeState.projects = projects; creativeState.recipes = recipes; renderCreativeProjects(); renderCreativeRecipes();
     creativeState.workflowProfiles = workflowProfiles; creativeState.windowsModels=windowsModels.results||[]; creativeState.windowsLoras=windowsLoras.results||[]; renderWorkflowProfiles();
-    const select = $('#lmModel'); select.innerHTML = models.models.map(model => `<option value="${escapeHtml(model.id)}" data-source="${escapeHtml(model.source || 'local')}">${model.loaded ? '● ' : ''}${escapeHtml(model.name || model.id)}${model.params ? ` · ${escapeHtml(model.params)}` : ''}</option>`).join('');
+    const select = $('#lmModel'), previousModel = select.value; select.innerHTML = models.models.map(model => `<option value="${escapeHtml(model.id)}" data-source="${escapeHtml(model.source || 'local')}">${model.loaded ? '● ' : ''}${escapeHtml(model.name || model.id)}${model.params ? ` · ${escapeHtml(model.params)}` : ''}</option>`).join('');
     const loaded = models.models.find(model => model.loaded);
     const quickFallback = models.models.find(model => model.id.includes('qwen3.5-9b'));
     const preferred = loaded || quickFallback || models.models[0];
     if (preferred) select.value = preferred.id; else select.innerHTML = '<option value="">暂无可用模型</option>';
+    if (models.models.some(model => model.id === previousModel)) select.value = previousModel;
     select.disabled = !preferred;
-    const visionModels = models.models.filter(model => model.vision); const visionSelect = $('#visionModel'), taggerSelect=$('#wd14TaggerModel'), previousTagger=taggerSelect.value;
+    const visionModels = models.models.filter(model => model.vision); const visionSelect = $('#visionModel'), previousVision = visionSelect.value, taggerSelect=$('#wd14TaggerModel'), previousTagger=taggerSelect.value;
     const visionOptions = visionModels.map(model => `<option value="${escapeHtml(model.id)}" data-source="${escapeHtml(model.source || 'local')}">${model.loaded ? '● ' : ''}${escapeHtml(model.name || model.id)}${model.params ? ` · ${escapeHtml(model.params)}` : ''}</option>`).join('');
     visionSelect.innerHTML = visionOptions;
     taggerSelect.innerHTML = visionOptions || '<option value="">没有可用视觉模型</option>';
     const loadedVision = visionModels.find(model => model.loaded); const visionFallback = visionModels.find(model => model.id.includes('qwen3.5-9b')); const preferredVision = visionFallback || loadedVision || visionModels[0];
     if (preferredVision) visionSelect.value = preferredVision.id;
+    if (visionModels.some(model => model.id === previousVision)) visionSelect.value = previousVision;
     if (visionModels.some(model => model.id === previousTagger)) taggerSelect.value = previousTagger; else if (preferredVision) taggerSelect.value = preferredVision.id;
     creativeState.visionAvailable = Boolean(models.available && visionModels.length); visionSelect.disabled = !creativeState.visionAvailable;
     taggerSelect.disabled = !creativeState.visionAvailable; updateVisionHint(); updateWd14TaggerMode();
     const localCount = Number(models.local_count ?? models.models.filter(model => model.source !== 'external').length); const externalCount = Number(models.external_count ?? models.models.filter(model => model.source === 'external').length);
     $('#lmStatus').textContent = models.available ? `可用模型：LM Studio ${localCount} 个，外部 ${externalCount} 个；默认优先已加载的本地模型。` : '当前没有可用模型，手动编辑与双格式输出仍可使用。';
+    if ($('#creativeAiSummary')) $('#creativeAiSummary').textContent = models.available ? '可用' : '未连接 · 可手动编辑';
+    if (warnings.length) $('#lmStatus').textContent += ` 部分资源暂不可用：${warnings.join('；')}。可以重新读取模型与清单。`;
     $('#assistCreative').disabled = !models.available || !models.models.length;
+    $('#generateScenePlans').disabled=!preferred; $('#generateStyleAdvice').disabled=!preferred;
     try { const taggerConfig = await creativeJson('/api/tagger-config'); creativeState.taggerConfig = taggerConfig; $('#wd14Calibration').textContent = `目前模型 ${taggerConfig.model} · 校准值 general ${taggerConfig.general_threshold} / character ${taggerConfig.character_threshold}`; } catch (error) { $('#wd14Calibration').textContent = `打标模型校准值读取失败：${error.message}`; }
     creativeState.loadedMeta = true;
   }
 
   async function ensureCreativeProject() {
-    if (!creativeState.loadedMeta) await loadCreativeMeta();
-    if (!creativeState.project) creativeState.project = creativeState.projects[0] || await createCreativeProject();
-    await refreshImportedResults(creativeState.project.project_id);
-    renderCreativeProject();
-    checkTagCompletionStatus();
+    if (creativeInit) return creativeInit;
+    creativeInit = (async () => {
+      if (!creativeState.loadedMeta) await loadCreativeMeta();
+      if (!creativeState.project) {
+        if (creativeState.projects.length) { creativeState.project = creativeState.projects[0]; renderCreativeProject(); }
+        else await createCreativeProject();
+      }
+      await refreshImportedResults(creativeState.project.project_id);
+      checkTagCompletionStatus();
+    })();
+    try { await creativeInit; } finally { creativeInit = null; }
   }
   window.ensureCreativeProject = ensureCreativeProject;
 
@@ -611,7 +731,7 @@
 
   async function addEntryToCreative(item, slot) {
     await ensureCreativeProject();
-    const project = collectCreative(); const current = project.slots[slot] || ''; const addition = item.content || item.title || '';
+    const project = collectCreative(); if (project.slot_locks?.[slot]) throw new Error('这个槽位已锁定，请先解锁再加入资料'); const current = project.slots[slot] || ''; const addition = item.content || item.title || '';
     if (addition && !current.includes(addition)) project.slots[slot] = [current, addition].filter(Boolean).join(', ');
     const key = `${item.source_id}:${item.external_id}:${slot}`;
     if (!project.references.some(ref => ref.key === key)) project.references.push({key, slot, source_id:item.source_id, external_id:item.external_id, title:item.title, kind:item.kind, safety:item.safety, source_url:item.source_url || '', visuals:item.visuals || []});
@@ -672,16 +792,16 @@
     if (file.size > 25 * 1024 * 1024) throw new Error('结果图不能超过 25 MiB');
     await saveCreative(); const button = $('#uploadResultImage'); button.disabled = true; button.textContent = '正在导入…'; $('#resultReviewStatus').textContent = '正在校验图片并生成本地缩略图…';
     try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results?filename=${encodeURIComponent(file.name)}`, {method:'POST', headers:{'Content-Type':file.type || 'application/octet-stream'}, body:file});
-      creativeState.project = response.project; const index = creativeState.projects.findIndex(project => project.project_id === response.project.project_id); if (index >= 0) creativeState.projects[index] = response.project;
-      $('#resultImageFile').value = ''; renderCreativeProject(); $('#resultReviewStatus').textContent = `已导入 ${response.asset.filename}；图片只保存在本机。`;
+      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results?filename=${encodeURIComponent(file.name)}&expected_revision=${creativeState.project.revision}`, {method:'POST', headers:{'Content-Type':file.type || 'application/octet-stream'}, body:file});
+      if (!mergeCreativeResultProject(response.project)) return;
+      $('#resultImageFile').value = ''; renderResultGallery(); $('#resultReviewStatus').textContent = `已导入 ${response.asset.filename}；图片只保存在本机。`;
     } finally { button.disabled = false; button.textContent = '导入结果图'; }
   }
 
   async function updateDatasetAsset(assetId, values, message) {
     await saveCreative();
-    const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/dataset`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({profile_id:creativeState.datasetProfile, ...values})});
-    creativeState.project = response.project; const index = creativeState.projects.findIndex(project => project.project_id === response.project.project_id); if (index >= 0) creativeState.projects[index] = response.project;
+    const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/dataset`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({profile_id:creativeState.datasetProfile, ...values, expected_revision:creativeState.project.revision})});
+    if (!mergeCreativeResultProject(response.project)) return;
     creativeState.datasetMessageProjectId = response.project.project_id; creativeState.datasetMessage = message; renderResultGallery(); renderCreativeProjects(); await refreshProjectJourney();
   }
 
@@ -693,8 +813,9 @@
 
   async function saveDatasetCaption(assetId) {
     const input = document.querySelector(`[data-dataset-caption="${CSS.escape(assetId)}"]`); if (!input) return;
-    const hasCaption = Boolean(input.value.trim());
-    await updateDatasetAsset(assetId, {caption_override:input.value}, hasCaption ? '已保存这张图当前格式的说明文字。' : '已清除单图修改；导出时使用项目生成的说明文字。');
+    const caption = input.value, hasCaption = Boolean(caption.trim()), key = `${creativeState.project.project_id}:${assetId}:${creativeState.datasetProfile}`;
+    await updateDatasetAsset(assetId, {caption_override:caption}, hasCaption ? '已保存这张图当前格式的说明文字。' : '已清除单图修改；导出时使用项目生成的说明文字。');
+    if (resultCaptionDrafts.get(key) === caption) resultCaptionDrafts.delete(key);
   }
 
   function wd14Payload() {
@@ -704,8 +825,18 @@
   }
 
   function applyDatasetProject(project, message) {
-    creativeState.project = project; const index = creativeState.projects.findIndex(item => item.project_id === project.project_id); if (index >= 0) creativeState.projects[index] = project;
+    if (!mergeCreativeResultProject(project)) return;
     creativeState.datasetMessageProjectId = project.project_id; creativeState.datasetMessage = message; renderResultGallery(); renderCreativeProjects();
+  }
+
+  function mergeCreativeResultProject(project) {
+    const index = creativeState.projects.findIndex(item => item.project_id === project.project_id);
+    if (index >= 0) creativeState.projects[index] = project; else creativeState.projects.unshift(project);
+    if (creativeState.project?.project_id !== project.project_id) return false;
+    // Image operations update result records, never the active prompt or controls.
+    creativeState.project.generation = {...creativeState.project.generation, result_assets:project.generation?.result_assets || []};
+    creativeState.project.revision = Math.max(creativeState.project.revision || 0, project.revision || 0);
+    return true;
   }
 
   async function tagResultAsset(assetId) {
@@ -714,7 +845,7 @@
     await saveCreative(); const button = document.querySelector(`[data-wd14-tag="${CSS.escape(assetId)}"]`); if (button) { button.disabled = true; button.textContent = `${label} 打标中…`; }
     creativeState.datasetMessageProjectId = creativeState.project.project_id; creativeState.datasetMessage = payload.tagger==='model'?`正在使用 ${payload.model} 生成标签草稿…`:'正在本机使用 WD14 分析图片…'; $('#datasetExportStatus').textContent = creativeState.datasetMessage;
     try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/tag`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/tag`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, expected_revision:creativeState.project.revision})});
       applyDatasetProject(response.project, `${label} 已生成 ${response.asset.wd14_tagging?.general?.length || 0} 个 general 标签；请审核后确认。`);
     } finally { if (button) { button.disabled = false; button.textContent = `用 ${label} 生成标签`; } }
   }
@@ -725,7 +856,7 @@
     await saveCreative(); const button = $('#tagSelectedDataset'); button.disabled = true; button.textContent = '精选图片打标中…';
     creativeState.datasetMessageProjectId = creativeState.project.project_id; creativeState.datasetMessage = '正在逐张处理精选图片，请保持页面打开…'; $('#datasetExportStatus').textContent = creativeState.datasetMessage;
     try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-tag`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-tag`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...payload, expected_revision:creativeState.project.revision})});
       const suffix = response.failed_count ? `；${response.failed_count} 张失败，可单独重试` : '';
       applyDatasetProject(response.project, `${label} 已完成 ${response.tagged_count}/${response.selected_count} 张${suffix}。`);
     } finally { button.textContent = '打标全部精选'; renderResultGallery(); }
@@ -733,14 +864,14 @@
 
   async function saveWd14Review(assetId, confirmAnima) {
     const input = document.querySelector(`[data-wd14-draft="${CSS.escape(assetId)}"]`); if (!input) return;
-    await saveCreative(); const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/tag-review`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({draft_tags:input.value, confirm_anima:confirmAnima})});
+    await saveCreative(); const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/tag-review`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({draft_tags:input.value, confirm_anima:confirmAnima, expected_revision:creativeState.project.revision})});
     applyDatasetProject(response.project, confirmAnima ? '已确认写入此图的 Anima 标签；Krea 2 图片说明没有变化。' : '已保存 WD14 审核草稿，尚未改变导出时使用的标签。');
   }
 
   async function exportDataset() {
     await saveCreative(); const button = $('#exportDataset'); button.disabled = true; button.textContent = '正在打包…';
     try {
-      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-export`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({profile_id:creativeState.datasetProfile})});
+      const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/dataset-export`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({profile_id:creativeState.datasetProfile, expected_revision:creativeState.project.revision})});
       creativeState.datasetMessageProjectId = creativeState.project.project_id; creativeState.datasetMessage = `已导出 ${response.item_count} 张，文件保存在本机 exports/datasets。`; renderResultGallery();
       const link = document.createElement('a'); link.href = response.download_url; link.download = response.filename; document.body.appendChild(link); link.click(); link.remove();
     } finally { button.textContent = '导出精选数据集 ZIP'; renderResultGallery(); }
@@ -751,32 +882,45 @@
     const buttons = [...document.querySelectorAll('[data-review-asset]')]; buttons.forEach(button => { button.disabled = true; });
     $('#resultReviewStatus').textContent = `正在由 ${model} 分析图片；本地大模型通常需要约 1–3 分钟，外部模型通常更快…`;
     try {
-      creativeState.review = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(assetId)}/analyze`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model})});
-      creativeState.reviewAssetId = assetId; creativeState.reviewProjectId = creativeState.project.project_id; renderReviewProposal(); $('#resultReviewStatus').textContent = '图片分析已经完成，当前只是预览；请确认是否保存到项目。';
+      clearTimeout(creativeState.saveTimer); await saveCreative(); const projectId=creativeState.project.project_id;
+      const endpoint=creativeState.project.generation?.scene_plan?`/api/creative/projects/${encodeURIComponent(projectId)}/scene-review/${encodeURIComponent(assetId)}`:`/api/creative/projects/${encodeURIComponent(projectId)}/results/${encodeURIComponent(assetId)}/analyze`;
+      const review=await creativeJson(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model})});
+      if(creativeState.project?.project_id!==projectId) return;
+      creativeState.review=review; creativeState.reviewAssetId = assetId; creativeState.reviewProjectId = projectId; renderReviewProposal(); $('#resultReviewStatus').textContent = '图片分析已经完成，当前只是预览；请确认是否保存到项目。';
     } finally { buttons.forEach(button => { button.disabled = false; }); }
   }
 
   async function applyResultReview(fillEmptySlots) {
-    if (!creativeState.review || !creativeState.reviewAssetId) return;
-    const updated = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(creativeState.reviewAssetId)}/apply`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({analysis:creativeState.review, fill_empty_slots:fillEmptySlots})});
-    creativeState.project = updated; const index = creativeState.projects.findIndex(project => project.project_id === updated.project_id); if (index >= 0) creativeState.projects[index] = updated; renderCreativeProject(); $('#resultReviewStatus').textContent = fillEmptySlots ? '已补充空白且未锁定的部分，并写入实测备注。' : '已把图片分析写入实测备注；画面设置没有变化。';
+    if (!creativeState.review || !creativeState.reviewAssetId || creativeState.reviewProjectId !== creativeState.project?.project_id || sceneState.applying) return;
+    setCreativeApplyBusy(true);
+    try {
+      clearTimeout(creativeState.saveTimer); await saveCreative();
+      const updated = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/results/${encodeURIComponent(creativeState.reviewAssetId)}/apply`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({analysis:creativeState.review, fill_empty_slots:fillEmptySlots, expected_revision:creativeState.project.revision})});
+      acceptCreativeProject(updated); $('#resultReviewStatus').textContent = fillEmptySlots ? '已补充空白且未锁定的部分，并写入实测备注。' : '已把图片分析写入实测备注；画面设置没有变化。';
+    } finally { setCreativeApplyBusy(false); }
   }
 
   async function branchResultReview() {
-    if (!creativeState.review || !creativeState.reviewAssetId || !creativeState.project) return;
+    if (!creativeState.review || !creativeState.reviewAssetId || creativeState.reviewProjectId !== creativeState.project?.project_id || sceneState.applying) return;
+    setCreativeApplyBusy(true);
+    try {
     await saveCreative(); const parentProjectId = creativeState.project.project_id;
     $('#resultReviewStatus').textContent = '正在创建下一版项目；旧项目不会改变…';
-    const nextProject = await creativeJson(`/api/creative/projects/${encodeURIComponent(parentProjectId)}/results/${encodeURIComponent(creativeState.reviewAssetId)}/branch`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({analysis:creativeState.review})});
+    const nextProject = await creativeJson(`/api/creative/projects/${encodeURIComponent(parentProjectId)}/results/${encodeURIComponent(creativeState.reviewAssetId)}/branch`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({analysis:creativeState.review, expected_revision:creativeState.project.revision})});
     creativeState.projects.unshift(nextProject); creativeState.project = nextProject; creativeState.review = null; creativeState.reviewAssetId = ''; creativeState.reviewProjectId = ''; creativeState.sourcing = null; creativeState.sourcingProjectId = ''; renderCreativeProject(); $('#resultReviewStatus').textContent = `已创建第 ${iterationOf(nextProject)} 版；旧结果图没有复制，请根据修改说明开始调整。`;
+    } finally { setCreativeApplyBusy(false); }
   }
 
   async function applyIterationSuggestions() {
-    if (!creativeState.project?.project_id) return;
+    if (!creativeState.project?.project_id || sceneState.applying) return;
+    setCreativeApplyBusy(true);
+    try {
     await saveCreative(); const button = $('#applyIterationSuggestions'); button.disabled = true; button.textContent = '正在填入…';
-    const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/iteration/apply`, {method:'POST'});
+    const response = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/iteration/apply`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({expected_revision:creativeState.project.revision})});
     creativeState.project = response.project; creativeState.iteration = response.iteration; creativeState.iterationProjectId = response.project.project_id; creativeState.iterationMessageProjectId = response.project.project_id; creativeState.iterationMessage = response.applied_slots.length ? `已填入：${response.applied_slots.map(slot => slotsMeta[slot]?.[0] || slot).join('、')}。` : '没有可填入的槽位；锁定和已有内容均保持不变。';
     const index = creativeState.projects.findIndex(project => project.project_id === response.project.project_id); if (index >= 0) creativeState.projects[index] = response.project;
     renderCreativeProject();
+    } finally { setCreativeApplyBusy(false); renderIterationPanel(); }
   }
 
   function closeOcSeed() {
@@ -913,8 +1057,166 @@
     }
   }
 
+  function sceneInputSnapshot() {
+    const p=collectCreative();
+    return JSON.stringify({brief:p.brief_zh,slots:p.slots,locks:p.slot_locks,references:p.references,width:p.generation.width,height:p.generation.height,profile:p.target_profile});
+  }
+  function galleryReferenceIds() { return [...new Set((creativeState.project?.references||[]).map(ref=>ref.gallery_asset_id||((ref.source_id==='local-gallery'||ref.source_id==='gallery')?(ref.asset_id||ref.external_id):'')).filter(Boolean))]; }
+  function sceneRequest(url,body) { return creativeJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+  function showSceneError(error) { $('#scenePlanStatus').textContent=`场景方案暂未完成：${error.message}`; }
+  function showStyleError(error) { $('#styleAdviceStatus').textContent=`搭配建议暂未完成：${error.message}`; }
+  function canvasDescription(canvas) { return canvas?`${canvas.ratio||''} · ${Number(canvas.width)||'?'} × ${Number(canvas.height)||'?'}`:'尚未提供画幅建议'; }
+  function sceneDetails(plan) {
+    const parts=[['这一瞬间',plan.moment_zh],['表达什么',plan.intent_zh],['镜头位置',plan.camera_zh],['空间安排',plan.space_zh],['光线',plan.lighting_zh]];
+    return `<dl class="scene-detail-list">${parts.filter(([,value])=>value).map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${plan.clues_zh?.length?`<p class="scene-clues"><strong>故事线索</strong> ${plan.clues_zh.map(escapeHtml).join(' · ')}</p>`:''}`;
+  }
+  function renderScenePlans() {
+    const same=sceneState.projectId===creativeState.project?.project_id;
+    $('#sceneApplyPreview').hidden=!same||!sceneState.preview;
+    const plans=same?sceneState.plans:[];
+    $('#scenePlanCards').innerHTML=plans.length?plans.map((plan,index)=>`<article class="scene-plan-card ${plan.plan_id===sceneState.selectedPlanId?'is-selected':''}"><span class="scene-card-index">方案 ${index+1}${plan.plan_id===sceneState.selectedPlanId?' · 已采用':''}${plan.stale?' · 已过期':''}</span><h3>${escapeHtml(plan.title_zh||'场景方案')}</h3><p class="scene-event">${escapeHtml(plan.event_zh||plan.moment_zh||'')}</p>${sceneDetails(plan)}<div class="scene-canvas"><strong>建议画幅 · ${escapeHtml(canvasDescription(plan.canvas))}</strong><p>${escapeHtml(plan.canvas?.reason_zh||'')}</p>${plan.canvas?.alternatives?.length?`<details><summary>备选画幅</summary>${plan.canvas.alternatives.map(canvas=>`<p><strong>${escapeHtml(canvasDescription(canvas))}</strong><br>${escapeHtml(canvas.reason_zh||'')}</p>`).join('')}</details>`:''}</div>${plan.warnings?.length?`<p class="scene-caution">${plan.warnings.map(escapeHtml).join('；')}</p>`:''}${plan.stale?'<p class="scene-caution">画面或工作流已经变化，请按同一事件重新设计并确认。</p>':''}<button type="button" data-scene-preview="${escapeHtml(plan.plan_id)}" ${plan.stale?'disabled':''}>${plan.stale?'请重新设计后采用':'查看采用内容 →'}</button></article>`).join(''):'<p class="scene-empty">这里会出现 2～3 个有不同事件与镜头的方案。AI 建议先展示，确认后才进入项目。</p>';
+    if(!same) { $('#scenePlanStatus').textContent='先写一点想法，点击“帮我设计场景”；也可以加入画廊参考。'; $('#sceneApplyPreview').hidden=true; }
+  }
+  async function loadScenePlans(force=false) {
+    const projectId=creativeState.project?.project_id;
+    if(!projectId||(!force&&sceneState.projectId===projectId)) return;
+    const run=++sceneState.run;
+    const result=await creativeJson(`/api/creative/projects/${encodeURIComponent(projectId)}/scene-plans`);
+    if(run!==sceneState.run||creativeState.project?.project_id!==projectId) return;
+    sceneState.projectId=projectId; sceneState.plans=result.plans||[]; sceneState.selectedPlanId=result.selected_plan_id||''; sceneState.preview=null; sceneState.input=sceneInputSnapshot();
+    renderScenePlans(); $('#scenePlanStatus').textContent=sceneState.plans.length?'已读取方案；点击卡片预览采用内容。':'先写一点想法，点击“帮我设计场景”；也可以加入画廊参考。';
+  }
+  async function generateScenePlans() {
+    if ($('#sceneDesignOptions')) $('#sceneDesignOptions').open = true;
+    if(sceneState.generating) return;
+    if(!creativeState.project) await ensureCreativeProject(); const model=$('#lmModel').value;
+    if(!model) throw new Error('请先在左侧选择一个可用模型');
+    if(!$('#creativeBrief').value.trim()) throw new Error('请先写一点人物、事件或情绪想法');
+    sceneState.generating=true; const button=$('#generateScenePlans'); button.disabled=true;
+    $('#scenePlanStatus').textContent='正在设计不同的场景、镜头和画幅；返回后先预览。';
+    try {
+      clearTimeout(creativeState.saveTimer); await saveCreative();
+      const projectId=creativeState.project.project_id,input=sceneInputSnapshot(),run=++sceneState.run;
+      const direction={landscape:'请按横幅设计事件与空间。',portrait:'请按竖幅设计事件与空间。',square:'请按方形画幅设计事件与空间。'}[$('#sceneCanvasDirection').value]||'';
+      const result=await sceneRequest(`/api/creative/projects/${encodeURIComponent(projectId)}/scene-plans`,{model,instruction:[$('#sceneInstruction').value.trim(),direction].filter(Boolean).join('\n'),reference_asset_ids:galleryReferenceIds(),canvas_locked:$('#sceneCanvasLocked').checked,width:Number($('#genWidth').value)||1024,height:Number($('#genHeight').value)||1024});
+      if(run!==sceneState.run||creativeState.project?.project_id!==projectId) return;
+      sceneState.projectId=projectId; sceneState.plans=result.plans||[]; sceneState.selectedPlanId=''; sceneState.preview=null; sceneState.input=input;
+      renderScenePlans(); $('#scenePlanStatus').textContent=input!==sceneInputSnapshot()?'生成期间内容已改变；请重新生成后采用。':(result.warnings||[]).join('；')||`已设计 ${sceneState.plans.length} 个方案；先选喜欢的事件，再查看采用内容。`;
+    } finally { sceneState.generating=false; button.disabled=!$('#lmModel').value; }
+  }
+  function scenePreviewImpact() {
+    const plan=sceneState.preview; if(!plan) return;
+    const p=collectCreative(),branch=document.querySelector('input[name="sceneApplyMode"]:checked')?.value==='branch';
+    const updates=Object.keys(slotsMeta).filter(key=>plan.slots?.[key]&&!p.slot_locks?.[key]&&(branch||!p.slots?.[key]));
+    const kept=Object.keys(slotsMeta).filter(key=>p.slot_locks?.[key]||(!branch&&p.slots?.[key]));
+    const resolution=$('#sceneApplyResolution').checked?`生成宽高改为 ${canvasDescription(plan.canvas)}。`:'保留当前生成宽高。';
+    $('#sceneApplyImpact').textContent=`${branch?'创建下一版；当前项目保留。':'写入当前项目。'}${updates.length?`将填写：${updates.map(key=>slotsMeta[key][0]).join('、')}。`:'没有可填写的槽位。'}${kept.length?`保留：${kept.map(key=>slotsMeta[key][0]).join('、')}。`:''}${resolution}`;
+  }
+  function previewScenePlan(planId) {
+    if(sceneState.projectId!==creativeState.project?.project_id) return;
+    const plan=sceneState.plans.find(item=>item.plan_id===planId); if(!plan||plan.stale) return;
+    sceneState.preview=plan; $('#sceneApplyTitle').textContent=`采用“${plan.title_zh||'场景方案'}”`;
+    $('#sceneApplyContent').innerHTML=`<p class="scene-event">${escapeHtml(plan.event_zh||'')}</p>${sceneDetails(plan)}<p class="scene-canvas"><strong>基础生成尺寸：${escapeHtml(canvasDescription(plan.canvas))}</strong><br>${escapeHtml(plan.canvas?.reason_zh||'')}</p><details><summary>查看七个槽位与生成 Prompt</summary><dl class="scene-detail-list">${Object.entries(slotsMeta).map(([key,meta])=>`<div><dt>${meta[0]}${creativeState.project.slot_locks?.[key]?' · 已锁定':''}</dt><dd>${escapeHtml(plan.slots?.[key]||'留空')}</dd></div>`).join('')}</dl><pre>${escapeHtml(JSON.stringify(plan.prompts||{},null,2))}</pre></details>`;
+    const hasContent=Object.values(collectCreative().slots).some(value=>Boolean(value));
+    document.querySelector(`input[name="sceneApplyMode"][value="${hasContent?'branch':'empty'}"]`).checked=true;
+    $('#sceneApplyResolution').checked=!$('#sceneCanvasLocked').checked; $('#confirmScenePlan').disabled=sceneState.input!==sceneInputSnapshot();
+    $('#sceneApplyPreview').hidden=false; scenePreviewImpact(); $('#sceneApplyPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  function acceptCreativeProject(project) {
+    const index=creativeState.projects.findIndex(item=>item.project_id===project.project_id);
+    if(index>=0) creativeState.projects[index]=project; else creativeState.projects.unshift(project);
+    creativeState.project=project; renderCreativeProject();
+  }
+  function setCreativeApplyBusy(busy) {
+    sceneState.applying=busy;
+    document.querySelector('#creativePage .creative-layout').inert=busy;
+    if (document.querySelector('#creativePage .creative-toolbar')) document.querySelector('#creativePage .creative-toolbar').inert=busy;
+    $('#creativePage').setAttribute('aria-busy',String(busy));
+  }
+  async function applyScenePlan() {
+    const plan=sceneState.preview,projectId=creativeState.project?.project_id;
+    if(!plan||sceneState.projectId!==projectId) return;
+    if(sceneState.input!==sceneInputSnapshot()) throw new Error('内容已修改，请重新生成场景方案后采用');
+    if(sceneState.applying) return;
+    const button=$('#confirmScenePlan'); button.disabled=true; setCreativeApplyBusy(true);
+    try {
+      clearTimeout(creativeState.saveTimer); await saveCreative(); const branch=document.querySelector('input[name="sceneApplyMode"]:checked')?.value==='branch';
+      const result=await sceneRequest(`/api/creative/projects/${encodeURIComponent(projectId)}/scene-plans/${encodeURIComponent(plan.plan_id)}/apply`,{apply_resolution:$('#sceneApplyResolution').checked,replace_slots:branch,branch,expected_revision:creativeState.project.revision});
+      if(creativeState.project?.project_id!==projectId) return;
+      sceneState.preview=null; sceneState.selectedPlanId=plan.plan_id; sceneState.input=''; acceptCreativeProject(result.project);
+      sceneState.input=sceneInputSnapshot(); $('#sceneApplyPreview').hidden=true; await loadScenePlans(true); $('#scenePlanStatus').textContent=(result.warnings||[]).join('；')||(branch?'已创建下一版并采用场景；旧项目已保留。':'已采用场景，锁定项和已有内容按预览保留。');
+    } finally { setCreativeApplyBusy(false); button.disabled=false; }
+  }
+  function styleSuggestionDetails(suggestion) {
+    const loras=Array.isArray(suggestion.loras)?suggestion.loras:[];
+    const roleLabels={character:'角色',outfit:'服装',style:'整体画风',effect:'视觉效果',unknown:'用途待确认'};
+    return `<p>${escapeHtml(suggestion.reason_zh||'')}</p><ul class="style-lora-list">${loras.map(item=>{ const local=creativeState.windowsLoras.find(lora=>lora.lora_id===item.lora_id); return `<li><strong>${escapeHtml(local?.name||item.name||'未匹配的 LoRA')}</strong><span>${escapeHtml(roleLabels[item.role]||'用途待确认')} · 权重 ${Number.isFinite(Number(item.weight))?Number(item.weight):'待定'}</span><p>${escapeHtml(item.reason_zh||'')}</p><small>${escapeHtml(item.weight_basis||'权重待测试')}${local?` · ${escapeHtml(local.relative_path||'本地已有')}`:' · 本地清单未找到，不能直接采用'}</small></li>`; }).join('')||'<li>沿用当前工作流，不增加 LoRA。</li>'}</ul>${suggestion.notes_zh?.length?`<ul class="style-notes">${suggestion.notes_zh.map(item=>`<li>${escapeHtml(item)}</li>`).join('')}</ul>`:''}${suggestion.unknowns_zh?.length?`<div class="scene-caution"><strong>仍需确认 / 测试</strong><ul>${suggestion.unknowns_zh.map(item=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`:''}`;
+  }
+  function renderStyleAdvice() {
+    const same=sceneState.styleProjectId===creativeState.project?.project_id;
+    $('#styleApplyPreview').hidden=!same||!sceneState.stylePreview;
+    $('#styleAdviceCards').innerHTML=same&&sceneState.style?.suggestions?.length?sceneState.style.suggestions.map(suggestion=>`<article class="style-advice-card"><h3>${escapeHtml(suggestion.title_zh||'画风搭配')}</h3>${styleSuggestionDetails(suggestion)}<button type="button" data-style-preview="${escapeHtml(suggestion.suggestion_id)}">查看并确认搭配 →</button></article>`).join(''):'<p class="scene-empty">AI 会根据视觉目标与当前工作流给出少量搭配，并说明推荐依据和待测试的部分。</p>';
+  }
+  async function generateStyleAdvice() {
+    if ($('#styleAdviceOptions')) $('#styleAdviceOptions').open = true;
+    if(!creativeState.project) await ensureCreativeProject(); const model=$('#lmModel').value,profile=selectedWorkflowProfile();
+    if(!model) throw new Error('请先选择一个可用模型');
+    if(!profile) throw new Error('请先选择对应的 ComfyUI 工作流');
+    const button=$('#generateStyleAdvice'); button.disabled=true; $('#styleAdviceStatus').textContent='正在结合当前工作流、本地 LoRA 和视觉目标设计搭配；结果先预览。';
+    try {
+      clearTimeout(creativeState.saveTimer); await saveCreative(); const projectId=creativeState.project.project_id;
+      const result=await sceneRequest(`/api/creative/projects/${encodeURIComponent(projectId)}/style-advice`,{model,goal_zh:$('#styleGoal').value.trim(),reference_asset_ids:galleryReferenceIds(),candidate_lora_ids:[],workflow_profile_id:profile.profile_id});
+      if(creativeState.project?.project_id!==projectId) return;
+      sceneState.style=result; sceneState.styleProjectId=projectId; sceneState.styleProfileId=profile.profile_id; sceneState.stylePreview=null; renderStyleAdvice();
+      $('#styleAdviceStatus').textContent=(result.warnings||[]).join('；')||`工作流：${profile.label||profile.profile_id}。建议权重需要实测，先选一组查看。`;
+    } finally { button.disabled=!$('#lmModel').value; }
+  }
+  function previewStyleAdvice(suggestionId) {
+    const suggestion=sceneState.style?.suggestions?.find(item=>item.suggestion_id===suggestionId);
+    if(!suggestion||sceneState.styleProjectId!==creativeState.project?.project_id) return;
+    sceneState.stylePreview=suggestion; $('#styleApplyContent').innerHTML=`<h4>${escapeHtml(suggestion.title_zh||'画风搭配')}</h4>${styleSuggestionDetails(suggestion)}`;
+    $('#styleApplyPreview').hidden=false; $('#styleApplyPreview').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  async function applyStyleAdvice() {
+    const projectId=creativeState.project?.project_id,profile=selectedWorkflowProfile(),suggestion=sceneState.stylePreview;
+    if(!suggestion||sceneState.styleProjectId!==projectId) return;
+    if(profile?.profile_id!==sceneState.styleProfileId) throw new Error('工作流已经切换，请为当前工作流重新获取搭配建议');
+    if(sceneState.applying) return;
+    const button=$('#confirmStyleAdvice'); button.disabled=true; setCreativeApplyBusy(true);
+    try {
+      clearTimeout(creativeState.saveTimer); await saveCreative();
+      const result=await sceneRequest(`/api/creative/projects/${encodeURIComponent(projectId)}/style-advice/${encodeURIComponent(sceneState.style.advice_id)}/apply`,{suggestion_id:suggestion.suggestion_id,workflow_profile_id:profile.profile_id,expected_revision:creativeState.project.revision});
+      if(creativeState.project?.project_id!==projectId) return;
+      sceneState.stylePreview=null; sceneState.projectId=''; acceptCreativeProject(result.project); $('#styleApplyPreview').hidden=true;
+      $('#styleAdviceStatus').textContent=[...(result.warnings||[]),'已采用到当前工作流。请先做低成本测试；画面方案需按新搭配重新设计并确认。'].join('；');
+    } finally { setCreativeApplyBusy(false); button.disabled=false; }
+  }
+  window.addGalleryReference=async function(assetId,purpose='all',projectId='') {
+    if(sceneState.applying) throw new Error('正在采用方案，请稍后再加入参考');
+    if(!creativeState.project) await ensureCreativeProject();
+    if(sceneState.applying) throw new Error('正在保存更改，请稍后再加入参考');
+    setCreativeApplyBusy(true);
+    try {
+    clearTimeout(creativeState.saveTimer); await saveCreative(); const targetId=projectId||creativeState.project.project_id;
+    const updated=await sceneRequest(`/api/gallery/assets/${encodeURIComponent(assetId)}/reference/${encodeURIComponent(targetId)}`,{purpose});
+    const index=creativeState.projects.findIndex(item=>item.project_id===updated.project_id);
+    if(index>=0) creativeState.projects[index]=updated; else creativeState.projects.unshift(updated);
+    if(creativeState.project?.project_id===targetId) { sceneState.projectId=''; acceptCreativeProject(updated); }
+    return updated;
+    } finally { setCreativeApplyBusy(false); }
+  };
+  window.getCreativeProjectId=()=>creativeState.project?.project_id||'';
+  $('#generateScenePlans').addEventListener('click',()=>generateScenePlans().catch(showSceneError));
+  $('#scenePlanCards').addEventListener('click',event=>{ const button=event.target.closest('[data-scene-preview]'); if(button) previewScenePlan(button.dataset.scenePreview); });
+  $('#sceneApplyPreview').addEventListener('change',scenePreviewImpact);
+  $('#closeScenePreview').addEventListener('click',()=>{ sceneState.preview=null; $('#sceneApplyPreview').hidden=true; });
+  $('#confirmScenePlan').addEventListener('click',()=>applyScenePlan().catch(showSceneError));
+  $('#generateStyleAdvice').addEventListener('click',()=>generateStyleAdvice().catch(showStyleError));
+  $('#styleAdviceCards').addEventListener('click',event=>{ const button=event.target.closest('[data-style-preview]'); if(button) previewStyleAdvice(button.dataset.stylePreview); });
+  $('#closeStylePreview').addEventListener('click',()=>{ sceneState.stylePreview=null; $('#styleApplyPreview').hidden=true; });
+  $('#confirmStyleAdvice').addEventListener('click',()=>applyStyleAdvice().catch(showStyleError));
   function showCreativeError(error) { $('#creativeSaveState').textContent = `操作失败：${error.message}`; console.error(error); }
-  function showResultReviewError(error) { $('#resultReviewStatus').textContent = `结果图操作失败：${error.message}`; $('#datasetExportStatus').textContent = `操作失败：${error.message}`; showCreativeError(error); }
+  function showResultReviewError(error) { setCreativeStage('review'); $('#resultReviewStatus').textContent = `结果图操作失败：${error.message}`; $('#datasetExportStatus').textContent = `操作失败：${error.message}`; showCreativeError(error); }
 
   $('#creativeSlots').innerHTML = slotTemplate();
   $('#ocSeedModal').addEventListener('change', updateOcSeedPreview);
@@ -922,9 +1224,9 @@
   $('#applyOcSeed').addEventListener('click', () => applyOcSeed().catch(showCreativeError));
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#ocSeedModal').hidden) closeOcSeed(); });
   $('#refreshProjectJourney').addEventListener('click',()=>refreshProjectJourney().catch(showCreativeError));
-  $('#projectJourneyGrid').addEventListener('click',event=>{ const button=event.target.closest('[data-journey-action]'); if(!button) return; const stage=button.dataset.journeyAction,view=button.dataset.journeyView,target=button.dataset.journeyTarget; if(stage==='dataset'&&!target) { syncProjectDataset().catch(showCreativeError); return; } window.setPromptHubView?.(view).then(()=>{ if(view==='datasets'&&target) return window.openDatasetWorkspace?.(target,stage==='delivery'?5:0); const targets={inspiration:'#creativeBrief',prompts:'.output-rail',generation:'.workflow-dispatch',results:'#creativeResultsSection'}; document.querySelector(targets[stage]||'.creative-editor')?.scrollIntoView({behavior:'smooth',block:'start'}); }).catch(showCreativeError); });
+  $('#projectJourneyGrid').addEventListener('click',event=>{ const button=event.target.closest('[data-journey-action]'); if(!button) return; const stage=button.dataset.journeyAction,view=button.dataset.journeyView,target=button.dataset.journeyTarget; if(stage==='dataset'&&!target) { syncProjectDataset().catch(showCreativeError); return; } window.setPromptHubView?.(view).then(()=>{ if(view==='datasets'&&target) return window.openDatasetWorkspace?.(target,stage==='delivery'?5:0); if(view==='creative') { setCreativeStage(stage==='generation'?'generation':stage==='results'?'review':'design'); if(stage==='prompts') { $('#creativeOutputRail').classList.add('is-preview-open'); $('#creativePreviewToggle').setAttribute('aria-expanded','true'); } } const targets={inspiration:'#creativeBrief',prompts:'.output-rail',generation:'.workflow-dispatch',results:'#creativeResultsSection'}; document.querySelector(targets[stage]||'.creative-editor')?.scrollIntoView({behavior:'smooth',block:'start'}); }).catch(showCreativeError); });
   $('#newCreativeProject').addEventListener('click', () => createCreativeProject().catch(showCreativeError));
-  ['creativeTitle','creativeBrief','creativeSafety','creativeNotes','genSteps','genCfg','genSeed','genResults'].forEach(id => $('#' + id).addEventListener('input', queueCreativeSave));
+  ['creativeTitle','creativeBrief','creativeSafety','creativeNotes','genWidth','genHeight','genSteps','genCfg','genSeed','genResults'].forEach(id => $('#' + id).addEventListener('input', queueCreativeSave));
   $('#creativeSlots').addEventListener('input', queueCreativeSave);
   $('#creativeSlots').addEventListener('input', (event) => {
     const textarea = event.target.closest('[data-slot-input]');
@@ -1025,7 +1327,7 @@
   }, { passive: true });
   $('#creativeSlots').addEventListener('click', event => { const button = event.target.closest('[data-lock-slot]'); if (!button || !creativeState.project) return; creativeState.project = collectCreative(); const key = button.dataset.lockSlot; creativeState.project.slot_locks[key] = !creativeState.project.slot_locks[key]; renderCreativeProject(); queueCreativeSave(); });
   $('#creativeReferences').addEventListener('click', event => { const button = event.target.closest('[data-remove-reference]'); if (!button) return; creativeState.project.references.splice(Number(button.dataset.removeReference), 1); renderCreativeReferences(); queueCreativeSave(); });
-  $('#creativeProjectList').addEventListener('click', async event => { const button = event.target.closest('[data-project-id]'); if (!button || button.dataset.projectId === creativeState.project?.project_id) return; try { clearTimeout(creativeState.saveTimer); await saveCreative(); creativeState.project = creativeState.projects.find(p => p.project_id === button.dataset.projectId); creativeState.review = null; creativeState.reviewProjectId = ''; renderCreativeProject(); } catch(error) { showCreativeError(error); } });
+  $('#creativeProjectList').addEventListener('click', event => { const button = event.target.closest('[data-project-id]'); if (button && button.dataset.projectId !== creativeState.project?.project_id) openCreativeProject(button.dataset.projectId).catch(showCreativeError); });
   $('#sourceCreative').addEventListener('click', () => runCreativeSourcing().catch(showCreativeError));
   $('#closeSourcing').addEventListener('click', () => { $('#sourcingPanel').hidden = true; });
   $('#sourcingGroups').addEventListener('click', async event => { const button = event.target.closest('[data-source-slot]'); if (!button || !creativeState.sourcing) return; const group = creativeState.sourcing.slots?.[button.dataset.sourceSlot]; const item = group?.candidates?.[Number(button.dataset.sourceIndex)]; if (!item) return; try { await addEntryToCreative(item, button.dataset.sourceSlot); renderSourcing(); } catch(error) { showCreativeError(error); } });
@@ -1037,7 +1339,7 @@
   $('#datasetProfile').addEventListener('change', event => { creativeState.datasetProfile = event.target.value; creativeState.datasetMessage = ''; renderResultGallery(); });
   $('#tagSelectedDataset').addEventListener('click', () => tagSelectedDataset().catch(showResultReviewError));
   $('#exportDataset').addEventListener('click', () => exportDataset().catch(showResultReviewError));
-  $('#resultGallery').addEventListener('input', event => { const input = event.target.closest('[data-wd14-draft]'); if (!input) return; const asset = (creativeState.project?.generation?.result_assets || []).find(item => item.asset_id === input.dataset.wd14Draft); if (asset?.wd14_tagging) asset.wd14_tagging.draft_tags = input.value; });
+  $('#resultGallery').addEventListener('input', event => { const caption = event.target.closest('[data-dataset-caption]'); if (caption && creativeState.project) resultCaptionDrafts.set(`${creativeState.project.project_id}:${caption.dataset.datasetCaption}:${creativeState.datasetProfile}`, caption.value); const input = event.target.closest('[data-wd14-draft]'); if (!input) return; const asset = (creativeState.project?.generation?.result_assets || []).find(item => item.asset_id === input.dataset.wd14Draft); if (asset?.wd14_tagging) asset.wd14_tagging.draft_tags = input.value; });
   $('#resultGallery').addEventListener('click', event => {
     const language = event.target.closest('[data-toggle-tag-language]'); if (language) { window.toggleTagDisplayLanguage?.(); return; }
     const chip = event.target.closest('[data-wd14-chip]'); if (chip) { toggleWd14Chip(chip.dataset.wd14Chip, chip.dataset.tagValue); return; }
@@ -1072,10 +1374,37 @@
   $('#saveRecipe').addEventListener('click', async () => { try { await saveCreative(); const recipe = await creativeJson('/api/creative/recipes', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id:creativeState.project.project_id, name:$('#recipeName').value.trim()})}); creativeState.recipes.unshift(recipe); renderCreativeRecipes(); $('#recipeName').value=''; $('#creativeSaveState').textContent='配方已保存'; } catch (error) { showCreativeError(error); } });
   $('#creativeRecipeList').addEventListener('click', event => { const button = event.target.closest('[data-recipe-id]'); if (!button) return; const recipe = creativeState.recipes.find(r => r.recipe_id === button.dataset.recipeId); if (!recipe?.snapshot?.project) return; const keep = {project_id:creativeState.project.project_id, created_at:creativeState.project.created_at}; creativeState.project = {...recipe.snapshot.project, ...keep}; renderCreativeProject(); queueCreativeSave(); });
   $('#exportCreative').addEventListener('click', async () => { try { await saveCreative(); const data = await creativeJson(`/api/creative/projects/${encodeURIComponent(creativeState.project.project_id)}/export`); const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const link = document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=(creativeState.project.title || 'creative-project').replace(/[\\/:*?"<>|]/g,'-') + '.json'; link.click(); URL.revokeObjectURL(link.href); $('#creativeSaveState').textContent='双格式 JSON 已导出'; } catch(error) { showCreativeError(error); } });
-  $('#assistCreative').addEventListener('click', async () => { try { const payload=collectCreative(); if (!payload.brief_zh) throw new Error('请先写一段中文创作想法'); $('#assistCreative').disabled=true; $('#assistCreative').textContent='所选模型正在补全…'; creativeState.suggestion=await creativeJson('/api/creative/assist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({brief:payload.brief_zh,slots:payload.slots,slot_locks:payload.slot_locks,model:$('#lmModel').value,target_profile:creativeState.profile})}); $('#assistPreview').textContent=JSON.stringify(creativeState.suggestion.suggested_slots,null,2); $('#assistProposal').hidden=false; } catch(error) { showCreativeError(error); } finally { $('#assistCreative').disabled=false; $('#assistCreative').textContent='用所选模型补全空白项'; } });
-  $('#applyAssist').addEventListener('click', () => { if (!creativeState.suggestion) return; creativeState.project.slots=creativeState.suggestion.suggested_slots; creativeState.suggestion=null; $('#assistProposal').hidden=true; renderCreativeProject(); queueCreativeSave(); });
+  async function assistCreative() {
+    const payload = collectCreative(), projectId = payload.project_id, input = creativeContentSnapshot(payload);
+    if (!payload.brief_zh) throw new Error('请先写一段中文创作想法');
+    const button = $('#assistCreative'); button.disabled = true; button.textContent = '所选模型正在补全…';
+    try {
+      const suggestion = await creativeJson('/api/creative/assist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({brief:payload.brief_zh,slots:payload.slots,slot_locks:payload.slot_locks,model:$('#lmModel').value,target_profile:creativeState.profile})});
+      if (creativeState.project?.project_id !== projectId) return;
+      creativeState.suggestion = {...suggestion, projectId, input};
+      $('#assistPreview').textContent = JSON.stringify(suggestion.suggested_slots, null, 2); $('#assistProposal').hidden = false;
+    } finally { button.disabled = !$('#lmModel').value; button.textContent = '用所选模型补全空白项'; }
+  }
+  function applyCreativeAssist() {
+    const suggestion = creativeState.suggestion;
+    if (!suggestion || suggestion.projectId !== creativeState.project?.project_id) return;
+    const project = collectCreative();
+    if (suggestion.input !== creativeContentSnapshot(project)) throw new Error('内容已修改，请重新补全后采用；当前编辑已保留');
+    for (const key of Object.keys(slotsMeta)) if (!project.slot_locks?.[key] && !project.slots[key] && suggestion.suggested_slots?.[key]) project.slots[key] = suggestion.suggested_slots[key];
+    creativeState.project = project; creativeState.suggestion = null; $('#assistProposal').hidden = true;
+    renderCreativeProject(); queueCreativeSave();
+  }
+  $('#assistCreative').addEventListener('click', () => assistCreative().catch(showCreativeError));
+  $('#applyAssist').addEventListener('click', () => { try { applyCreativeAssist(); } catch (error) { showCreativeError(error); } });
   $('#cancelAssist').addEventListener('click', () => { creativeState.suggestion=null; $('#assistProposal').hidden=true; });
-  $('#openModelEndpointSettings').addEventListener('click', () => { window.openModelEndpoints?.(); });
+  $('#openModelEndpointSettings').addEventListener('click', () => { Promise.resolve(window.openModelEndpoints?.()).catch(showCreativeError); });
+  $('#reloadCreativeResources').addEventListener('click', async () => {
+    if (sceneState.applying) return;
+    setCreativeApplyBusy(true);
+    try { if (creativeState.project) { saveWorkflowControlsFromForm(); clearTimeout(creativeState.saveTimer); await saveCreative(); } await loadCreativeMeta(); }
+    catch (error) { showCreativeError(error); }
+    finally { setCreativeApplyBusy(false); }
+  });
 
   $('#results').addEventListener('click', event => {
     const add = event.target.closest('[data-creative-add]'); if (add) { const card=add.closest('[data-result-index]'); const item=currentResults[Number(card.dataset.resultIndex)]; const slot=card.querySelector('[data-creative-slot]').value; addEntryToCreative(item,slot).catch(showCreativeError); return; }

@@ -985,7 +985,7 @@ final class LauncherDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func shellStatus() -> [String: Any] {
         let bundleVersion = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.1.1"
+        ) as? String ?? "unknown"
         let version = reportedVersion.isEmpty ? bundleVersion : reportedVersion
         let channel = reportedReleaseChannel.lowercased() == "stable" ? "Stable" : reportedReleaseChannel
         let ownsRunningService = serviceProcess?.isRunning == true

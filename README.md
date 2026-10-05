@@ -4,18 +4,18 @@ Soda Prompt Hub 是一套本机优先的 AI 绘图创作与数据集整理工具
 保存提示词、视觉参照、OC、创作项目、结果图、Caption、审核记录和冻结版本；Windows Worker 可以把
 经过确认的任务交给本机 ComfyUI，也可以与另一台设备配合。LoRA 正式训练仍在 Windows 的训练工具中完成。
 
-当前源码版本为 `1.1.1`。2026-09-14 第一版桌面安装包以 **Pre-release** 发布，
-未正式平台签名；软件里显示的 stable 不代表这批安装包已经完成原生人工验收。
+当前版本为 `1.2.0`，三端安装包见 [1.2.0 Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0)。
+安装包标为 **Pre-release**：已完成双端运行与维护者界面验收，完整安装生命周期及平台签名仍待完成。
 版本与构建标识的区别见[正式版本体系](docs/RELEASES.md)。
 
-2026-10-05 画风来源与本地映射构建已完成本机验证，目前仅提交 PR，尚未合并或发布新的安装包。
+1.2.0 加入场景提案、画幅建议、真实 LoRA 辅助、个人画廊与生成记录；详见[创作指南](docs/CREATIVE_AI_GUIDE.md)。
 
 ## 下载：先选使用方式
 
 | 使用方式 | 下载 | 要运行的应用 |
 | --- | --- | --- |
-| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
-| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-windows-standalone-20260914) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
+| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
+| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
 
 Mac 包面向 Apple Silicon（arm64），Windows 包面向 x64。下载 Release 的 Assets 中的 DMG / Setup，
 不是 GitHub 自动生成的 Source code ZIP。每套附有 `SHA256SUMS` 和手动验收说明。
@@ -45,7 +45,7 @@ Linux 支持由社区适配分支提供，状态为 **Experimental**，不随官
 4. 启动台显示 Core 已就绪后打开工作台，确认实时 Worker / ComfyUI 状态。最终用户无需预装 Python、`uv`、Git 或 `.NET SDK`。
 5. 按需安装资料库和可选模型；外部 AI 服务的 URL、Key 与模型在“设备连接 → 模型服务”配置。
 
-完整安装步骤见[快速开始](docs/QUICK_START.md)，1.1.1 候选测试见[pre1 手动验收](docs/acceptance/manual-1.1.1-pre1-20260914.md)。
+完整安装步骤见[快速开始](docs/QUICK_START.md)，测试范围见[1.2.0 发行验证](docs/acceptance/release-1.2.0-20261005.md)。
 
 程序默认只监听本机 `127.0.0.1`。新用户的个人资料默认保存在：
 
@@ -64,6 +64,7 @@ Windows 单机用“退出并停止本机服务”。只退出启动器可以保
 ## 它能做什么
 
 - 从灵感、OC 或参考图建立绘图项目，并输出 Anima tags 与 Krea 2 自然语言 Prompt。
+- AI 提供场景、镜头与画幅方案，以及真实本地 LoRA 搭配；支持个人作品与参考画廊、按用途分析和方案复盘，见[创作辅助指南](docs/CREATIVE_AI_GUIDE.md)。
 - 检索本地提示词库、视觉参照、网页收藏和 OC Manager JSON；可按来源快速切换，并只查看带图资料。
 - 使用 AnimaDex 的角色、画师和作品缩略图作视觉参照；完整目录仍由用户使用自己的导出 token 下载到本机。
 - 导入 Krea2、Anima、Illustrious Style Explorer 与 Neons 资料；支持只读本地图库映射；见[画风资料来源](docs/STYLE_SOURCES.md)。
@@ -98,6 +99,7 @@ macOS 钥匙串保存，Prompt Hub 不读取密码。更完整的文件关系见
 | 第一次安装，先把页面打开 | [快速开始](docs/QUICK_START.md) |
 | 下载、安装、升级或卸载商业包 | [商业分发与安装说明](docs/COMMERCIAL_RELEASE.md) |
 | 从灵感到出图、复盘和数据集 | [核心工作流](docs/WORKFLOWS.md) |
+| 设计有故事感的画面、挑选 LoRA 并整理个人画廊 | [创作辅助与画廊](docs/CREATIVE_AI_GUIDE.md) |
 | 按页面顺序完成日常操作 | [用户使用说明书草稿](docs/USER_MANUAL_DRAFT.md) |
 | 启动、停止、备份、恢复和安全更新 | [Mac 使用与维护](docs/MAC_GUIDE.md) |
 | 在 Windows 安装、自检和启动 Worker | [Windows Worker 完整指南](docs/WINDOWS_WORKER.md) |
@@ -109,7 +111,7 @@ macOS 钥匙串保存，Prompt Hub 不读取密码。更完整的文件关系见
 | 页面打不开、共享盘断开或任务不动 | [常见问题与排错](docs/TROUBLESHOOTING.md) |
 | 版本号、更新通道和发布检查 | [正式版本体系](docs/RELEASES.md) |
 | 查看长期开发边界和历史路线 | [开发计划](DEVELOPMENT_PLAN.md) |
-| 安装新包后手动验收两种模式 | [1.1.1 pre1 验收清单](docs/acceptance/manual-1.1.1-pre1-20260914.md) |
+| 安装新包后手动验收两种模式 | [1.2.0 发行验证](docs/acceptance/release-1.2.0-20261005.md) |
 
 ## 当前边界
 
@@ -128,9 +130,8 @@ uv sync
 uv run --no-sync prompt-hub serve --host 127.0.0.1 --port 8765
 ```
 
-自定义个人资料位置时使用 `PROMPT_HUB_LIBRARY_ROOT`；自定义模型目录时使用
-`PROMPT_HUB_MODELS_ROOT`。开发检查与贡献约定见[开发计划](DEVELOPMENT_PLAN.md)和
-[正式版本体系](docs/RELEASES.md)。
+自定义个人资料位置时使用 `PROMPT_HUB_LIBRARY_ROOT`；模型目录使用 `PROMPT_HUB_MODELS_ROOT`。
+开发检查与贡献约定见[开发计划](DEVELOPMENT_PLAN.md)和[正式版本体系](docs/RELEASES.md)。
 
 ## 许可证
 

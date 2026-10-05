@@ -261,10 +261,26 @@ class RemoteCatalogMixin:
             "with_source_count": sum(bool(_catalog_source_url(item)) for item in prepared_items),
         }
 
-    def search_loras(self, query: str = "", *, limit: int = 100) -> list[dict[str, Any]]:
+    def search_loras(
+        self, query: str = "", *, limit: int = 100, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        return self.search_lora_page(query, limit=limit, offset=offset)["results"]
+
+    def search_lora_page(
+        self, query: str = "", *, limit: int = 100, offset: int = 0
+    ) -> dict[str, Any]:
+        page = {
+            "results": [],
+            "count": 0,
+            "total": 0,
+            "offset": max(0, offset),
+            "limit": max(1, min(limit, 500)),
+            "snapshot_id": "",
+        }
         status = self.lora_catalog_status()
         if not status["available"]:
-            return []
+            return page
+        page["snapshot_id"] = status["snapshot_id"]
         snapshot = _read_json(self.catalog_root / f"{status['snapshot_id']}.json", {})
         items = snapshot.get("items", [])
         needle = query.strip().casefold()
@@ -286,6 +302,9 @@ class RemoteCatalogMixin:
                 )
             ).casefold()
             if not needle or needle in search_text:
+                page["total"] += 1
+                if page["total"] <= page["offset"] or len(matched) >= page["limit"]:
+                    continue
                 result = dict(item)
                 result["source_url"] = _catalog_source_url(item)
                 preview_files = item.get("preview_files", [])
@@ -300,9 +319,7 @@ class RemoteCatalogMixin:
                 ]
                 result["preview_count"] = len(result["preview_urls"])
                 matched.append(result)
-            if len(matched) >= max(1, min(limit, 500)):
-                break
-        return matched
+        return {**page, "results": matched, "count": len(matched)}
 
     def get_lora(self, lora_id: str) -> dict[str, Any]:
         clean_id = _safe_id(lora_id, "lora_id")
@@ -542,10 +559,33 @@ class RemoteCatalogMixin:
         asset_type: str = "",
         model_family: str = "",
         limit: int = 200,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
+        return self.search_model_page(
+            query, asset_type=asset_type, model_family=model_family, limit=limit, offset=offset
+        )["results"]
+
+    def search_model_page(
+        self,
+        query: str = "",
+        *,
+        asset_type: str = "",
+        model_family: str = "",
+        limit: int = 200,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        page = {
+            "results": [],
+            "count": 0,
+            "total": 0,
+            "offset": max(0, offset),
+            "limit": max(1, min(limit, 2000)),
+            "snapshot_id": "",
+        }
         status = self.model_catalog_status()
         if not status["available"]:
-            return []
+            return page
+        page["snapshot_id"] = status["snapshot_id"]
         if asset_type and asset_type not in MODEL_ASSET_TYPES:
             raise RemoteNodeError("模型类型无效")
         snapshot = _read_json(self.model_catalog_root / f"{status['snapshot_id']}.json", {})
@@ -579,6 +619,9 @@ class RemoteCatalogMixin:
                 )
             ).casefold()
             if not needle or needle in search_text:
+                page["total"] += 1
+                if page["total"] <= page["offset"] or len(matched) >= page["limit"]:
+                    continue
                 result = dict(item)
                 result["source_url"] = _catalog_source_url(item)
                 preview_files = item.get("preview_files", [])
@@ -593,9 +636,7 @@ class RemoteCatalogMixin:
                 ]
                 result["preview_count"] = len(result["preview_urls"])
                 matched.append(result)
-            if len(matched) >= max(1, min(limit, 2000)):
-                break
-        return matched
+        return {**page, "results": matched, "count": len(matched)}
 
     def get_model(self, asset_id: str) -> dict[str, Any]:
         clean_id = _safe_id(asset_id, "asset_id")

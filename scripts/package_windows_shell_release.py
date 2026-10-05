@@ -37,6 +37,11 @@ class ShellVersionMismatchError(WindowsShellPackageError):
         super().__init__("Worker release version does not match project version")
 
 
+class PublishedVersionMismatchError(WindowsShellPackageError):
+    def __init__(self, expected: str) -> None:
+        super().__init__(f"Published Worker release metadata does not match version {expected}")
+
+
 def package_release(
     repository_root: Path,
     published_root: Path,
@@ -52,6 +57,7 @@ def package_release(
     for relative in REQUIRED_PATHS:
         if not (published / relative).is_file():
             raise MissingPublishedFileError(relative)
+    _validate_published_version(published, version)
 
     package_name = f"Soda-Compute-Worker-{version}-{runtime}"
     package_root = output / package_name
@@ -114,6 +120,15 @@ def _validate_release_version(repository: Path, version: str) -> None:
     )
     if release.get("worker_version") != version:
         raise ShellVersionMismatchError
+
+
+def _validate_published_version(published: Path, version: str) -> None:
+    try:
+        payload = json.loads((published / "worker/RELEASE.json").read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise PublishedVersionMismatchError(version) from error
+    if not isinstance(payload, dict) or payload.get("worker_version") != version:
+        raise PublishedVersionMismatchError(version)
 
 
 def _project_version(path: Path) -> str:

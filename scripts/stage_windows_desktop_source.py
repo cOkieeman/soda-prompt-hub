@@ -19,6 +19,7 @@ SOURCE_DIRECTORIES = (
     "src/prompt_hub",
     "tests/git-runtime-regression",
     "tests/desktop-host-regression",
+    "tests/installer-payload-regression",
 )
 SOURCE_FILES = (
     "LICENSE",

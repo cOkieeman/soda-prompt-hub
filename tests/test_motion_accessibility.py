@@ -57,7 +57,7 @@ def test_motion_is_local_lightweight_and_reduced_motion_safe() -> None:
 
 def test_success_feedback_does_not_animate_each_edit() -> None:
     queue_start = CREATIVE_JS.index("function queueCreativeSave")
-    save_start = CREATIVE_JS.index("async function saveCreative")
+    save_start = CREATIVE_JS.index("function saveCreative")
     workflow_start = CREATIVE_JS.index("async function sendWorkflowProfile")
     queue_source = CREATIVE_JS[queue_start:save_start]
     save_source = CREATIVE_JS[save_start:workflow_start]
@@ -65,6 +65,40 @@ def test_success_feedback_does_not_animate_each_edit() -> None:
     assert "playPromptHubStatusPulse" not in queue_source
     assert "playPromptHubStatusPulse" in save_source
     assert "offsetWidth" not in CREATIVE_JS
+    script = (
+        queue_source
+        + save_source
+        + r"""
+const assert=require('node:assert/strict');
+let dom='first',pulses=0,pending=[],creativeSaveQueue=Promise.resolve();
+const creativeState={project:{project_id:'a',revision:1},projects:[]},sceneState={projectId:''};
+const window={playPromptHubStatusPulse:()=>pulses++};
+const $=()=>({textContent:''}),renderOutput=()=>{},renderCreativeProjects=()=>{};
+const collectCreative=()=>({...creativeState.project,brief_zh:dom});
+const creativeContentSnapshot=project=>JSON.stringify((project||collectCreative()).brief_zh);
+const creativeJson=(url,options)=>new Promise((resolve,reject)=>{
+ pending.push({resolve,reject,body:JSON.parse(options.body)});
+});
+const setTimeout=()=>1,clearTimeout=()=>{},showCreativeError=()=>{};
+const loadIterationContext=async()=>{},refreshProjectJourney=async()=>{};
+const tick=()=>new Promise(setImmediate);
+(async()=>{
+ queueCreativeSave();dom='typing';queueCreativeSave();
+ assert.equal(pulses,0);
+ const saved=saveCreative();await tick();assert.equal(pulses,0);
+ dom='edited during save';queueCreativeSave();
+ const first=pending.shift();first.resolve({...first.body,revision:2});await tick();
+ assert.equal(pulses,0);assert.equal(pending.length,1);
+ const last=pending.shift();last.resolve({...last.body,revision:3});await saved;
+ assert.equal(pulses,1);
+ const failed=saveCreative();await tick();pending.shift().reject(Error('write failed'));
+ await assert.rejects(failed,/write failed/);assert.equal(pulses,1);
+})().catch(error=>{console.error(error);process.exitCode=1;});
+"""
+    )
+    node = shutil.which("node")
+    assert node is not None
+    subprocess.run([node, "-e", script], check=True, capture_output=True, text=True)  # noqa: S603
 
 
 def test_known_dark_surface_text_meets_normal_text_contrast() -> None:

@@ -21,6 +21,7 @@ def test_public_document_layers_exist_and_readme_routes_users() -> None:
         "RELEASES.md",
         "USER_MANUAL_DRAFT.md",
         "STYLE_SOURCES.md",
+        "CREATIVE_AI_GUIDE.md",
     }
     assert {path.name for path in (repository / "docs").glob("*.md")} == expected
 
