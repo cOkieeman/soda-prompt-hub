@@ -10,10 +10,16 @@ BASE_CSS = (ROOT / "src/prompt_hub/web_assets/base.css").read_text(encoding="utf
 BASE_JS = (ROOT / "src/prompt_hub/web_assets/base.js").read_text(encoding="utf-8")
 CREATIVE_CSS = (ROOT / "src/prompt_hub/web_assets/creative.css").read_text(encoding="utf-8")
 CREATIVE_JS = (ROOT / "src/prompt_hub/web_assets/creative.js").read_text(encoding="utf-8")
-SOURCE_CENTER = (ROOT / "src/prompt_hub/source_center_web.py").read_text(encoding="utf-8")
+SOURCE_CENTER = (ROOT / "src/prompt_hub/source_center_web.py").read_text(encoding="utf-8") + (
+    ROOT / "src/prompt_hub/web_assets/source_center.css"
+).read_text(encoding="utf-8")
 CREATIVE_LAYOUT = (ROOT / "src/prompt_hub/creative_web_layout.py").read_text(encoding="utf-8")
-COMFY_WEB = (ROOT / "src/prompt_hub/comfy_web.py").read_text(encoding="utf-8")
-LORA_WEB = (ROOT / "src/prompt_hub/lora_web.py").read_text(encoding="utf-8")
+COMFY_WEB = (ROOT / "src/prompt_hub/comfy_web.py").read_text(encoding="utf-8") + (
+    ROOT / "src/prompt_hub/web_assets/comfy.css"
+).read_text(encoding="utf-8")
+LORA_WEB = (ROOT / "src/prompt_hub/lora_web.py").read_text(encoding="utf-8") + (
+    ROOT / "src/prompt_hub/web_assets/lora.css"
+).read_text(encoding="utf-8")
 
 
 def _relative_luminance(hex_color: str) -> float:

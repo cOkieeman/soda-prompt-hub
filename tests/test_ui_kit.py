@@ -8,7 +8,16 @@ BASE_CSS = (ROOT / "src/prompt_hub/web_assets/base.css").read_text(encoding="utf
 KIT_CSS = BASE_CSS[BASE_CSS.index("/* Shared UI kit") : BASE_CSS.index("button:focus-visible")]
 ROOT_BLOCK = BASE_CSS[BASE_CSS.index(":root {") : BASE_CSS.index('html[lang="zh-TW"]')]
 # Pages already moved onto the shared tokens; each later PR appends its stylesheet here.
-TOKENIZED_PAGE_CSS = ("workspace.css",)
+TOKENIZED_PAGE_CSS = (
+    "workspace.css",
+    "gallery.css",
+    "comfy.css",
+    "lora.css",
+    "search.css",
+    "remote.css",
+    "source_center.css",
+    "pairing.css",
+)
 
 
 def _relative_luminance(hex_color: str) -> float:
