@@ -2,7 +2,6 @@
 .pairing-entry[hidden],.pairing-dialog [hidden]{display:none!important}
 .pairing-entry h2{margin:8px 0;font-size:24px}.pairing-entry p{margin:0}
 .pairing-dialog{width:min(660px,calc(100vw - 32px));max-height:85vh;box-sizing:border-box;border:1px solid var(--ink-lift);background:var(--paper-lift);color:var(--ink);padding:28px;overflow:auto}
-.pairing-dialog::backdrop{background:rgba(32,37,31,.46);backdrop-filter:blur(4px)}
 .pairing-dialog header{display:flex;justify-content:space-between;align-items:start;gap:20px}.pairing-dialog h2{margin:8px 0 20px;font-size:30px}.pairing-dialog h3{font-size:22px;margin:24px 0 12px}
 .pairing-dialog p{font-size:14px;line-height:1.8}.pairing-dialog label{display:grid;gap:8px;margin:16px 0;font-size:14px}.pairing-dialog input{width:100%;box-sizing:border-box;padding:12px;background:var(--paper-lift);border:1px solid var(--rule);color:inherit;font:inherit}
 .pairing-dialog button,.pairing-entry button{appearance:none;border:1px solid var(--ink);background:transparent;color:inherit;font:inherit;padding:11px 16px;cursor:pointer}.pairing-dialog button:disabled{opacity:.5;cursor:wait}.pairing-dialog button:hover:not(:disabled),.pairing-entry button:hover{background:var(--acid)}.pairing-dialog button:focus-visible{outline:3px solid var(--signal);outline-offset:3px}

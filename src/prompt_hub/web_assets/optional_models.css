@@ -1,5 +1,4 @@
 .model-installer { width: min(1080px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); box-sizing: border-box; padding: 0; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: 12px 12px 0 rgba(0,0,0,.18); overflow-y: auto; }
-.model-installer::backdrop { background: rgba(28,27,24,.68); backdrop-filter: blur(4px); }
 .model-installer-head { display: flex; justify-content: space-between; align-items: start; gap: 20px; padding: 30px 32px 24px; }
 .model-installer-head h2 { margin: 10px 0; font: 800 clamp(25px,3.2vw,40px)/1.2 "Iowan Old Style",serif; letter-spacing: -.035em; }
 .model-installer-head p, .model-installer-foot p { margin: 8px 0 0; font-size: 12px; line-height: 1.7; color: var(--muted); }

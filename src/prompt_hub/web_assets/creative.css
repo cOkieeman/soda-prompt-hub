@@ -27,7 +27,7 @@
   .scene-canvas { margin: 14px 0; padding: 12px; background: var(--paper-wash); font-size: 12px; line-height: 1.6; }
   .scene-canvas p { margin: 6px 0 0; }
   .scene-canvas summary, .scene-apply-preview summary { cursor: pointer; padding: 6px 0; }
-  .scene-caution { padding: 10px; border-left: 3px solid var(--signal); font-size: 12px; line-height: 1.65; background: var(--paper); }
+  .scene-caution { padding: 10px; border-left: 4px solid var(--signal); font-size: 12px; line-height: 1.65; background: var(--paper); }
   .scene-apply-preview { margin-top: 15px; border: 1px solid var(--signal); padding: 18px; background: var(--paper); }
   .scene-apply-preview[hidden], .scene-review-checks[hidden] { display: none; }
   .scene-preview-head { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
@@ -79,7 +79,7 @@
   .rail-button.primary { background: var(--signal); color: var(--paper-lift); border-color: var(--signal); margin-bottom: 14px; }
   .project-list, .recipe-list { display: grid; gap: 7px; margin-top: 10px; }
   .project-item, .recipe-item { border: 1px solid rgba(31, 29, 25, .22); background: rgba(255,255,255,.35); padding: 10px; text-align: left; }
-  .project-item.active { border-color: var(--signal); box-shadow: inset 3px 0 var(--signal); }
+  .project-item.active { border-color: var(--signal); box-shadow: inset 4px 0 var(--signal); }
   .project-item strong, .recipe-item strong { display: block; font: 700 13px/1.25 "Avenir Next", sans-serif; }
   .project-item span, .recipe-item span { display: block; margin-top: 4px; color: var(--muted); font: 9px monospace; }
   .lineage-notice { margin: -7px 0 18px; border: 1px solid var(--signal); background: var(--paper-wash); padding: 10px 12px; color: var(--muted); font-size: 11px; }
@@ -326,7 +326,7 @@
   .workflow-lora-picker-head strong, .workflow-lora-picker-head span { display: block; }
   .workflow-lora-picker-head strong { color: var(--paper-surface); font: 800 9px monospace; }
   .workflow-lora-picker-head span { margin-top: 2px; color: var(--on-ink-faint); font: 7px monospace; }
-  .workflow-lora-picker-head button { border: 1px solid rgba(244,237,223,.38); background: transparent; color: var(--paper-surface); padding: 4px 7px; font: 900 13px monospace; }
+  .workflow-lora-picker-head button { border: 1px solid rgba(244,237,223,.38); background: transparent; color: var(--paper-surface); padding: 4px 7px; font: 800 13px monospace; }
   .workflow-lora-filter { display: grid; grid-template-columns: minmax(0,1fr) 110px; gap: 5px; padding: 7px; }
   .workflow-lora-filter input, .workflow-lora-filter select { min-width: 0; width: 100%; margin: 0; border: 1px solid rgba(244,237,223,.3); background: var(--ink-line); color: var(--paper-surface); padding: 8px; font: 8px monospace; }
   .workflow-lora-picker > p { margin: 0 !important; border-top: 1px solid rgba(244,237,223,.12); padding: 6px 8px; }
@@ -338,9 +338,9 @@
   .workflow-lora-result strong, .workflow-lora-result small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .workflow-lora-result strong { font: 800 9px/1.3 "Avenir Next",sans-serif; }
   .workflow-lora-result small { margin-top: 3px; color: var(--on-ink-faint); font: 7px monospace; }
-  .workflow-lora-result > span:last-child { color: var(--acid); font: 900 8px monospace; }
+  .workflow-lora-result > span:last-child { color: var(--acid); font: 800 8px monospace; }
   .workflow-lora-result .workflow-civitai-link { display: inline-block; margin-top: 4px; border-top: 0; border-bottom: 1px solid currentColor; padding: 0; text-align: left; }
-  .workflow-lora-add { border: 1px solid rgba(244,237,223,.38); background: transparent; color: var(--acid); padding: 7px; font: 900 8px monospace; }
+  .workflow-lora-add { border: 1px solid rgba(244,237,223,.38); background: transparent; color: var(--acid); padding: 7px; font: 800 8px monospace; }
   .workflow-task-link { margin-top: 8px; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--acid); font: 800 8px monospace; cursor: pointer; }
   .output-actions { display: grid; gap: 8px; margin-top: 22px; }
   .output-actions .creative-action { color: var(--paper-surface); }
@@ -361,7 +361,7 @@
   .project-journey-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--rule); }
   .project-journey-card.ready::before { background: var(--acid); }
   .project-journey-card strong, .project-journey-card span, .project-journey-card small { display: block; }
-  .project-journey-card .journey-number { color: var(--signal); font: 900 9px monospace; }
+  .project-journey-card .journey-number { color: var(--signal); font: 800 9px monospace; }
   .project-journey-card strong { margin-top: 14px; font: 800 11px/1.25 monospace; }
   .project-journey-card .journey-count { margin-top: 7px; font: 700 24px/1 "Iowan Old Style", serif; }
   .project-journey-card small { margin-top: 4px; overflow-wrap: anywhere; color: var(--muted); font: 8px/1.45 monospace; }
@@ -377,7 +377,7 @@
   .recipe-name { width: 100%; margin-top: 12px; border: 1px solid rgba(244,237,223,.35); background: rgba(255,255,255,.06); color: var(--paper-surface); padding: 9px; }
   .oc-seed-modal { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 24px; }
   .oc-seed-modal[hidden] { display: none; }
-  .oc-seed-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(23,24,21,.76); cursor: default; }
+  .oc-seed-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--scrim); cursor: default; }
   .oc-seed-dialog { position: relative; width: min(820px, 100%); max-height: min(88vh, 920px); overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--ink); background: var(--paper-surface); box-shadow: 14px 14px 0 rgba(0,0,0,.28); }
   .oc-seed-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 18px; align-items: start; border-bottom: 1px solid var(--ink); background: var(--paper-surface); padding: 20px 22px 16px; }
   .oc-seed-head .section-label { margin-bottom: 7px; color: var(--signal); }

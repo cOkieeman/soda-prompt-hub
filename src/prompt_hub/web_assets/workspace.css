@@ -14,12 +14,12 @@
   .dataset-sidebar { padding: 20px; border-right: 1px solid var(--line); background: var(--paper-deep); }
   .dataset-continue { display: grid; gap: 8px; margin-bottom: 18px; padding: 14px; border: 1px solid var(--ink); background: var(--acid); box-shadow: 5px 5px 0 rgba(31,29,25,.16); }
   .dataset-continue[hidden] { display: none; }
-  .dataset-continue > span { color: var(--muted); font: 900 8px/1 monospace; letter-spacing: .08em; }
+  .dataset-continue > span { color: var(--muted); font: 800 8px/1 monospace; letter-spacing: .08em; }
   .dataset-continue > strong { overflow: hidden; font: 700 21px/1.1 "Iowan Old Style", serif; text-overflow: ellipsis; white-space: nowrap; }
   .dataset-continue > p { margin: 0; color: var(--muted); font: 9px/1.45 monospace; }
   .dataset-continue .dataset-primary { background: var(--ink); border-color: var(--ink); color: var(--paper); text-align: center; }
   .dataset-sidebar form { display: grid; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
-  .dataset-step-kicker { color: var(--signal); font: 900 9px/1 monospace; letter-spacing: .08em; }
+  .dataset-step-kicker { color: var(--signal); font: 800 9px/1 monospace; letter-spacing: .08em; }
   .dataset-sidebar label, .dataset-toolbar label, .dataset-dialog-body label { display: grid; gap: 6px; color: var(--muted); font: 800 9px monospace; text-transform: uppercase; letter-spacing: .06em; }
   .dataset-sidebar input, .dataset-toolbar select, .dataset-curation-block select, .dataset-curation-block input, .dataset-dialog-body select, .dataset-dialog-body textarea { width: 100%; border: 1px solid var(--line); background: var(--paper-surface); color: var(--ink); padding: 9px; font: 11px/1.45 monospace; }
   .dataset-primary { border: 1px solid var(--signal); background: var(--signal); color: var(--paper-lift); padding: 10px 12px; text-align: left; font: 800 9px monospace; text-transform: uppercase; }
@@ -59,7 +59,7 @@
   .dataset-browse-nav em { color: var(--signal-deep); font: 8px/1.4 monospace; }
   .dataset-browse-row.blocked { background: var(--paper-wash); }
   .dataset-browse-row.blocked .dataset-browse-nav { color: var(--muted); }
-  .dataset-browse-pick { border: 0; border-left: 1px solid var(--line); background: var(--acid); padding: 0 14px; font: 900 9px monospace; }
+  .dataset-browse-pick { border: 0; border-left: 1px solid var(--line); background: var(--acid); padding: 0 14px; font: 800 9px monospace; }
   .dataset-browse-pick:disabled { background: transparent; color: var(--rule); }
   .dataset-sidebar-head { display: flex; justify-content: space-between; margin: 18px 0 8px; font: 800 9px monospace; text-transform: uppercase; }
   .dataset-workspace-list { min-width: 0; display: grid; gap: 7px; }
@@ -70,7 +70,7 @@
   .dataset-workspace-item span { margin-top: 5px; color: var(--muted); font: 8px monospace; }
   .dataset-main { min-width: 0; padding: 24px; background-image: linear-gradient(rgba(31,29,25,.03) 1px, transparent 1px); background-size: 100% 36px; }
   .dataset-empty { max-width: 520px; margin: 110px auto; text-align: center; }
-  .dataset-empty span { display: inline-grid; width: 54px; aspect-ratio: 1; place-items: center; border: 1px solid var(--ink); background: var(--acid); font: 900 12px monospace; }
+  .dataset-empty span { display: inline-grid; width: 54px; aspect-ratio: 1; place-items: center; border: 1px solid var(--ink); background: var(--acid); font: 800 12px monospace; }
   .dataset-empty h2 { margin: 18px 0 7px; font: 700 34px "Iowan Old Style", serif; }
   .dataset-empty p { color: var(--muted); font-size: 12px; }
   .dataset-titlebar { display: flex; justify-content: space-between; gap: 18px; align-items: end; }
@@ -91,7 +91,7 @@
   .dataset-journey { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); margin-top: 18px; border: 1px solid var(--ink); background: var(--line); gap: 1px; }
   .dataset-journey button { position: relative; display: grid; min-width: 0; gap: 6px; padding: 13px 11px; background: var(--paper-wash); text-align: left; }
   .dataset-journey button::after { content: ""; position: absolute; inset: auto 0 0; height: 4px; background: transparent; }
-  .dataset-journey button span { color: var(--signal); font: 900 9px/1 monospace; }
+  .dataset-journey button span { color: var(--signal); font: 800 9px/1 monospace; }
   .dataset-journey button strong { font: 800 10px/1.2 monospace; }
   .dataset-journey button small { overflow: hidden; color: var(--muted); font: 8px/1.35 monospace; text-overflow: ellipsis; white-space: nowrap; }
   .dataset-journey button.complete::after { background: var(--acid); }
@@ -191,7 +191,6 @@
   .dataset-card-flags .alert { color: var(--signal); border-color: rgba(154,48,35,.35); }
   .dataset-card-flags .ok { color: var(--ink); }
   .dataset-dialog { width: min(1080px, calc(100% - 28px)); max-height: calc(100vh - 28px); border: 1px solid var(--ink); background: var(--paper); padding: 0; color: var(--ink); }
-  .dataset-dialog::backdrop { background: rgba(16,17,14,.82); backdrop-filter: blur(3px); }
   .dataset-dialog[open] { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(310px, .65fr); }
   .dataset-dialog-close { position: absolute; z-index: 3; top: 8px; right: 10px; width: 34px; height: 34px; background: var(--signal); color: var(--paper-lift); font-size: 20px; }
   .dataset-dialog-image { position: relative; display: grid; place-items: center; min-height: 560px; background: var(--ink); }
@@ -219,7 +218,7 @@
   .dataset-preflight.ready span { border-color: var(--acid); color: var(--ink); background: var(--acid); }
   .dataset-preflight.blocked span { border-color: var(--signal); color: var(--signal-deep); background: var(--signal-wash); }
   .dataset-preflight ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
-  .dataset-preflight li { border-left: 3px solid var(--signal); padding: 5px 8px; background: var(--paper-wash); font: 8px/1.45 monospace; }
+  .dataset-preflight li { border-left: 4px solid var(--signal); padding: 5px 8px; background: var(--paper-wash); font: 8px/1.45 monospace; }
   .dataset-preflight li.warning { border-color: var(--ink); }
   .dataset-preflight button { width: fit-content; border: 1px solid var(--ink); padding: 7px 9px; font: 800 8px monospace; }
   .dataset-delivery-action { display: grid; align-content: start; gap: 9px; padding: 14px; border: 1px solid var(--ink); background: rgba(247,241,229,.9); }
