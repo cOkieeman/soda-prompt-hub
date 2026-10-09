@@ -7,6 +7,22 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE_CSS = (ROOT / "src/prompt_hub/web_assets/base.css").read_text(encoding="utf-8")
 KIT_CSS = BASE_CSS[BASE_CSS.index("/* Shared UI kit") : BASE_CSS.index("button:focus-visible")]
 ROOT_BLOCK = BASE_CSS[BASE_CSS.index(":root {") : BASE_CSS.index('html[lang="zh-TW"]')]
+# Custom properties a script sets per element; they are not shared tokens.
+SCRIPT_SET_PROPERTIES = {"--visual-count"}
+# Every stylesheet must stay on the shared tokens; add new ones here.
+TOKENIZED_PAGE_CSS = (
+    "base.css",
+    "creative.css",
+    "optional_models.css",
+    "workspace.css",
+    "gallery.css",
+    "comfy.css",
+    "lora.css",
+    "search.css",
+    "remote.css",
+    "source_center.css",
+    "pairing.css",
+)
 
 
 def _relative_luminance(hex_color: str) -> float:
@@ -64,3 +80,15 @@ def test_ui_kit_text_pairs_stay_readable() -> None:
 
     for foreground, background in pairs:
         assert _contrast(tokens[foreground], tokens[background]) >= 4.5, (foreground, background)
+
+
+def test_tokenized_pages_use_defined_tokens_and_no_literal_colors() -> None:
+    tokens = _tokens()
+
+    for name in TOKENIZED_PAGE_CSS:
+        styles = (ROOT / "src/prompt_hub/web_assets" / name).read_text(encoding="utf-8")
+        styles = styles.replace(ROOT_BLOCK, "")
+        used = set(re.findall(r"var\((--[a-z-]+)\)", styles)) - SCRIPT_SET_PROPERTIES
+        assert used <= set(tokens), name
+        assert not re.findall(r"#[0-9a-fA-F]{3,8}\b", styles), name
+        assert not re.findall(r":\s*(?:white|black)\b", styles), name
