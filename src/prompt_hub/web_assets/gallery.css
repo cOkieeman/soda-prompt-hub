@@ -63,7 +63,7 @@
 #galleryDelete { color: var(--signal); border-color: var(--signal); }
 .gallery-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 20px 24px; border-bottom: 1px solid var(--line); }
 .gallery-detail-head h2 { margin: 6px 0 0; font-size: 24px; overflow-wrap: anywhere; }
-.gallery-detail-head button { font-size: 21px; }
+.gallery-detail-head button { font: inherit; font-size: 21px; font-weight: 700; letter-spacing: normal; }
 .gallery-detail-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 .gallery-detail-image { min-width: 0; padding: 24px; background: var(--paper-wash); }
 .gallery-detail-image img { display: block; width: 100%; max-height: 70vh; object-fit: contain; }
