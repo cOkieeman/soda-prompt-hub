@@ -23,6 +23,15 @@
       --line: rgba(23, 24, 21, .19);
       --shadow: 0 22px 55px rgba(29, 27, 20, .14);
       --on-ink-muted: #c8c0b2;
+      --paper-lift: #fbf6ec;
+      --paper-surface: #f4eddf;
+      --paper-wash: #e2dccd;
+      --rule: #bcb4a3;
+      --on-ink-faint: #aaa99f;
+      --ink-lift: #20211e;
+      --ink-line: #35342f;
+      --signal-deep: #8a3328;
+      --signal-wash: #f4ddd3;
       --motion-press: 90ms;
       --motion-fast: 140ms;
       --motion-page: 180ms;
@@ -58,6 +67,69 @@
     button, input, select, textarea { font: inherit; }
     button { border: 0; background: transparent; color: inherit; transition: translate var(--motion-fast) var(--motion-ease-out); }
     button:not(:disabled):not([data-motion="none"]):active { translate: 0 1px; transition-duration: var(--motion-press); }
+
+    /* Shared UI kit: pages opt in by class. Nothing here restyles an existing selector. */
+    .ui-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 32px;
+      border: 1px solid var(--ink);
+      padding: 10px 12px;
+      background: transparent;
+      color: var(--ink);
+      font: 800 10px/1.2 monospace;
+      letter-spacing: .06em;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease, background var(--motion-fast) ease, color var(--motion-fast) ease, translate var(--motion-fast) var(--motion-ease-out);
+    }
+    .ui-btn:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink); }
+    .ui-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .ui-btn-primary { background: var(--signal); border-color: var(--signal); color: var(--paper-lift); }
+    .ui-btn-ink { background: var(--ink); color: var(--paper-surface); }
+    .ui-btn-ghost { border-color: var(--line); color: var(--muted); }
+    .ui-btn-ghost:hover:not(:disabled) { transform: none; box-shadow: none; border-color: var(--ink); color: var(--ink); }
+    .ui-btn-on-ink { border-color: currentColor; color: var(--paper-surface); }
+    .ui-btn-on-ink:hover:not(:disabled) { box-shadow: 5px 5px 0 var(--acid); }
+    .ui-btn-sm { min-height: 24px; padding: 7px 9px; font-size: 9px; }
+    .ui-btn-lg { min-height: 42px; padding: 15px 18px; font-size: 11px; letter-spacing: .1em; }
+
+    .ui-banner { margin: 0; border-left: 4px solid var(--acid); padding: 10px 12px; background: var(--paper-wash); color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+    .ui-banner strong { color: var(--ink); }
+    .ui-banner-signal { border-left-color: var(--signal); }
+    .ui-banner-error { border-left-color: var(--signal); background: var(--signal-wash); color: var(--signal-deep); }
+
+    input.ui-field:not([type="checkbox"]):not([type="radio"]), select.ui-field, textarea.ui-field {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      padding: 9px;
+      background: var(--paper-lift);
+      color: var(--ink);
+      font: 12px/1.5 "Avenir Next", sans-serif;
+      box-shadow: none;
+    }
+    input.ui-field:not([type="checkbox"]):not([type="radio"]):focus, select.ui-field:focus, textarea.ui-field:focus { border-color: var(--signal); box-shadow: 0 2px 0 var(--signal); }
+
+    .ui-card { min-width: 0; border: 1px solid var(--line); padding: 20px; background: var(--paper-surface); color: var(--ink); }
+    .ui-card-ink { border-color: var(--ink); background: var(--ink); color: var(--paper-surface); }
+
+    .ui-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); padding: 5px 7px; background: transparent; color: var(--ink); font: 700 9px/1 monospace; letter-spacing: .08em; }
+    .ui-chip-ink { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+    .ui-chip-signal { border-color: var(--signal); background: var(--signal); color: var(--paper-lift); }
+    .ui-chip-acid { border-color: var(--acid); background: var(--acid); }
+    .ui-chip-soft { border-color: var(--paper-deep); background: var(--paper-deep); }
+
+    .ui-dialog { width: min(1080px, calc(100% - 28px)); max-height: calc(100vh - 28px); border: 1px solid var(--ink); padding: 0; background: var(--paper); color: var(--ink); overflow: auto; }
+    .ui-dialog::backdrop { background: rgba(20, 20, 17, .72); }
+
+    .ui-job { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; border-left: 4px solid var(--acid); padding: 10px 12px; background: var(--paper-wash); color: var(--ink); font: 800 9px/1.5 monospace; }
+    .ui-job progress { width: 100%; height: 7px; accent-color: var(--signal); }
+    .ui-job-ink { border-left-color: var(--acid); background: var(--ink); color: var(--paper-surface); }
+    .ui-job-ink progress { accent-color: var(--acid); }
     button:disabled { cursor: not-allowed; }
     input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
     .prompt-hub-view-enter { animation: prompt-hub-view-enter var(--motion-page) var(--motion-ease-out); }
