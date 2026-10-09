@@ -6,7 +6,7 @@
   .scene-design-panel .scene-primary, .style-advice-panel .scene-primary { color: var(--paper-lift); background: var(--signal); border-color: var(--signal); }
   .scene-design-panel button:disabled, .style-advice-panel button:disabled { opacity: .45; cursor: not-allowed; }
   .scene-intro, .scene-status, .scene-empty { color: var(--muted); font-size: 12px; line-height: 1.65; }
-  .scene-empty { margin: 0; padding: 14px; border: 1px dashed var(--on-ink-muted); }
+  .scene-empty { margin: 0; padding: 14px; border: 1px dashed var(--rule); }
   .scene-status { min-height: 20px; overflow-wrap: anywhere; }
   .scene-request-controls { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 10px; }
   .scene-request-controls label { display: grid; gap: 6px; font-size: 12px; }
@@ -285,7 +285,7 @@
   .workflow-dispatch-head { display: flex; justify-content: space-between; gap: 10px; color: var(--paper-surface); }
   .workflow-dispatch-head strong { font: 800 10px monospace; letter-spacing: .05em; }
   .workflow-dispatch-head span { color: var(--acid); font: 800 9px monospace; }
-  .workflow-dispatch > label { display: block; margin-top: 11px; color: var(--rule); font: 800 8px monospace; text-transform: uppercase; }
+  .workflow-dispatch > label { display: block; margin-top: 11px; color: var(--on-ink-muted); font: 800 8px monospace; text-transform: uppercase; }
   .workflow-dispatch select, .workflow-dispatch input[type=number] { width: 100%; margin-top: 6px; border: 1px solid rgba(244,237,223,.38); background: var(--ink-lift); color: var(--paper-surface); padding: 9px; font: 9px monospace; }
   .workflow-dispatch .workflow-cost { display: flex; gap: 8px; align-items: start; text-transform: none; }
   .workflow-cost input { margin-top: 2px; accent-color: var(--acid); }
@@ -293,11 +293,11 @@
   .workflow-cost strong { color: var(--paper-surface); font: 800 9px monospace; }
   .workflow-cost small { margin-top: 3px; color: var(--on-ink-faint); font: 9px/1.4 "Avenir Next", sans-serif; }
   .workflow-dispatch .creative-action { width: 100%; margin-top: 12px; }
-  .workflow-dispatch p { margin: 8px 0 0; color: var(--rule); font: 9px/1.45 monospace; overflow-wrap: anywhere; }
+  .workflow-dispatch p { margin: 8px 0 0; color: var(--on-ink-muted); font: 9px/1.45 monospace; overflow-wrap: anywhere; }
   .workflow-controls { margin-top: 10px; border-top: 1px solid rgba(244,237,223,.22); padding-top: 9px; }
   .workflow-controls summary { cursor: pointer; color: var(--acid); font: 800 9px monospace; }
   .workflow-control-list { display: grid; gap: 8px; margin-top: 10px; }
-  .workflow-control-list label, .workflow-pair label, .workflow-lora-row label { display: grid; gap: 4px; color: var(--rule); font: 800 8px monospace; text-transform: uppercase; }
+  .workflow-control-list label, .workflow-pair label, .workflow-lora-row label { display: grid; gap: 4px; color: var(--on-ink-muted); font: 800 8px monospace; text-transform: uppercase; }
   .workflow-model-card { display: grid; grid-template-columns: minmax(0,1fr) 88px; gap: 7px; align-items: stretch; }
   .workflow-model-card > label { align-content: end; }
   .workflow-model-visual { display: grid; min-height: 78px; border: 1px solid rgba(244,237,223,.32); background: repeating-linear-gradient(135deg,var(--ink-line) 0 8px,var(--ink-line) 8px 9px); color: var(--on-ink-faint); }
@@ -309,7 +309,7 @@
   .workflow-civitai-link:hover, .workflow-civitai-link:focus-visible { background: rgba(255,255,255,.08); }
   .workflow-model-empty { display: grid; place-items: center; min-height: 78px; padding: 6px; text-align: center; font: 700 7px/1.4 monospace; }
   .workflow-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
-  .workflow-lora-defaults { margin-top: 9px; padding: 8px; background: rgba(255,255,255,.05); color: var(--rule); font: 8px/1.45 monospace; }
+  .workflow-lora-defaults { margin-top: 9px; padding: 8px; background: rgba(255,255,255,.05); color: var(--on-ink-muted); font: 8px/1.45 monospace; }
   .workflow-lora-rows { display: grid; gap: 7px; margin-top: 8px; }
   .workflow-lora-row { display: grid; grid-template-columns: minmax(0,1fr) 64px 26px; gap: 5px; align-items: center; border: 1px solid rgba(244,237,223,.18); padding: 5px; }
   .workflow-lora-selected { display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 7px; align-items: center; min-width: 0; }
@@ -345,7 +345,7 @@
   .output-actions { display: grid; gap: 8px; margin-top: 22px; }
   .output-actions .creative-action { color: var(--paper-surface); }
   .output-actions .creative-action.primary { background: var(--acid); color: var(--ink); border-color: var(--acid); }
-  .save-state { margin-top: 10px; color: var(--rule); font: 9px monospace; text-transform: uppercase; }
+  .save-state { margin-top: 10px; color: var(--on-ink-muted); font: 9px monospace; text-transform: uppercase; }
   .output-rail input::placeholder, .output-rail textarea::placeholder,
   .wd14-toolbar input::placeholder, .workflow-dispatch input::placeholder,
   .workflow-lora-filter input::placeholder, .recipe-name::placeholder { color: var(--on-ink-muted); opacity: 1; }
@@ -358,7 +358,7 @@
   .project-journey-head button { border-bottom: 1px solid currentColor; color: var(--signal); font: 800 8px monospace; }
   .project-journey-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; background: var(--line); }
   .project-journey-card { position: relative; display: grid; min-width: 0; min-height: 168px; align-content: space-between; gap: 12px; padding: 13px 12px; background: var(--paper-surface); }
-  .project-journey-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--on-ink-faint); }
+  .project-journey-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--rule); }
   .project-journey-card.ready::before { background: var(--acid); }
   .project-journey-card strong, .project-journey-card span, .project-journey-card small { display: block; }
   .project-journey-card .journey-number { color: var(--signal); font: 900 9px monospace; }

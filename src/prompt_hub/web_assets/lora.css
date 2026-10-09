@@ -60,7 +60,7 @@
   .lora-workspace-picker select { min-width: 0; border: 1px solid var(--line); background: var(--paper-lift); padding: 10px; }
   .lora-source-grid, .lora-asset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
   .lora-source-card, .lora-asset-card { background: var(--paper-surface); border: 1px solid var(--line); min-width: 0; overflow: hidden; }
-  .lora-source-card img, .lora-asset-card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--on-ink-muted); display: block; }
+  .lora-source-card img, .lora-asset-card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--paper-deep); display: block; }
   .lora-source-card label { display: grid; grid-template-columns: auto 1fr; gap: 7px; padding: 9px; align-items: start; font-size: 10px; overflow-wrap: anywhere; cursor: pointer; }
   .lora-asset-body { padding: 10px; display: grid; gap: 8px; }
   .lora-asset-name { margin: 0; font: 700 9px/1.4 monospace; overflow-wrap: anywhere; }
@@ -73,7 +73,7 @@
   .lora-matrix-row { display: grid; grid-template-columns: 86px 1fr; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
   .lora-matrix-row > strong { color: var(--signal); font: 800 10px/1.4 monospace; }
   .lora-matrix-items { display: flex; flex-wrap: wrap; gap: 5px; }
-  .lora-matrix-item { padding: 6px 8px; background: var(--on-ink-muted); color: var(--muted); font-size: 9px; }
+  .lora-matrix-item { padding: 6px 8px; background: var(--paper-deep); color: var(--muted); font-size: 9px; }
   .lora-matrix-item.complete { background: var(--acid); color: var(--ink); }
   .lora-warning { padding: 10px; border-left: 4px solid var(--signal); background: var(--paper); color: var(--signal-deep); font-size: 10px; line-height: 1.5; }
   .lora-coverage-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }

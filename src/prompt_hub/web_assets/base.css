@@ -406,7 +406,7 @@
     }
     .personal-summary strong { color: var(--acid); font-size: 14px; }
     .personal-summary .divider { padding: 0 7px; color: rgba(236,232,220,.72); }
-    .stats-panel .section-label { color: var(--rule); }
+    .stats-panel .section-label { color: var(--on-ink-muted); }
     .sync-button {
       border: 1px solid var(--acid);
       color: var(--acid);
@@ -620,7 +620,7 @@
       aspect-ratio: 4 / 3;
       margin: -20px -20px 18px;
       overflow: hidden;
-      background: var(--on-ink-muted);
+      background: var(--paper-deep);
       border-bottom: 1px solid var(--line);
       gap: 1px;
     }
@@ -629,7 +629,7 @@
       position: relative;
       min-width: 0;
       overflow: hidden;
-      background: var(--on-ink-muted);
+      background: var(--paper-deep);
     }
     .visual-frame img {
       width: 100%;
