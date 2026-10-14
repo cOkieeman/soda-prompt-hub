@@ -12,6 +12,8 @@ from scripts.build_linux_release import (
     build_release,
 )
 
+from prompt_hub import __version__
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -27,7 +29,7 @@ def test_linux_release_contains_launcher_runtime_and_docs(tmp_path: Path) -> Non
         build_date="20260915",
     )
     archive = Path(str(result["archive"]))
-    assert archive.name == "soda-prompt-hub-linux-x86_64-1.1.1-20260915.tar.gz"
+    assert archive.name == f"soda-prompt-hub-linux-x86_64-{__version__}-20260915.tar.gz"
     assert result["architecture"] == "x86_64"
     assert result["self_contained"] is False
     assert result["requires_uv"] is True

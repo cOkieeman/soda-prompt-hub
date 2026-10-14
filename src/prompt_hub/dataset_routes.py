@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from prompt_hub.creative import CreativeProjectConflictError
 from prompt_hub.dataset_export import (
     DatasetExportError,
     create_dataset_export,
@@ -36,22 +37,26 @@ if TYPE_CHECKING:
 
 
 class DatasetAssetUpdate(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
     selected: bool | None = None
     profile_id: Literal["anima", "krea2"] = "anima"
     caption_override: str | None = Field(default=None, max_length=12000)
 
 
 class DatasetExportInput(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
     profile_id: Literal["anima", "krea2"] = "anima"
 
 
 class DatasetTagInput(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
     tagger: Literal["wd14", "model"] = "wd14"
     model: str = Field(default="", max_length=400)
     limit: int = Field(default=80, ge=1, le=200)
 
 
 class DatasetTagReviewInput(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
     draft_tags: str = Field(default="", max_length=12000)
     confirm_anima: bool = False
 
@@ -63,14 +68,30 @@ def create_dataset_router(
 ) -> APIRouter:
     router = APIRouter()
 
+    def require_project(project_id: str, expected_revision: int | None) -> dict[str, Any]:
+        project = creative_store.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Creative project not found")
+        if expected_revision is not None and project["revision"] != expected_revision:
+            raise HTTPException(status_code=409, detail="项目已改变; 请重新读取后再操作数据集")
+        return project
+
+    def save_generation(project: dict[str, Any], generation: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return creative_store.update_project(
+                project["project_id"],
+                {"generation": generation},
+                expected_revision=int(project["revision"]),
+            )
+        except CreativeProjectConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+
     @router.post("/api/creative/projects/{project_id}/dataset-export")
     def export_creative_dataset(
         project_id: str,
         payload: DatasetExportInput,
     ) -> dict[str, Any]:
-        project = creative_store.get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Creative project not found")
+        project = require_project(project_id, payload.expected_revision)
         try:
             export = create_dataset_export(
                 settings,
@@ -89,9 +110,7 @@ def create_dataset_router(
         asset_id: str,
         payload: DatasetAssetUpdate,
     ) -> dict[str, Any]:
-        project = creative_store.get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Creative project not found")
+        project = require_project(project_id, payload.expected_revision)
         try:
             generation, asset = update_dataset_asset(
                 project,
@@ -102,7 +121,7 @@ def create_dataset_router(
             )
         except LookupError as error:
             raise HTTPException(status_code=404, detail="Result image not found") from error
-        updated = creative_store.update_project(project_id, {"generation": generation})
+        updated = save_generation(project, generation)
         return {"asset": asset, "project": updated}
 
     @router.post("/api/creative/projects/{project_id}/results/{asset_id}/tag")
@@ -112,9 +131,7 @@ def create_dataset_router(
         payload: DatasetTagInput,
     ) -> dict[str, Any]:
         _validate_tagger_input(payload)
-        project = creative_store.get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Creative project not found")
+        project = require_project(project_id, payload.expected_revision)
         asset = find_result_asset(project, asset_id)
         if asset is None:
             raise HTTPException(status_code=404, detail="Result image not found")
@@ -134,7 +151,7 @@ def create_dataset_router(
             )
         except (WD14Error, LocalModelError) as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
-        updated = creative_store.update_project(project_id, {"generation": generation})
+        updated = save_generation(project, generation)
         return {"asset": tagged_asset, "project": updated}
 
     @router.post("/api/creative/projects/{project_id}/dataset-tag")
@@ -143,9 +160,7 @@ def create_dataset_router(
         payload: DatasetTagInput,
     ) -> dict[str, Any]:
         _validate_tagger_input(payload)
-        project = creative_store.get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Creative project not found")
+        project = require_project(project_id, payload.expected_revision)
         assets = selected_result_assets(project)
         if not assets:
             raise HTTPException(status_code=422, detail="请先至少精选一张结果图")
@@ -180,11 +195,7 @@ def create_dataset_router(
                 results.append({"asset_id": asset_id, "status": "failed", "detail": detail})
 
         tagged_count = sum(item["status"] == "tagged" for item in results)
-        updated = (
-            creative_store.update_project(project_id, {"generation": working["generation"]})
-            if tagged_count
-            else project
-        )
+        updated = save_generation(project, working["generation"]) if tagged_count else project
         return {
             "project": updated,
             "selected_count": len(assets),
@@ -199,9 +210,7 @@ def create_dataset_router(
         asset_id: str,
         payload: DatasetTagReviewInput,
     ) -> dict[str, Any]:
-        project = creative_store.get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Creative project not found")
+        project = require_project(project_id, payload.expected_revision)
         try:
             generation, asset = review_wd14_draft(
                 project,
@@ -213,7 +222,7 @@ def create_dataset_router(
             raise HTTPException(status_code=404, detail="Result image not found") from error
         except DatasetTaggingError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
-        updated = creative_store.update_project(project_id, {"generation": generation})
+        updated = save_generation(project, generation)
         return {"asset": asset, "project": updated}
 
     @router.get(

@@ -15,6 +15,12 @@ def test_catalog_renders_without_waiting_for_labels_and_can_retry() -> None:
         pytest.skip("Node.js required")
     start = REMOTE_SCRIPT.index("  async function loadLoras(")
     end = REMOTE_SCRIPT.index("  const modelTypeLabels=", start)
+    base = (Path(__file__).resolve().parents[1] / "src/prompt_hub/web_assets/base.js").read_text()
+    catalog_helper = base[
+        base.index("    async function loadPromptHubResourceCatalog(") : base.index(
+            "    window.loadPromptHubResourceCatalog"
+        )
+    ]
     harness = r"""
 const assert=require('node:assert/strict');
 const elements=new Map();
@@ -24,16 +30,21 @@ const $=key=>{
  });return elements.get(key);
 };
 const state={catalog:[],loraQuery:'',collapsedLoraRoots:new Set(),loraLoaded:false};
-let rendered=0,fail=false,requests=0;
+let rendered=0,fail=false,requests=0,pageOffsets=[];
+const catalog=Array.from({length:626},(_,id)=>({lora_id:String(id),tags:['test']}));
 const api=async url=>{
  requests++;if(fail)throw new Error('offline');
- return url.endsWith('/status')?{available:true,count:1}:{results:[{tags:['test']}]};
+ if(url.endsWith('/status'))return {available:true,count:catalog.length};
+ const params=new URL(url,'http://localhost').searchParams;
+ const offset=Number(params.get('offset')),limit=Number(params.get('limit'));
+ assert.equal(limit,500);pageOffsets.push(offset);
+ return {results:catalog.slice(offset,offset+limit),total:catalog.length,snapshot_id:'qa'};
 };
 const setRemoteTabCount=()=>{};
 const loraTreeData=()=>[];
 const renderLoras=()=>{rendered++;};
 let resolveLabels;
-const window={ensureTagLabels:(tags,options)=>{
+const window={loadPromptHubResourceCatalog,ensureTagLabels:(tags,options)=>{
  assert.equal(options.allowModel,false);
  return new Promise(resolve=>{resolveLabels=resolve;});
 }};
@@ -44,6 +55,9 @@ const window={ensureTagLabels:(tags,options)=>{
   await Promise.race([loadLoras(),new Promise((_,reject)=>setTimeout(
    ()=>reject(new Error('catalog blocked by translation')),100))]);
   assert.equal(rendered,1);assert.equal(state.loraLoaded,true);
+  assert.equal(state.catalog.length,626);
+  assert.equal(new Set(state.catalog.map(item=>item.lora_id)).size,626);
+  assert.deepEqual(pageOffsets,[0,500]);
   state.loraLabelEpoch++;
   $('#remoteLoraTranslationStatus').textContent='AI stopped';
   resolveLabels(true);await new Promise(setImmediate);
@@ -52,10 +66,13 @@ const window={ensureTagLabels:(tags,options)=>{
   assert.match($('#remoteLoraStatus').textContent,/offline/);
   assert.equal($('#remoteLoraReload').disabled,false);
   fail=false;const before=requests;await Promise.all([loadLoras(),loadLoras()]);
-  assert.equal(requests-before,2);assert.equal(rendered,3);
+  assert.equal(requests-before,3);assert.equal(rendered,3);
+  assert.deepEqual(pageOffsets.slice(-2),[0,500]);
 })().catch(error=>{console.error(error);process.exitCode=1;});
 """
-    subprocess.run([node, "-e", REMOTE_SCRIPT[start:end] + harness], check=True)  # noqa: S603
+    subprocess.run(  # noqa: S603
+        [node, "-e", catalog_helper + REMOTE_SCRIPT[start:end] + harness], check=True
+    )
 
 
 def test_tag_label_retry_progress_abort_and_cache_race() -> None:
@@ -109,11 +126,18 @@ def test_json_requests_have_timeout_abort_and_http_errors() -> None:
             "    window.fetchJsonWithTimeout"
         )
     ]
+    error_helper = base[
+        base.index("    function promptHubErrorMessage(") : base.index(
+            "    window.promptHubErrorMessage"
+        )
+    ]
     harness = r"""
 const assert=require('node:assert/strict');
 let mode='wait';
 const fetch=async(url,options)=>{
  if(mode==='error')return {ok:false,status:503,json:async()=>({detail:'offline'})};
+ if(mode==='validation')return {ok:false,status:422,json:async()=>({detail:[{msg:'required'}]})};
+ if(mode==='html')return {ok:false,status:503,json:async()=>{throw Error('not JSON');}};
  if(mode==='success')return {ok:true,json:async()=>({ok:true})};
  return new Promise((resolve,reject)=>{
   if(options.signal.aborted)reject(options.signal.reason);
@@ -125,7 +149,9 @@ const fetch=async(url,options)=>{
  const controller=new AbortController();controller.abort(new Error('stop'));
  await assert.rejects(fetchJsonWithTimeout('/test',{signal:controller.signal},1000),/stop/);
  mode='error';await assert.rejects(fetchJsonWithTimeout('/test'),/offline/);
+ mode='validation';await assert.rejects(fetchJsonWithTimeout('/test'),/required/);
+ mode='html';await assert.rejects(fetchJsonWithTimeout('/test'),/503/);
  mode='success';assert.deepEqual(await fetchJsonWithTimeout('/test'),{ok:true});
 })().catch(error=>{console.error(error);process.exitCode=1;});
 """
-    subprocess.run([node, "-e", script + harness], check=True)  # noqa: S603
+    subprocess.run([node, "-e", error_helper + script + harness], check=True)  # noqa: S603

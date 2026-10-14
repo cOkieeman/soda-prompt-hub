@@ -3,6 +3,7 @@ import json
 
 from prompt_hub.comfy_web import COMFY_HTML, COMFY_SCRIPT, COMFY_STYLES
 from prompt_hub.creative_web import CREATIVE_HTML, CREATIVE_SCRIPT, CREATIVE_STYLES
+from prompt_hub.gallery_web import GALLERY_HTML, GALLERY_SCRIPT, GALLERY_STYLES
 from prompt_hub.lora_web import LORA_HTML, LORA_SCRIPT, LORA_STYLES
 from prompt_hub.optional_models_web import (
     OPTIONAL_MODELS_HTML,
@@ -29,13 +30,13 @@ INDEX_HTML = (
 
 INDEX_HTML = INDEX_HTML.replace(
     "</head>",
-    f"{CREATIVE_STYLES}{WORKSPACE_STYLES}{LORA_STYLES}{COMFY_STYLES}{SEARCH_STYLES}{REMOTE_STYLES}{SOURCE_CENTER_STYLES}</head>",
+    f"{CREATIVE_STYLES}{GALLERY_STYLES}{WORKSPACE_STYLES}{LORA_STYLES}{COMFY_STYLES}{SEARCH_STYLES}{REMOTE_STYLES}{SOURCE_CENTER_STYLES}</head>",
     1,
 )
 
 INDEX_HTML = INDEX_HTML.replace(
     '<section class="management-page" id="managementPage" hidden>',
-    f'{CREATIVE_HTML}{SEARCH_HTML}{WORKSPACE_HTML}{LORA_HTML}{COMFY_HTML}{REMOTE_HTML}<section class="management-page" id="managementPage" hidden>',
+    f'{CREATIVE_HTML}{GALLERY_HTML}{SEARCH_HTML}{WORKSPACE_HTML}{LORA_HTML}{COMFY_HTML}{REMOTE_HTML}<section class="management-page" id="managementPage" hidden>',
     1,
 )
 INDEX_HTML = INDEX_HTML.replace(
@@ -45,7 +46,7 @@ INDEX_HTML = INDEX_HTML.replace(
 )
 INDEX_HTML = INDEX_HTML.replace(
     "</body>",
-    f"{OPTIONAL_MODELS_STYLES}{OPTIONAL_MODELS_HTML}{CREATIVE_SCRIPT}{SEARCH_SCRIPT}{WORKSPACE_SCRIPT}{LORA_SCRIPT}{COMFY_SCRIPT}{REMOTE_SCRIPT}{SOURCE_CENTER_SCRIPT}{OPTIONAL_MODELS_SCRIPT}</body>",
+    f"{OPTIONAL_MODELS_STYLES}{OPTIONAL_MODELS_HTML}{CREATIVE_SCRIPT}{GALLERY_SCRIPT}{SEARCH_SCRIPT}{WORKSPACE_SCRIPT}{LORA_SCRIPT}{COMFY_SCRIPT}{REMOTE_SCRIPT}{SOURCE_CENTER_SCRIPT}{OPTIONAL_MODELS_SCRIPT}</body>",
     1,
 )
 
@@ -56,6 +57,8 @@ def render_index_html(device_name: str, *, usage_mode: str | None = None) -> str
         message = f"Unsupported usage mode: {mode}"
         raise ValueError(message)
     dataset_example, model_example = _usage_mode_examples(mode)
+    output_example, mapping_example = _usage_mode_folder_examples(mode)
+    backup_example = _usage_mode_backup_example(mode)
     safe_name = device_name.strip() or (
         "Linux 绘图设备" if mode == LINUX_LOCAL else "Windows 绘图设备"
     )
@@ -76,6 +79,9 @@ def render_index_html(device_name: str, *, usage_mode: str | None = None) -> str
         markup.replace("__PROMPT_HUB_USAGE_MODE__", mode)
         .replace("__PROMPT_HUB_DATASET_PATH__", dataset_example)
         .replace("__PROMPT_HUB_MODEL_PATH__", model_example)
+        .replace("__PROMPT_HUB_OUTPUT_PATH__", output_example)
+        .replace("__PROMPT_HUB_MAPPING_PATH__", mapping_example)
+        .replace("__PROMPT_HUB_BACKUP_PATH__", backup_example)
     )
 
 
@@ -86,3 +92,25 @@ def _usage_mode_examples(mode: str) -> tuple[str, str]:
     if mode == LINUX_LOCAL:
         return "~/Pictures/my-dataset", "~/models/vision_model.onnx"
     return "/Users/your-name/Pictures/my-dataset", "/Users/you/models/vision_model.onnx"
+
+
+def _usage_mode_folder_examples(mode: str) -> tuple[str, str]:
+    """Folder examples for ComfyUI output scanning and local source mapping.
+
+    Both boxes used to advertise Windows or macOS locations on every platform, which
+    pointed Linux users at directories that cannot exist on their machine.
+    """
+    if mode == "windows_local":
+        return "D:/ComfyUI/output", "D:/Libraries/krea2-style-explorer"
+    if mode == LINUX_LOCAL:
+        return "~/ComfyUI/output", "~/Libraries/krea2-style-explorer"
+    return "/Volumes/ComfyUI/output", "/Volumes/Shared/krea2-style-explorer"
+
+
+def _usage_mode_backup_example(mode: str) -> str:
+    """Example destination for the full-backup box."""
+    if mode == "windows_local":
+        return "D:/PromptHub-Backups/2026-09-14"
+    if mode == LINUX_LOCAL:
+        return "~/PromptHub-Backups/2026-09-14"
+    return "/Volumes/Backups/PromptHub/2026-09-14"

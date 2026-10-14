@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from prompt_hub.comfy_results import ComfyResultError, ComfyResultStore
-from prompt_hub.creative import next_iteration_values
+from prompt_hub.creative import CreativeProjectConflictError, next_iteration_values
 from prompt_hub.result_media import ResultImageError, store_result_image
 
 if TYPE_CHECKING:
@@ -29,6 +29,10 @@ class ComfySettingsInput(BaseModel):
 class ComfyResultUpdate(BaseModel):
     disposition: Literal["unreviewed", "candidate", "failed_test", "reference"] | None = None
     note: str | None = Field(default=None, max_length=3000)
+
+
+class ComfyAttachInput(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
 
 
 def create_comfy_router(
@@ -112,7 +116,9 @@ def create_comfy_router(
             _raise_comfy_http(error)
 
     @router.post("/api/comfy-results/{result_id}/attach/{project_id}")
-    def attach_comfy_result_route(result_id: str, project_id: str) -> dict[str, Any]:
+    def attach_comfy_result_route(
+        result_id: str, project_id: str, payload: ComfyAttachInput | None = None
+    ) -> dict[str, Any]:
         return attach_comfy_result(
             settings,
             store,
@@ -120,10 +126,13 @@ def create_comfy_router(
             result_id=result_id,
             project_id=project_id,
             selected=False,
+            expected_revision=payload.expected_revision if payload else None,
         )
 
     @router.post("/api/comfy-results/{result_id}/candidate/{project_id}")
-    def select_comfy_candidate_route(result_id: str, project_id: str) -> dict[str, Any]:
+    def select_comfy_candidate_route(
+        result_id: str, project_id: str, payload: ComfyAttachInput | None = None
+    ) -> dict[str, Any]:
         return attach_comfy_result(
             settings,
             store,
@@ -131,6 +140,7 @@ def create_comfy_router(
             result_id=result_id,
             project_id=project_id,
             selected=True,
+            expected_revision=payload.expected_revision if payload else None,
         )
 
     @router.post(
@@ -200,11 +210,14 @@ def attach_comfy_result(
     result_id: str,
     project_id: str,
     selected: bool,
+    expected_revision: int | None = None,
 ) -> dict[str, Any]:
     result = _require_result(store, result_id)
     project = creative_store.get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Creative project not found")
+    if expected_revision is not None and project["revision"] != expected_revision:
+        raise HTTPException(status_code=409, detail="项目已改变，请重新读取后再关联结果图")
     generation = dict(project.get("generation", {}))
     raw_assets = generation.get("result_assets", [])
     assets = list(raw_assets) if isinstance(raw_assets, list) else []
@@ -239,7 +252,14 @@ def attach_comfy_result(
     elif selected:
         asset["dataset_selected"] = True
     generation["result_assets"] = assets
-    updated = creative_store.update_project(project_id, {"generation": generation})
+    try:
+        updated = creative_store.update_project(
+            project_id,
+            {"generation": generation},
+            expected_revision=int(project["revision"]),
+        )
+    except CreativeProjectConflictError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     disposition = "candidate" if selected else "reference"
     linked = store.update(
         result_id,

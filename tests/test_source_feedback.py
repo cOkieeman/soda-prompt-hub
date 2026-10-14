@@ -103,6 +103,8 @@ const $=key=>{
  });return elements.get(key);
 };
 const document={querySelectorAll:()=>[]};
+const window={};
+const formatNumber=value=>String(Number(value)||0);
 const escapeHtml=s=>String(s??'');
 const renderHomeSourceSetup=()=>{};
 const sourceSyncUi={busy:false,rebuilding:false,sources:[],jobs:[],job:null,epoch:0,loadSerial:0};

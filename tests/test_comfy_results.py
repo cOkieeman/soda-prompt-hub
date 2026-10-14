@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from io import BytesIO
 
 import pytest
@@ -9,7 +10,11 @@ from fastapi.testclient import TestClient
 from PIL import Image, PngImagePlugin
 
 from prompt_hub.api import create_app
-from prompt_hub.comfy_results import ComfyResultStore, inspect_comfy_image
+from prompt_hub.comfy_results import (
+    ComfyResultStore,
+    inspect_comfy_image,
+    parse_generation_metadata,
+)
 
 
 def _comfy_png(*, seed: int = 12345) -> bytes:
@@ -51,6 +56,111 @@ def _comfy_png(*, seed: int = 12345) -> bytes:
     output = BytesIO()
     Image.new("RGB", (96, 128), (70, 90, seed % 255)).save(output, "PNG", pnginfo=info)
     return output.getvalue()
+
+
+def test_metadata_numeric_overflow_is_unknown_and_integer_seed_stays_exact() -> None:
+    raw = '{"1":{"class_type":"KSampler","inputs":{"seed":9007199254740993,"cfg":1e999,"steps":8}}}'
+    metadata = parse_generation_metadata({"prompt": raw}, width=96, height=128)
+    assert metadata["seed"] == 9007199254740993
+    assert isinstance(metadata["seed"], int)
+    assert metadata["cfg"] is None
+    assert metadata["prompt"]["1"]["inputs"]["cfg"] is None
+    assert any("无效数值" in item for item in metadata["generation_evidence"]["warnings"])
+    json.dumps(metadata, allow_nan=False)
+
+
+def test_metadata_dict_normalization_does_not_mutate_input() -> None:
+    prompt = {"280": {"is_changed": float("nan"), "inputs": {"values": [float("inf"), 0.6]}}}
+    metadata = parse_generation_metadata({"prompt": prompt}, width=96, height=128)
+    assert metadata["prompt"]["280"] == {"is_changed": None, "inputs": {"values": [None, 0.6]}}
+    assert math.isnan(prompt["280"]["is_changed"])
+    assert math.isinf(prompt["280"]["inputs"]["values"][0])
+    json.dumps(metadata, allow_nan=False)
+
+
+def test_saved_resource_metadata_survives_image_import_without_workflow_candidates() -> None:
+    records = [
+        {
+            "kind": "lora",
+            "status": "resolved",
+            "name": "light_c1-st2000",
+            "hash": "B24C8D432F",
+            "weight": 0.3,
+        },
+        {
+            "kind": "lora",
+            "status": "resolved",
+            "name": "Ps_impasto_style_v1-000024",
+            "hash": "E22D6DA913",
+            "weight": 0.05,
+        },
+        {
+            "kind": "lora",
+            "status": "resolved",
+            "name": "harustyle_v1.6",
+            "hash": "CC13749B1B",
+            "weight": 0.15,
+        },
+        {
+            "kind": "lora",
+            "status": "resolved",
+            "name": "kieed_v1_epoch20",
+            "hash": "533DE01417",
+            "weight": 0.5,
+        },
+    ]
+    info = PngImagePlugin.PngInfo()
+    info.add_text("resources_json", json.dumps(records))
+    info.add_text("comment", "not a resource record")
+    output = BytesIO()
+    Image.new("RGB", (32, 48), "teal").save(output, "PNG", pnginfo=info)
+    metadata = inspect_comfy_image(output.getvalue(), filename="recorded-resources.png")["metadata"]
+    assert metadata["metadata_present"] is True
+    assert metadata["saved_resource_metadata"] == {"resources_json": records}
+    final = metadata["generation_evidence"]["final_generation"]
+    assert [row["name"] for row in final["loras"]] == [row["name"] for row in records]
+    assert final["lora_source"]["status"] == "recorded"
+    json.dumps(metadata, allow_nan=False)
+
+
+def test_saved_resource_fields_normalize_numbers_without_mutating_input() -> None:
+    records = [
+        {
+            "kind": "lora",
+            "status": "resolved",
+            "name": "known",
+            "hash": "AABBCCDDEE",
+            "weight": float("nan"),
+        }
+    ]
+    raw_info = {
+        "resources_json": records,
+        "lora_hashes": "",
+        "additional_hashes": "known:AABBCCDDEE",
+    }
+    metadata = parse_generation_metadata(raw_info, width=32, height=48)
+    assert metadata["saved_resource_metadata"]["resources_json"][0]["weight"] is None
+    assert metadata["saved_resource_metadata"]["lora_hashes"] == ""
+    assert metadata["saved_resource_metadata"]["additional_hashes"] == "known:AABBCCDDEE"
+    assert math.isnan(records[0]["weight"])
+    assert any("无效数值" in row for row in metadata["generation_evidence"]["warnings"])
+    json.dumps(metadata, allow_nan=False)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("Lora hashes", "first: AABBCCDDEE, second: 123456789A"),
+        ("lora_hashes", 'Lora hashes: "first: AABBCCDDEE, second: 123456789A"'),
+    ],
+)
+def test_named_png_lora_hash_fields_reach_recorded_evidence(key, value) -> None:
+    metadata = parse_generation_metadata({key: value}, width=32, height=48)
+    final = metadata["generation_evidence"]["final_generation"]
+    assert [row["name"] for row in final["loras"]] == ["first", "second"]
+    assert final["lora_source"]["status"] == "recorded"
+    assert all(row["strength_model"] is None for row in final["loras"])
+    assert metadata["saved_resource_metadata"] == {key: value}
 
 
 def test_comfy_png_metadata_and_store_deduplicate(settings) -> None:

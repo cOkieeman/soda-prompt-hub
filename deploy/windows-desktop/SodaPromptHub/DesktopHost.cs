@@ -731,16 +731,18 @@ internal sealed class DesktopHost : IDisposable
         }
     }
 
+    private static string BundledVersion => typeof(DesktopHost).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+
     private string ReadReleaseVersion()
     {
         try
         {
             using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(CoreRoot, "RELEASE.json")));
-            return document.RootElement.GetProperty("product_version").GetString() ?? "1.1.1";
+            return document.RootElement.GetProperty("product_version").GetString() ?? BundledVersion;
         }
         catch (Exception error) when (error is IOException or JsonException or KeyNotFoundException)
         {
-            return "1.1.1";
+            return BundledVersion;
         }
     }
 

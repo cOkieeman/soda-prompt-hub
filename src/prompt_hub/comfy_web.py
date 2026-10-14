@@ -1,68 +1,19 @@
-COMFY_STYLES = r"""
+from prompt_hub.web_resources import read_web_asset
+
+COMFY_STYLES = f"""
 <style>
-  .comfy-page { width: min(1480px, calc(100% - 36px)); margin: 18px auto 60px; }
-  .comfy-page .eyebrow, .comfy-page .section-label, .comfy-panel label { text-transform: none; }
-  .comfy-hero { display: grid; grid-template-columns: 1.15fr .85fr; min-height: 330px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
-  .comfy-hero-copy { position: relative; overflow: hidden; padding: 48px; border-right: 1px solid var(--line); background: linear-gradient(135deg, rgba(216,75,42,.08), transparent 55%); }
-  .comfy-hero-copy::after { content: var(--result-step-label); position: absolute; right: -8px; bottom: -20px; color: rgba(23,24,21,.06); font: 900 72px/1 monospace; transform: rotate(-5deg); }
-  .comfy-hero h1 { max-width: 720px; margin: 12px 0 16px; font: 900 clamp(46px, 7vw, 90px)/.83 Georgia, serif; letter-spacing: -.06em; }
-  .comfy-hero p { max-width: 720px; line-height: 1.7; }
-  .comfy-flow { display: flex; flex-direction: column; justify-content: center; padding: 38px; background: #d8d1bf; }
-  .comfy-flow ol { margin: 18px 0 0; padding: 0; list-style: none; counter-reset: flow; }
-  .comfy-flow li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 11px 0; border-top: 1px solid rgba(23,24,21,.18); font-weight: 750; }
-  .comfy-flow li::before { counter-increment: flow; content: "0" counter(flow); color: var(--signal); font: 900 10px monospace; }
-  .comfy-controls { display: grid; grid-template-columns: 1fr 1fr .8fr; gap: 12px; margin: 14px 0; }
-  .comfy-panel { border: 1px solid var(--line); background: var(--paper); padding: 20px; }
-  .comfy-panel h2 { margin: 0 0 14px; font: 900 16px Georgia, serif; }
-  .comfy-panel label { display: grid; gap: 7px; color: var(--muted); font: 800 9px/1.4 monospace; text-transform: uppercase; }
-  .comfy-panel input:not([type="checkbox"]):not([type="radio"]), .comfy-panel select { width: 100%; min-height: 42px; border: 1px solid var(--line); background: #fbf6ec; padding: 9px; color: var(--ink); }
-  .comfy-panel .comfy-check { display: flex; align-items: center; gap: 8px; margin-top: 9px; cursor: pointer; }
-  .comfy-check input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; flex: 0 0 16px; margin: 0; padding: 0; accent-color: var(--signal); }
-  .comfy-file { display: flex !important; align-items: center; justify-content: center; min-height: 42px; border: 1px dashed rgba(23,24,21,.42); background: #eee7da; cursor: pointer; color: var(--ink) !important; }
-  .comfy-button { min-height: 40px; border: 1px solid var(--ink); background: var(--ink); padding: 9px 13px; color: var(--paper); font: 900 9px monospace; cursor: pointer; }
-  .comfy-button.secondary { background: transparent; color: var(--ink); }
-  .comfy-button.signal { border-color: var(--signal); background: var(--signal); }
-  .comfy-button:disabled { opacity: .45; cursor: not-allowed; }
-  .comfy-status { min-height: 42px; margin: 0 0 14px; border-left: 5px solid var(--acid); background: #30351f; padding: 12px 15px; color: #f4eddf; font: 800 10px/1.6 monospace; }
-  .comfy-scan-status { margin-top: 12px; line-height: 1.6; font-size: 13px; overflow-wrap: anywhere; }
-  .comfy-scan-status progress { display: block; width: 100%; height: 14px; margin: 8px 0; accent-color: #586328; }
-  .comfy-scan-status [data-tone="error"] { color: #94321e; }
-  .comfy-scan-status small { display: block; color: var(--muted); }
-  .comfy-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 28px 0 12px; color: var(--paper); }
-  .comfy-head h2 { margin: 0; font: 900 30px Georgia, serif; }
-  .comfy-head .section-label, .comfy-head label { color: #b9ae9f; }
-  .comfy-head select { min-height: 36px; border: 1px solid rgba(244,237,223,.38); background: #f7f1e5; padding: 7px 9px; color: var(--ink); }
-  .comfy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .comfy-card { display: grid; grid-template-rows: 250px auto; min-width: 0; border: 1px solid var(--line); background: var(--paper); box-shadow: 6px 8px 0 rgba(23,24,21,.09); }
-  .comfy-card-image { position: relative; display: block; width: 100%; min-width: 0; overflow: hidden; border-bottom: 1px solid var(--line); background: #1e1f1c; }
-  .comfy-card-image img { display: block; width: 100%; max-width: 100%; min-width: 0; height: 100%; object-fit: contain; }
-  .comfy-disposition { position: absolute; top: 10px; left: 10px; border: 1px solid var(--ink); background: var(--acid); padding: 6px 8px; color: var(--ink); font: 900 8px monospace; }
-  .comfy-card-body { min-width: 0; padding: 16px; }
-  .comfy-card-title { display: flex; justify-content: space-between; gap: 12px; }
-  .comfy-card-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .comfy-card-title span { color: var(--muted); font: 800 8px monospace; white-space: nowrap; }
-  .comfy-meta-summary { margin: 12px 0; padding: 10px; border: 1px solid rgba(23,24,21,.15); background: #eee7da; font: 9px/1.6 monospace; }
-  .comfy-no-meta { border-color: var(--signal); color: #9d321e; }
-  .comfy-prompt { max-height: 72px; overflow: auto; margin: 7px 0; white-space: pre-wrap; word-break: break-word; }
-  .comfy-details summary { cursor: pointer; font: 900 9px monospace; }
-  .comfy-details pre { max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; padding: 10px; background: #20211e; color: #ece8dc; font: 8px/1.5 monospace; }
-  .comfy-origin { margin: 10px 0; padding: 9px 10px; border-left: 3px solid #7d8660; background: rgba(88,99,40,.08); color: #55564f; font: 9px/1.55 monospace; overflow-wrap: anywhere; }
-  .comfy-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
-  .comfy-empty { grid-column: 1 / -1; min-height: 260px; display: grid; place-items: center; border: 1px dashed rgba(23,24,21,.35); background: rgba(236,232,220,.65); text-align: center; }
-  @media (max-width: 1000px) { .comfy-controls, .comfy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .comfy-controls .comfy-panel:last-child { grid-column: 1 / -1; } }
-  @media (max-width: 760px) { .comfy-page { width: min(100% - 18px, 1480px); margin-top: 9px; } .comfy-hero, .comfy-controls, .comfy-grid { grid-template-columns: 1fr; } .comfy-hero-copy { padding: 30px 22px; border-right: 0; border-bottom: 1px solid var(--line); } .comfy-flow { padding: 24px 22px; } .comfy-controls .comfy-panel:last-child { grid-column: auto; } .comfy-card { grid-template-rows: 230px auto; } .comfy-actions { grid-template-columns: 1fr; } .comfy-head { display: block; } }
-</style>
+{read_web_asset("comfy.css")}</style>
 """
 
 COMFY_HTML = r"""
 <section class="comfy-page" id="comfyPage" hidden>
   <section class="comfy-hero">
-    <div class="comfy-hero-copy"><span class="eyebrow">从 <span data-remote-device-name>__PROMPT_HUB_DEVICE_NAME_HTML__</span> 导入资料库</span><h1>Windows<br>出图结果</h1><p>在这里导入 ComfyUI 生成的图片，并读取图片中实际保存的工作流和生成参数。没有参数的图片也能保存，但系统不会猜测或补写。</p></div>
+    <div class="comfy-hero-copy"><span class="eyebrow">从 <span data-remote-device-name>__PROMPT_HUB_DEVICE_NAME_HTML__</span> 导入资料库</span><h1>出图结果</h1><p>在这里导入 ComfyUI 生成的图片，并读取图片中实际保存的工作流和生成参数。没有参数的图片也能保存，但系统不会猜测或补写。</p></div>
     <aside class="comfy-flow"><span class="section-label">处理顺序</span><ol><li>选择一张图片，或扫描已经挂载的结果目录</li><li>核对模型、LoRA、提示词和生成参数</li><li>选择这张图属于哪个创作项目</li><li>决定作为参考、数据集候选、失败记录或下一版起点</li></ol></aside>
   </section>
   <section class="comfy-controls">
     <form class="comfy-panel" id="comfyFileForm"><h2>1. 导入一张图片</h2><label class="comfy-file" for="comfyFile">选择 PNG / JPEG / WebP<input id="comfyFile" type="file" accept="image/png,image/jpeg,image/webp" hidden></label><p id="comfyFileName">尚未选择图片</p><button class="comfy-button signal" type="submit">导入并读取生成参数</button></form>
-    <form class="comfy-panel" id="comfyDirectoryForm"><h2>或：扫描整个结果文件夹</h2><label>运行工作台的设备能访问的文件夹路径<input id="comfyDirectory" placeholder="例如 D:\ComfyUI\output，或 /Volumes/ComfyUI/output"></label><label class="comfy-check"><input id="comfyRememberDirectory" type="checkbox" checked><span>设为常用结果目录，下次自动填入</span></label><p>递归读取 PNG / JPEG / WebP，最多 2000 张。新目录会增补，不会覆盖旧记录；源文件始终保持不变。</p><button class="comfy-button" id="comfyScanStart" type="submit">扫描这个文件夹</button> <button class="comfy-button secondary" id="comfyScanCancel" type="button" hidden>取消扫描</button><div class="comfy-scan-status"><div id="comfyScanStatus" role="status" aria-live="polite">尚未开始扫描。</div><progress id="comfyScanProgress" aria-label="目录导入进度" hidden></progress><small id="comfyScanDetail">可切换页面；刷新后会恢复显示任务。取消会保留已导入图片。</small></div></form>
+    <form class="comfy-panel" id="comfyDirectoryForm"><h2>或：扫描整个结果文件夹</h2><label>运行工作台的设备能访问的文件夹路径<input id="comfyDirectory" placeholder="例如 __PROMPT_HUB_OUTPUT_PATH__"></label><label class="comfy-check"><input id="comfyRememberDirectory" type="checkbox" checked><span>设为常用结果目录，下次自动填入</span></label><p>递归读取 PNG / JPEG / WebP，最多 2000 张。新目录会增补，不会覆盖旧记录；源文件始终保持不变。</p><button class="comfy-button" id="comfyScanStart" type="submit">扫描这个文件夹</button> <button class="comfy-button secondary" id="comfyScanCancel" type="button" hidden>取消扫描</button><div class="comfy-scan-status"><div id="comfyScanStatus" role="status" aria-live="polite">尚未开始扫描。</div><progress id="comfyScanProgress" aria-label="目录导入进度" hidden></progress><small id="comfyScanDetail">可切换页面；刷新后会恢复显示任务。取消会保留已导入图片。</small></div></form>
     <div class="comfy-panel"><h2>2. 选择它属于哪个项目</h2><label>创作项目<select id="comfyProject"><option value="">请选择项目</option></select></label><p>除了“记录为失败测试”，其他处理方式都需要先选择项目。</p><button class="comfy-button secondary" id="comfyRefresh" type="button">刷新结果列表</button></div>
   </section>
   <div class="comfy-status" id="comfyStatus">先导入图片，或扫描 Windows 的结果文件夹。</div>
@@ -177,7 +128,7 @@ COMFY_SCRIPT = r"""
   async function act(resultId, action) { const projectId=$('#comfyProject').value; if(action==='remove') { if(!confirm('把这张图移出 Prompt Hub 结果库？\n\n源目录里的原图不会删除；Prompt Hub 管理副本会进入内部回收区。')) return; await api(`/api/comfy-results/${encodeURIComponent(resultId)}`,{method:'DELETE'}); status('已移出结果库；源图片未删除，管理副本已进入内部回收区。'); }
     else if(action!=='failed'&&!projectId) return status('请先在上方选择这张图所属的创作项目。'); else if(action==='failed') { await api(`/api/comfy-results/${encodeURIComponent(resultId)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({disposition:'failed_test'})}); status('已记录为失败测试；图片没有进入任何训练集。'); }
     else if(action==='branch') { const child=await api(`/api/comfy-results/${encodeURIComponent(resultId)}/branch/${encodeURIComponent(projectId)}`,{method:'POST'}); status(`已建立 ${child.title}；来源工作流和参数已经保存在版本记录中。`); }
-    else { const endpoint=action==='candidate'?'candidate':'attach'; await api(`/api/comfy-results/${encodeURIComponent(resultId)}/${endpoint}/${encodeURIComponent(projectId)}`,{method:'POST'}); status(action==='candidate'?'已关联并加入数据集候选；仍需在创作台确认图片说明。':'已关联项目；图片尚未进入数据集。'); }
+    else { const endpoint=action==='candidate'?'candidate':'attach'; await api(`/api/comfy-results/${encodeURIComponent(resultId)}/${endpoint}/${encodeURIComponent(projectId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expected_revision:state.projects.find(project=>project.project_id===projectId)?.revision})}); status(action==='candidate'?'已关联并加入数据集候选；仍需在创作台确认图片说明。':'已关联项目；图片尚未进入数据集。'); }
     await load(); }
   $('#comfyFile').addEventListener('change',event=>{ const file=event.target.files[0]; $('#comfyFileName').textContent=file?`${file.name} · ${(file.size/1024/1024).toFixed(2)} MiB`:'尚未选择图片'; });
   $('#comfyFileForm').addEventListener('submit',event=>importFile(event).catch(error=>status(error.message)));

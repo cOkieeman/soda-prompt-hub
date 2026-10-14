@@ -6,9 +6,9 @@ WebView2 bootstrapper 签名。
 
 ## 构建要求
 
-普通用户无需执行本节。当前下载按[Mac+Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914)
-与[Windows单机](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-windows-standalone-20260914)分组，
-每套附独立SHA256SUMS和手动验收说明。2026-09-14构建为1.1.1 Pre-release，不代表生命周期手验全通过。
+普通用户无需执行本节。[1.2.0 Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0)
+包含 Mac DMG、Windows 单机 Desktop 和独立 Worker，以及统一 `SHA256SUMS.txt`。
+该批安装包标为 Pre-release；当前运行验收不能替代 Setup 完整安装生命周期验证，见[发行验证](../../docs/acceptance/release-1.2.0-20261005.md)。
 
 - Windows 10/11 x64 构建机
 - PowerShell 5.1 或更高版本

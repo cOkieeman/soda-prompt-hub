@@ -3,7 +3,7 @@
 本文件是主任务书 §30 要求的 **Implementation Plan**，与 `docs/linux/COMPATIBILITY_AUDIT.md`（审计）配套。
 两者合起来构成第一阶段的分析交付物。
 
-基线：`upstream/main` = `e96249b`（1.1.1）。实测环境见 `docs/linux/DEV_ENVIRONMENT.md`。
+基线：`upstream/main` = `e96249b`（1.1.1）。当前分支已跟进到 `1.2.0`。实测环境见 `docs/linux/DEV_ENVIRONMENT.md`。
 
 ---
 

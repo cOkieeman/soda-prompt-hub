@@ -1,5 +1,7 @@
 # ruff: noqa: E501, RUF001
 
+from prompt_hub.web_resources import read_web_asset
+
 WORKSPACE_HTML = r"""
 <section class="dataset-page" id="workspacePage" hidden>
   <header class="dataset-heading">
@@ -215,250 +217,9 @@ WORKSPACE_HTML = r"""
 </section>
 """
 
-WORKSPACE_STYLES = r"""
+WORKSPACE_STYLES = f"""
 <style>
-  .dataset-page { margin-top: 18px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
-  #workspacePage .eyebrow, #workspacePage .section-label, #workspacePage label, #workspacePage .dataset-primary, #workspacePage .dataset-sidebar-head, #workspacePage .dataset-stat span, #workspacePage .dataset-curation-block > strong, #workspacePage .dataset-preflight strong, #workspacePage .dataset-delivery-action > strong { text-transform: none; }
-  .dataset-page[hidden] { display: none; }
-  .dataset-page [data-dataset-stage-panel][hidden] { display: none !important; }
-  .dataset-page [data-caption-profile][hidden] { display: none !important; }
-  .dataset-heading { display: flex; justify-content: space-between; align-items: end; gap: 28px; padding: 25px 28px; border-bottom: 1px solid var(--line); background: linear-gradient(110deg, #ece5d5 0 72%, var(--acid) 72%); }
-  .dataset-heading h1 { margin: 5px 0 0; font: 700 clamp(38px, 5vw, 68px)/.9 "Iowan Old Style", serif; letter-spacing: -.045em; }
-  .dataset-heading p { max-width: 520px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-  .dataset-heading-copy { display: grid; justify-items: end; gap: 12px; }
-  .dataset-mode-switch { display: inline-flex; padding: 3px; border: 1px solid var(--ink); background: rgba(244,237,223,.85); }
-  .dataset-mode-switch button { padding: 7px 10px; color: var(--muted); font: 800 8px/1 monospace; }
-  .dataset-mode-switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-  .dataset-layout { display: grid; grid-template-columns: 285px minmax(0, 1fr); min-height: 720px; }
-  .dataset-sidebar { padding: 20px; border-right: 1px solid var(--line); background: #ddd5c5; }
-  .dataset-continue { display: grid; gap: 8px; margin-bottom: 18px; padding: 14px; border: 1px solid var(--ink); background: var(--acid); box-shadow: 5px 5px 0 rgba(31,29,25,.16); }
-  .dataset-continue[hidden] { display: none; }
-  .dataset-continue > span { color: #55564f; font: 900 8px/1 monospace; letter-spacing: .08em; }
-  .dataset-continue > strong { overflow: hidden; font: 700 21px/1.1 "Iowan Old Style", serif; text-overflow: ellipsis; white-space: nowrap; }
-  .dataset-continue > p { margin: 0; color: #55564f; font: 9px/1.45 monospace; }
-  .dataset-continue .dataset-primary { background: var(--ink); border-color: var(--ink); color: var(--paper); text-align: center; }
-  .dataset-sidebar form { display: grid; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
-  .dataset-step-kicker { color: var(--signal); font: 900 9px/1 monospace; letter-spacing: .08em; }
-  .dataset-sidebar label, .dataset-toolbar label, .dataset-dialog-body label { display: grid; gap: 6px; color: var(--muted); font: 800 9px monospace; text-transform: uppercase; letter-spacing: .06em; }
-  .dataset-sidebar input, .dataset-toolbar select, .dataset-curation-block select, .dataset-curation-block input, .dataset-dialog-body select, .dataset-dialog-body textarea { width: 100%; border: 1px solid var(--line); background: #f7f1e5; color: var(--ink); padding: 9px; font: 11px/1.45 monospace; }
-  .dataset-primary { border: 1px solid var(--signal); background: var(--signal); color: white; padding: 10px 12px; text-align: left; font: 800 9px monospace; text-transform: uppercase; }
-  .dataset-hint { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
-  .dataset-pick-folder { width: 100%; border: 1px solid var(--ink); background: #f7f1e5; color: var(--ink); padding: 10px 12px; text-align: left; font: 800 9px/1 monospace; text-transform: uppercase; letter-spacing: .06em; }
-  .dataset-picked-path { display: block; min-height: 14px; overflow-wrap: anywhere; color: var(--signal); font: 8px/1.4 monospace; text-transform: none; letter-spacing: 0; }
-  .dataset-manual-path { color: var(--muted); font: 9px/1.45 monospace; text-transform: uppercase; }
-  .dataset-manual-path summary { cursor: pointer; color: var(--muted); font: 800 8px monospace; }
-  .dataset-manual-path input { margin-top: 7px; }
-  .dataset-zip-row .dataset-pick-folder, .dataset-zip-row .dataset-primary { width: auto; }
-  .dataset-import-progress { display: grid; gap: 7px; padding: 11px; border: 1px solid var(--ink); background: #171714; color: #f4eddf; }
-  .dataset-import-progress[hidden], .dataset-manifest-note[hidden] { display: none; }
-  .dataset-import-progress strong { font: 800 9px/1 monospace; }
-  .dataset-import-progress progress { width: 100%; accent-color: var(--acid); }
-  .dataset-import-progress span { font: 8px/1.5 monospace; }
-  .dataset-import-progress button { border: 1px solid rgba(244,237,223,.5); background: transparent; color: #f4eddf; padding: 7px 9px; font: 800 8px monospace; }
-  .dataset-manifest-note { display: grid; gap: 7px; padding: 11px; border-left: 4px solid var(--acid); background: #e4ddce; }
-  .dataset-manifest-note strong { font: 800 9px monospace; }
-  .dataset-manifest-note span { color: var(--muted); font: 9px/1.5 monospace; }
-  .dataset-manifest-note button { width: fit-content; border: 1px solid var(--ink); padding: 7px 9px; font: 800 8px monospace; }
-  .dataset-browse-dialog { width: min(760px, calc(100% - 28px)); max-height: calc(100vh - 28px); }
-  .dataset-browse-dialog[open] { display: block; }
-  .dataset-browse-body { overflow: auto; max-height: calc(100vh - 28px); padding: 26px; }
-  .dataset-browse-body h2 { margin: 5px 0 7px; font: 700 26px "Iowan Old Style", serif; }
-  .dataset-browse-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-  .dataset-browse-quick button { border: 1px solid var(--ink); padding: 7px 9px; background: transparent; color: var(--ink); font: 800 8px monospace; }
-  .dataset-browse-quick button:disabled { opacity: .35; }
-  .dataset-browse-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 13px; color: var(--muted); font: 8px monospace; }
-  .dataset-browse-crumbs button { border: 0; padding: 0; background: transparent; color: var(--signal); text-decoration: underline; font: 8px monospace; }
-  .dataset-browse-crumbs .current { color: var(--ink); font-weight: 800; }
-  .dataset-browse-rows { display: grid; gap: 6px; margin-top: 10px; }
-  .dataset-browse-row { display: grid; grid-template-columns: minmax(0,1fr) auto; border: 1px solid var(--line); background: #f7f1e5; }
-  .dataset-browse-nav { display: grid; gap: 3px; min-width: 0; padding: 9px 11px; border: 0; background: transparent; text-align: left; cursor: pointer; }
-  .dataset-browse-nav.static { cursor: default; }
-  .dataset-browse-nav strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-  .dataset-browse-nav span { color: var(--muted); font: 8px monospace; }
-  .dataset-browse-nav em { color: #8a3328; font: 8px/1.4 monospace; }
-  .dataset-browse-row.blocked { background: #e5ded2; }
-  .dataset-browse-row.blocked .dataset-browse-nav { color: #8f8e84; }
-  .dataset-browse-pick { border: 0; border-left: 1px solid var(--line); background: var(--acid); padding: 0 14px; font: 900 9px monospace; }
-  .dataset-browse-pick:disabled { background: transparent; color: #b9b3a6; }
-  .dataset-sidebar-head { display: flex; justify-content: space-between; margin: 18px 0 8px; font: 800 9px monospace; text-transform: uppercase; }
-  .dataset-workspace-list { min-width: 0; display: grid; gap: 7px; }
-  .dataset-workspace-item { width: 100%; min-width: 0; max-width: 100%; overflow: hidden; border: 1px solid rgba(31,29,25,.25); background: #eee7da; padding: 10px; text-align: left; }
-  .dataset-workspace-item.active { border-color: var(--signal); box-shadow: inset 4px 0 var(--acid); }
-  .dataset-workspace-item strong, .dataset-workspace-item span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dataset-workspace-item strong { font-size: 11px; }
-  .dataset-workspace-item span { margin-top: 5px; color: var(--muted); font: 8px monospace; }
-  .dataset-main { min-width: 0; padding: 24px; background-image: linear-gradient(rgba(31,29,25,.03) 1px, transparent 1px); background-size: 100% 36px; }
-  .dataset-empty { max-width: 520px; margin: 110px auto; text-align: center; }
-  .dataset-empty span { display: inline-grid; width: 54px; aspect-ratio: 1; place-items: center; border: 1px solid var(--ink); background: var(--acid); font: 900 12px monospace; }
-  .dataset-empty h2 { margin: 18px 0 7px; font: 700 34px "Iowan Old Style", serif; }
-  .dataset-empty p { color: var(--muted); font-size: 12px; }
-  .dataset-titlebar { display: flex; justify-content: space-between; gap: 18px; align-items: end; }
-  .dataset-titlebar h2 { margin: 4px 0; font: 700 32px "Iowan Old Style", serif; }
-  .dataset-titlebar p { max-width: 760px; margin: 0; overflow-wrap: anywhere; color: var(--muted); font: 9px monospace; }
-  .dataset-origin { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 8px; color: var(--muted); font: 8px/1.45 monospace; }
-  .dataset-origin button, .dataset-origin a { border: 1px solid var(--ink); padding: 5px 7px; color: var(--ink); text-decoration: none; font: 800 7px monospace; }
-  .dataset-origin .independent { border-left: 4px solid var(--acid); padding: 5px 8px; background: #e4ddce; }
-  .dataset-title-actions { display: flex; gap: 7px; }
-  .dataset-title-actions button, .dataset-bulkbar button { border: 1px solid var(--ink); padding: 8px 9px; font: 800 8px monospace; }
-  .dataset-title-actions .danger { color: var(--signal); border-color: var(--signal); }
-  .dataset-job-panel { margin-top: 14px; border: 1px solid var(--ink); background: #171714; color: #f4eddf; padding: 12px; }
-  .dataset-job-line { display: grid; grid-template-columns: 90px minmax(0,1fr) auto; gap: 10px; align-items: center; }
-  .dataset-job-line progress { width: 100%; accent-color: var(--acid); }
-  .dataset-job-line button { color: var(--acid); border-bottom: 1px solid currentColor; font: 800 8px monospace; }
-  .dataset-job-line span { font: 8px monospace; }
-  .dataset-job-message { margin: 7px 0 0; color: #bdb5a6; font: 9px monospace; }
-  .dataset-journey { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); margin-top: 18px; border: 1px solid var(--ink); background: var(--line); gap: 1px; }
-  .dataset-journey button { position: relative; display: grid; min-width: 0; gap: 6px; padding: 13px 11px; background: #e9e2d4; text-align: left; }
-  .dataset-journey button::after { content: ""; position: absolute; inset: auto 0 0; height: 4px; background: transparent; }
-  .dataset-journey button span { color: var(--signal); font: 900 9px/1 monospace; }
-  .dataset-journey button strong { font: 800 10px/1.2 monospace; }
-  .dataset-journey button small { overflow: hidden; color: var(--muted); font: 8px/1.35 monospace; text-overflow: ellipsis; white-space: nowrap; }
-  .dataset-journey button.complete::after { background: #52735d; }
-  .dataset-journey button.current { background: var(--ink); color: var(--paper); }
-  .dataset-journey button.current span { color: var(--acid); }
-  .dataset-journey button.current::after { background: var(--acid); }
-  .dataset-journey button.current small { color: #c6c0b4; }
-  .dataset-journey button.blocked::after { background: var(--signal); }
-  .dataset-readiness { display: grid; grid-template-columns: minmax(0,1fr) minmax(210px,.36fr); gap: 20px; padding: 18px; border: 1px solid var(--ink); border-top: 0; background: #f3ecde; }
-  .dataset-readiness-copy h3, .dataset-stage-heading h3, .dataset-delivery-panel h3 { margin: 5px 0 7px; font: 700 26px/1.05 "Iowan Old Style", serif; }
-  .dataset-readiness-copy p, .dataset-stage-heading p, .dataset-delivery-panel p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
-  .dataset-readiness-copy ul { display: grid; gap: 5px; margin: 11px 0 0; padding: 0; list-style: none; }
-  .dataset-readiness-copy li { padding-left: 14px; color: #6e392d; font: 9px/1.45 monospace; }
-  .dataset-readiness-copy li::before { content: "→"; margin-left: -14px; margin-right: 6px; color: var(--signal); }
-  .dataset-readiness-action { display: grid; align-content: start; gap: 9px; }
-  .dataset-readiness-action label { display: grid; gap: 5px; color: var(--muted); font: 800 8px/1.3 monospace; }
-  .dataset-readiness-action select { width: 100%; border: 1px solid var(--line); background: white; padding: 9px; color: var(--ink); font: 10px monospace; }
-  .dataset-readiness-action small { color: var(--muted); font: 8px/1.45 monospace; }
-  .dataset-stats { display: grid; grid-template-columns: repeat(8, minmax(0,1fr)); gap: 1px; margin-top: 15px; border: 1px solid var(--line); background: var(--line); }
-  .dataset-stat { min-width: 0; background: #eee7da; padding: 11px; }
-  .dataset-stat strong, .dataset-stat span { display: block; }
-  .dataset-stat strong { font: 800 18px monospace; }
-  .dataset-stat span { margin-top: 3px; color: var(--muted); font: 8px monospace; text-transform: uppercase; }
-  .dataset-toolbar { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 8px; margin-top: 14px; padding: 12px; border: 1px solid var(--line); background: #e1d9ca; }
-  .dataset-bulkbar { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; }
-  .dataset-bulkbar label, .dataset-bulkbar span { margin-right: 6px; color: var(--muted); font: 9px monospace; }
-  .dataset-trigger-input { width: 180px; border: 1px solid var(--ink); padding: 7px 8px; font: 9px monospace; background: var(--paper); color: var(--ink); }
-  .dataset-results-head { display: flex; justify-content: space-between; margin-top: 15px; font: 9px monospace; }
-  .dataset-assets-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--ink); background: #eee7da; }
-  .dataset-stage-heading { display: flex; justify-content: space-between; gap: 20px; align-items: end; }
-  .dataset-stage-heading p { max-width: 520px; }
-  .dataset-write-note { margin: 8px 0 0; color: var(--muted); font: 8px/1.45 monospace; }
-  .dataset-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px; }
-  .dataset-pagination button { border: 1px solid var(--ink); padding: 7px 10px; font: 800 8px monospace; }
-  .dataset-pagination button:disabled { opacity: .35; }
-  .dataset-pagination span { min-width: 96px; text-align: center; color: var(--muted); font: 9px monospace; }
-  .dataset-curation-panel { margin-top: 14px; border: 1px solid var(--ink); background: #eee7da; }
-  .dataset-curation-head { display: flex; justify-content: space-between; gap: 20px; padding: 14px; border-bottom: 1px solid var(--line); }
-  .dataset-curation-head h3 { margin: 3px 0 0; font: 700 24px "Iowan Old Style", serif; }
-  .dataset-curation-head p { max-width: 520px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
-  .dataset-curation-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .dataset-curation-block { min-width: 0; padding: 13px; border-right: 1px solid var(--line); }
-  .dataset-curation-block:last-child { border-right: 0; }
-  .dataset-curation-block > strong { display: block; margin-bottom: 10px; font: 800 9px monospace; text-transform: uppercase; }
-  .dataset-curation-block label { display: grid; gap: 4px; margin-top: 7px; color: var(--muted); font: 8px monospace; text-transform: uppercase; }
-  .dataset-curation-block input, .dataset-curation-block select, .dataset-snapshot-row select { width: 100%; border: 1px solid var(--line); background: #f8f2e7; padding: 7px; font: 10px monospace; }
-  .dataset-thresholds { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-  #datasetWd14Thresholds { grid-template-columns: minmax(0,1fr); }
-  .dataset-action-row, .dataset-snapshot-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-  .dataset-action-row button, .dataset-snapshot-row button { border: 1px solid var(--ink); padding: 7px; font: 800 7px monospace; }
-  .dataset-action-row button:disabled { opacity: .35; }
-  .dataset-inline-check { display: flex !important; align-items: center; grid-template-columns: auto 1fr; }
-  .dataset-caption-rules { border-right: 0; border-bottom: 1px solid var(--line); }
-  .dataset-caption-rules .dataset-thresholds { grid-template-columns: repeat(3, 1fr); }
-  .dataset-caption-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 14px; padding-top: 8px; }
-  .dataset-caption-rules .dataset-inline-check { gap: 9px; cursor: pointer; }
-  .dataset-caption-rules input[type="checkbox"] {
-    appearance: none; -webkit-appearance: none; margin: 0;
-    width: 34px !important; height: 19px; flex: 0 0 34px;
-    border: 1px solid var(--line); border-radius: 999px;
-    background: var(--paper-deep); position: relative; cursor: pointer;
-    transition: background .15s ease, border-color .15s ease;
-  }
-  .dataset-caption-rules input[type="checkbox"]::after {
-    content: ""; position: absolute; top: 2px; left: 2px;
-    width: 13px; height: 13px; border-radius: 50%; background: #fff;
-    box-shadow: 0 1px 2px rgba(23, 24, 21, .3);
-    transition: transform .15s ease;
-  }
-  .dataset-caption-rules input[type="checkbox"]:checked { background: var(--signal); border-color: var(--signal); }
-  .dataset-caption-rules input[type="checkbox"]:checked::after { transform: translateX(15px); }
-  .dataset-caption-rules input[type="checkbox"]:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-  .dataset-source-gone { color: var(--signal); font-weight: 600; }
-  .dataset-caption-presets { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding-top: 10px; border-top: 1px solid var(--line); margin-top: 10px; }
-  .dataset-caption-presets .dataset-action-row, .dataset-caption-presets .dataset-hint { grid-column: 1 / -1; }
-  #datasetDetailKrea2Locale { min-height: 68px; }
-  .dataset-inline-check input { width: auto; }
-  .dataset-analytics { min-height: 44px; color: var(--muted); font: 8px/1.5 monospace; }
-  .dataset-analytics-tags, .dataset-tag-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
-  .dataset-analytics-tags span, .dataset-analytics-tags button, .dataset-tag-chips button { border: 1px solid rgba(31,29,25,.28); padding: 4px 5px; background: transparent; font: 7px monospace; }
-  .dataset-analytics-tags button { cursor: pointer; }
-  .dataset-tag-chips button.selected { background: var(--acid); border-color: var(--ink); }
-  .dataset-caption-profile { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; color: var(--muted); font: 8px monospace; }
-  .dataset-vlm-warning { border-left: 4px solid var(--signal); padding: 7px 9px; background: #e7d5c7; color: #8a3328 !important; }
-  .dataset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 9px; margin-top: 8px; }
-  .dataset-card { position: relative; min-width: 0; border: 1px solid var(--line); background: #f4eddf; }
-  .dataset-card.selected { border-color: var(--signal); box-shadow: inset 0 4px var(--acid); }
-  .dataset-card.invalid { background: #dfd2c7; }
-  .dataset-card-preview { width: 100%; aspect-ratio: 1; border: 0; background: #d7d0c3; padding: 0; }
-  .dataset-card-preview img { width: 100%; height: 100%; object-fit: cover; }
-  .dataset-card-placeholder { display: grid; width: 100%; height: 100%; place-items: center; color: #8a3328; font: 800 10px monospace; }
-  .dataset-card-select { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; accent-color: var(--signal); }
-  .dataset-card-body { padding: 9px; }
-  .dataset-card-body strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-  .dataset-card-meta, .dataset-card-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-  .dataset-card-meta span, .dataset-card-flags span { border: 1px solid rgba(31,29,25,.22); padding: 3px 4px; color: var(--muted); font: 7px monospace; }
-  .dataset-card-flags .alert { color: #9a3023; border-color: rgba(154,48,35,.35); }
-  .dataset-card-flags .ok { color: #325f49; }
-  .dataset-dialog { width: min(1080px, calc(100% - 28px)); max-height: calc(100vh - 28px); border: 1px solid var(--ink); background: #ece6d8; padding: 0; color: var(--ink); }
-  .dataset-dialog::backdrop { background: rgba(16,17,14,.82); backdrop-filter: blur(3px); }
-  .dataset-dialog[open] { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(310px, .65fr); }
-  .dataset-dialog-close { position: absolute; z-index: 3; top: 8px; right: 10px; width: 34px; height: 34px; background: var(--signal); color: white; font-size: 20px; }
-  .dataset-dialog-image { position: relative; display: grid; place-items: center; min-height: 560px; background: #191a17; }
-  .dataset-dialog-image img { max-width: 100%; max-height: calc(100vh - 30px); object-fit: contain; }
-  .dataset-dialog-image button { position: absolute; top: 50%; width: 38px; height: 46px; background: rgba(236,232,220,.85); font-size: 18px; }
-  #datasetPrevious { left: 10px; } #datasetNext { right: 10px; }
-  .dataset-dialog-body { overflow: auto; padding: 28px; }
-  .dataset-dialog-body h2 { margin: 6px 0; overflow-wrap: anywhere; font: 700 28px "Iowan Old Style", serif; }
-  .dataset-dialog-body > p { color: var(--muted); font: 9px/1.5 monospace; }
-  .dataset-dialog-body label { margin-top: 14px; }
-  .dataset-dialog-body textarea { min-height: 95px; resize: vertical; text-transform: none; }
-  .dataset-dialog-body details { margin-top: 15px; color: var(--muted); font: 9px monospace; }
-  .dataset-similar-panel { display: grid; gap: 7px; margin-top: 14px; border-left: 4px solid var(--acid); background: #e2dccd; padding: 10px; }
-  .dataset-similar-panel button { width: fit-content; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); padding: 8px 10px; font: 800 8px monospace; }
-  .dataset-similar-panel button:disabled { opacity: .45; }
-  .dataset-similar-panel span { color: var(--muted); font: 8px/1.5 monospace; }
-  .dataset-dialog-body pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-  .dataset-delivery-panel { margin-top: 14px; padding: 20px; border: 1px solid var(--ink); background: #eee7da; }
-  .dataset-delivery-head { max-width: 760px; }
-  .dataset-delivery-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(280px,.72fr); gap: 12px; margin-top: 16px; }
-  .dataset-preflight { display: grid; align-content: start; gap: 9px; padding: 14px; border: 1px solid var(--ink); background: #f7f1e5; }
-  .dataset-preflight > div { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-  .dataset-preflight strong, .dataset-delivery-action > strong { font: 800 9px monospace; text-transform: uppercase; }
-  .dataset-preflight span { border: 1px solid var(--line); padding: 4px 6px; color: var(--muted); font: 800 7px monospace; }
-  .dataset-preflight.ready span { border-color: #52735d; color: #325f49; background: #dfe7d8; }
-  .dataset-preflight.blocked span { border-color: var(--signal); color: #8a3328; background: #ead8cd; }
-  .dataset-preflight ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
-  .dataset-preflight li { border-left: 3px solid var(--signal); padding: 5px 8px; background: #e8ded0; font: 8px/1.45 monospace; }
-  .dataset-preflight li.warning { border-color: #9a7b30; }
-  .dataset-preflight button { width: fit-content; border: 1px solid var(--ink); padding: 7px 9px; font: 800 8px monospace; }
-  .dataset-delivery-action { display: grid; align-content: start; gap: 9px; padding: 14px; border: 1px solid var(--ink); background: rgba(247,241,229,.9); }
-  .dataset-delivery-action .dataset-primary { text-align: center; }
-  .dataset-delivery-history { margin-top: 14px; border-top: 1px solid var(--ink); padding-top: 14px; }
-  .dataset-delivery-history-head { display: flex; justify-content: space-between; gap: 20px; align-items: end; }
-  .dataset-delivery-history-head h4 { margin: 3px 0 0; font: 700 22px "Iowan Old Style", serif; }
-  .dataset-delivery-history-head p { max-width: 520px; margin: 0; color: var(--muted); font: 9px/1.5 monospace; }
-  .dataset-delivery-list { display: grid; gap: 8px; margin-top: 10px; }
-  .dataset-delivery-card { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 12px; border: 1px solid var(--line); background: #f7f1e5; }
-  .dataset-delivery-card h5 { margin: 0 0 6px; overflow-wrap: anywhere; font: 800 10px monospace; }
-  .dataset-delivery-meta, .dataset-delivery-copy { color: var(--muted); font: 8px/1.55 monospace; }
-  .dataset-delivery-actions { display: flex; flex-wrap: wrap; align-content: start; justify-content: end; gap: 6px; }
-  .dataset-delivery-actions a, .dataset-delivery-actions button { border: 1px solid var(--ink); padding: 7px 8px; background: transparent; color: var(--ink); font: 800 7px monospace; text-decoration: none; }
-  .dataset-delivery-actions button.primary { background: var(--ink); color: var(--paper); }
-  .dataset-page[data-dataset-mode="simple"] .dataset-advanced-only { display: none !important; }
-  @media (max-width: 1050px) { .dataset-stats { grid-template-columns: repeat(4,1fr); } .dataset-journey button small { display: none; } }
-  @media (max-width: 900px) { .dataset-layout { grid-template-columns: 230px minmax(0,1fr); } .dataset-toolbar { grid-template-columns: repeat(2,1fr); } .dataset-curation-grid, .dataset-delivery-grid { grid-template-columns: 1fr; } .dataset-curation-block { border-right: 0; border-bottom: 1px solid var(--line); } .dataset-readiness { grid-template-columns: 1fr; background: #eee7da; } }
-  @media (max-width: 620px) { .dataset-heading { display: block; background: #ece5d5; } .dataset-heading-copy { justify-items: start; margin-top: 12px; } .dataset-layout { display: block; } .dataset-sidebar { border-right: 0; border-bottom: 1px solid var(--line); } .dataset-titlebar, .dataset-curation-head, .dataset-stage-heading, .dataset-delivery-history-head { display: block; } .dataset-title-actions, .dataset-curation-head p, .dataset-stage-heading p, .dataset-delivery-history-head p { margin-top: 12px; } .dataset-journey { grid-template-columns: 1fr; } .dataset-journey button { grid-template-columns: 32px 1fr; align-items: center; } .dataset-journey button small { display: block; grid-column: 2; } .dataset-stats, .dataset-toolbar { grid-template-columns: repeat(2,1fr); } .dataset-grid { grid-template-columns: 1fr; } .dataset-delivery-card { grid-template-columns: 1fr; } .dataset-delivery-actions { justify-content: start; } .dataset-dialog[open] { display: block; overflow: auto; } .dataset-dialog-image { min-height: 360px; } }
-</style>
+{read_web_asset("workspace.css")}</style>
 """
 
 WORKSPACE_SCRIPT = r"""
@@ -498,7 +259,8 @@ WORKSPACE_SCRIPT = r"""
   function renderGrid(resetPage=false) { const {exact, near}=duplicateSets(), pageSize=workspacePageSize(); state.visible=filteredImages(); const pageCount=Math.max(1,Math.ceil(state.visible.length/pageSize)); if (resetPage) state.page=1; state.page=Math.min(Math.max(state.page,1),pageCount); const start=(state.page-1)*pageSize; state.pageItems=state.visible.slice(start,start+pageSize); $('#datasetResultCount').textContent=`${formatNumber(state.visible.length)} 张`; $('#datasetSelectionCount').textContent=`已选 ${formatNumber(state.selected.size)} 张`; $('#datasetSelectVisible').checked=state.visible.length>0 && state.visible.every(item => state.selected.has(item.relative_path)); $('#datasetPagination').hidden=state.visible.length<=pageSize; $('#datasetPageStatus').textContent=`第 ${formatNumber(state.page)} / ${formatNumber(pageCount)} 页 · 每页最多 ${formatNumber(pageSize)} 张`; $('#datasetPreviousPage').disabled=state.page<=1; $('#datasetNextPage').disabled=state.page>=pageCount; $('#datasetGrid').innerHTML=state.pageItems.length ? state.pageItems.map((item,index) => { const status=item.review?.status || 'pending', wd14=item.curation?.wd14 || {}, tagStatus=wd14.status || 'untagged', vlmStatus=item.curation?.krea2_vlm?.status || 'empty', profile=$('#datasetDeliveryProfile').value, profileCaption=item.curation?.captions?.[profile] || {}; const flags=[item.caption_status==='missing'?'<span class="alert">缺少原说明</span>':'<span class="ok">已有原说明</span>', String(profileCaption.current || '').trim()?(profileCaption.status==='reviewed'?`<span class="ok">${profile==='anima'?'Anima':'Krea 2'} 已确认</span>`:`<span>${profile==='anima'?'Anima':'Krea 2'} 草稿</span>`):`<span class="alert">缺 ${profile==='anima'?'Anima':'Krea 2'}</span>`, tagStatus==='completed'?`<span class="ok">${escapeHtml(taggerRecordLabel(wd14,true))}</span>`:tagStatus==='failed'?`<span class="alert">${escapeHtml(taggerRecordLabel(wd14,false))}</span>`:'', ['completed','confirmed'].includes(vlmStatus)?'<span class="ok">Krea 草稿</span>':vlmStatus==='failed'?'<span class="alert">Krea 草稿失败</span>':'', !item.valid?'<span class="alert">坏图</span>':'', exact.has(item.relative_path)?'<span class="alert">完全重复</span>':'', near.has(item.relative_path)?'<span>近似重复</span>':'', `<span>${labels[status]}</span>`].join(''); return `<article class="dataset-card ${state.selected.has(item.relative_path)?'selected':''} ${item.valid?'':'invalid'}" data-dataset-index="${index}"><input class="dataset-card-select" type="checkbox" ${state.selected.has(item.relative_path)?'checked':''} aria-label="选择 ${escapeHtml(item.filename)}"><button class="dataset-card-preview" ${item.valid?'':'disabled'}>${item.thumbnail_url?`<img src="${escapeHtml(item.thumbnail_url)}" loading="lazy" alt="${escapeHtml(item.filename)}">`:'<span class="dataset-card-placeholder">无法预览</span>'}</button><div class="dataset-card-body"><strong>${escapeHtml(item.filename)}</strong><div class="dataset-card-meta"><span>${item.width}×${item.height}</span><span>${escapeHtml(item.format || '未知')}</span><span>${(item.bytes/1024).toFixed(0)} KiB</span></div><div class="dataset-card-flags">${flags}</div></div></article>`; }).join('') : '<div class="dataset-empty"><h2>当前筛选没有图片</h2><p>调整上方条件即可恢复显示。</p></div>'; renderStats(); renderJourney(); }
   function configureFormats() { const selected=$('#datasetFormatFilter').value; const formats=[...new Set((state.report?.images || []).map(item=>item.format).filter(Boolean))].sort(); $('#datasetFormatFilter').innerHTML='<option value="all">全部格式</option>'+formats.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join(''); if (formats.includes(selected)) $('#datasetFormatFilter').value=selected; }
   async function loadModels() { const selects=[$('#datasetKrea2Model'),$('#datasetTaggerModel')], previous=selects.map(select=>select.value); try { const result=await api('/api/models'); state.models=(result.models || []).filter(item=>item.vision); const preferred=state.models.find(item=>item.loaded && /qwen.*3\.5.*9b/i.test(item.id)) || state.models.find(item=>item.loaded) || state.models.find(item=>/qwen.*3\.5.*9b/i.test(item.id)) || state.models[0]; selects.forEach((select,index)=>{ select.innerHTML=state.models.length?state.models.map(item=>`<option value="${escapeHtml(item.id)}" data-source="${escapeHtml(item.source || 'local')}">${escapeHtml(item.name || item.id)}${item.loaded?' · 已加载':''}</option>`).join(''):'<option value="">没有可用视觉模型</option>'; if (state.models.some(item=>item.id===previous[index])) select.value=previous[index]; else if (preferred) select.value=preferred.id; select.disabled=!state.models.length; }); updateDatasetTaggerMode(); } catch(error) { state.models=[]; selects.forEach(select=>{ select.innerHTML='<option value="">视觉模型当前不可连接</option>'; select.disabled=true; }); $('#datasetKrea2QueueHint').textContent=`视觉草稿暂不可用：${error.message}`; updateDatasetTaggerMode(); } }
-  async function loadReport() { if (!state.active) return; state.report=await api(`/api/dataset-workspaces/${encodeURIComponent(state.active.workspace_id)}/report`); state.selected=new Set((state.report.images || []).filter(item=>item.review?.selected).map(item=>item.relative_path)); state.preflight=null; syncDatasetTaggerSelection(); configureFormats(); renderGrid(); $('#datasetScanTime').textContent=`扫描于 ${(state.report.scanned_at || '').slice(0,16).replace('T',' ')}`; await Promise.all([loadAnalytics(),loadSnapshots(),loadExports()]); renderJourney(); }
+  let reportRun=0, workspaceInit=null, workspaceInitialized=false;
+  async function loadReport() { if (!state.active) return; const workspaceId=state.active.workspace_id,run=++reportRun,report=await api(`/api/dataset-workspaces/${encodeURIComponent(workspaceId)}/report`); if(run!==reportRun||state.active?.workspace_id!==workspaceId) return; state.report=report; state.selected=new Set((state.report.images || []).filter(item=>item.review?.selected).map(item=>item.relative_path)); state.preflight=null; syncDatasetTaggerSelection(); configureFormats(); renderGrid(); $('#datasetScanTime').textContent=`扫描于 ${(state.report.scanned_at || '').slice(0,16).replace('T',' ')}`; await Promise.all([loadAnalytics(),loadSnapshots(),loadExports()]); renderJourney(); }
   async function selectWorkspace(id) { state.page=1; state.step=0; state.exports=[]; state.preflight=null; state.active=state.workspaces.find(item=>item.workspace_id===id) || null; renderWorkspaces(); $('#datasetEmpty').hidden=Boolean(state.active); $('#datasetDesk').hidden=!state.active; if (!state.active) { state.report=null; return; } $('#datasetActiveName').textContent=state.active.name; $('#datasetActivePath').textContent=state.active.source_path+(state.active.source_available===false?'（来源目录已经不在。请重新导入，或把目录放回原处）':''); $('#datasetActivePath').classList.toggle('dataset-source-gone',state.active.source_available===false); renderDatasetOrigin(); if (state.active.current_report) await loadReport(); else { state.report=null; renderGrid(); } await refreshJobs(); }
   async function loadWorkspaces(preferred='') { state.workspaces=await api('/api/dataset-workspaces'); renderWorkspaces(); const id=preferred || state.active?.workspace_id || state.workspaces[0]?.workspace_id; if (id) await selectWorkspace(id); }
   function countLabel(entry) { const text=`${formatNumber(entry.image_count)} 张图片`; return entry.image_count_capped?`500+ 张图片`:text; }
@@ -524,9 +286,9 @@ WORKSPACE_SCRIPT = r"""
   async function queueKrea2VLM(scope) { if (!state.active) return; const model=$('#datasetKrea2Model').value, paths=scope==='selected'?selectedPaths():[]; if (!model) return alert('请先在 LM Studio 中准备并加载一个视觉模型。'); if (scope==='selected' && !paths.length) return alert('请先选择要生成草稿的图片。'); const result=await api(`/api/dataset-workspaces/${state.active.workspace_id}/krea2-vlm`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope,paths,model,...captionSettings()})}); renderJob(result.job); $('#datasetKrea2QueueHint').textContent='队列已开始。模型结果只会进入待确认草稿。'; startPolling(); }
   async function loadTagCatalog() { const payload=await api('/api/tags/catalog?language=zh'); $('#datasetTagSuggestions').innerHTML=(payload.items||[]).map(item=>`<option value="${escapeHtml(item.zh || item.en)}">${escapeHtml(item.en)}</option>`).join(''); }
   function appendBulkTag(tag) { const input=$('#datasetBulkAdd'), values=input.value.split(',').map(value=>value.trim()).filter(Boolean); if (!values.some(value=>value.toLowerCase()===tag.toLowerCase())) values.push(tag); input.value=values.join(', '); state.bulkPreview=null; $('#datasetBulkApply').disabled=true; $('#datasetBulkResult').textContent=`已选择 ${window.displayCanonicalTag?.(tag)||tag}；请先预览修改。`; }
-  async function loadAnalytics() { if (!state.active) return; state.analytics=await api(`/api/dataset-workspaces/${state.active.workspace_id}/analytics`); const top=(state.analytics.frequencies || []).slice(0,18); await window.ensureTagLabels?.(top.map(item=>item.tag)); const chips=top.map(item=>`<button type="button" data-bulk-tag="${escapeHtml(item.tag)}" title="加入批量添加">${escapeHtml(window.displayCanonicalTag?.(item.tag) || item.tag)} · ${item.count}</button>`).join(''); $('#datasetAnalytics').innerHTML=`<strong>${formatNumber(state.analytics.captioned_images)} 张有 Anima 标签 · ${formatNumber(state.analytics.unique_tags)} 个标签 · ${formatNumber((state.analytics.conflicts||[]).length)} 个冲突提示</strong><div class="dataset-analytics-tags">${chips || '<span>暂无标签</span>'}</div>`; }
-  async function loadSnapshots() { if (!state.active) return; const snapshots=await api(`/api/dataset-workspaces/${state.active.workspace_id}/snapshots`), selected=$('#datasetSnapshot').value; $('#datasetSnapshot').innerHTML='<option value="">选择修改记录</option>'+snapshots.map(item=>`<option value="${escapeHtml(item.snapshot_id)}">${escapeHtml(item.profile_id.toUpperCase())} · ${escapeHtml(item.operation)} · ${item.changed} 张 · ${escapeHtml(item.created_at.slice(0,16).replace('T',' '))}</option>`).join(''); if (snapshots.some(item=>item.snapshot_id===selected)) $('#datasetSnapshot').value=selected; }
-  async function loadExports() { if(!state.active) return; state.exports=await api(`/api/dataset-workspaces/${state.active.workspace_id}/exports`); renderExports(); }
+  async function loadAnalytics() { if (!state.active) return; const workspaceId=state.active.workspace_id,analytics=await api(`/api/dataset-workspaces/${workspaceId}/analytics`); if(state.active?.workspace_id!==workspaceId) return; state.analytics=analytics; const top=(state.analytics.frequencies || []).slice(0,18); await window.ensureTagLabels?.(top.map(item=>item.tag)); if(state.active?.workspace_id!==workspaceId||state.analytics!==analytics) return; const chips=top.map(item=>`<button type="button" data-bulk-tag="${escapeHtml(item.tag)}" title="加入批量添加">${escapeHtml(window.displayCanonicalTag?.(item.tag) || item.tag)} · ${item.count}</button>`).join(''); $('#datasetAnalytics').innerHTML=`<strong>${formatNumber(state.analytics.captioned_images)} 张有 Anima 标签 · ${formatNumber(state.analytics.unique_tags)} 个标签 · ${formatNumber((state.analytics.conflicts||[]).length)} 个冲突提示</strong><div class="dataset-analytics-tags">${chips || '<span>暂无标签</span>'}</div>`; }
+  async function loadSnapshots() { if (!state.active) return; const workspaceId=state.active.workspace_id,snapshots=await api(`/api/dataset-workspaces/${workspaceId}/snapshots`); if(state.active?.workspace_id!==workspaceId) return; const selected=$('#datasetSnapshot').value; $('#datasetSnapshot').innerHTML='<option value="">选择修改记录</option>'+snapshots.map(item=>`<option value="${escapeHtml(item.snapshot_id)}">${escapeHtml(item.profile_id.toUpperCase())} · ${escapeHtml(item.operation)} · ${item.changed} 张 · ${escapeHtml(item.created_at.slice(0,16).replace('T',' '))}</option>`).join(''); if (snapshots.some(item=>item.snapshot_id===selected)) $('#datasetSnapshot').value=selected; }
+  async function loadExports() { if(!state.active) return; const workspaceId=state.active.workspace_id,exports=await api(`/api/dataset-workspaces/${workspaceId}/exports`); if(state.active?.workspace_id!==workspaceId) return; state.exports=exports; renderExports(); }
   function sourceCaptionPayload(scope) { return {profile_id:$('#datasetSourceCaptionProfile').value,paths:scope==='selected'?selectedPaths():[],overwrite_existing:$('#datasetSourceCaptionOverwrite').checked,caption_status:$('#datasetSourceCaptionStatus').value}; }
   async function previewSourceCaptions(scope) { if(!state.active) return; if(scope==='selected'&&!state.selected.size) return alert('请先选择要接续原说明文字的图片。'); const payload=sourceCaptionPayload(scope), result=await api(`/api/dataset-workspaces/${state.active.workspace_id}/source-captions/preview`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); state.sourceCaptionPreview={payload,result}; const invalid=result.invalid?.length||0; $('#datasetSourceCaptionResult').textContent=`检查 ${result.inspected} 张：可接续 ${result.changed} 张，已有内容跳过 ${result.skipped_existing} 张，空白跳过 ${result.skipped_empty} 张，不符合英文要求 ${invalid} 张。`; $('#datasetSourceCaptionApply').disabled=!result.changed; }
   async function applySourceCaptions() { const preview=state.sourceCaptionPreview; if(!preview?.result?.changed) return; const profile=preview.payload.profile_id.toUpperCase(), status=preview.payload.caption_status==='reviewed'?'已人工审核':'待审核'; if(!confirm(`确认把 ${preview.result.changed} 份原说明文字接入 ${profile}，状态设为“${status}”？\n系统只创建一条批量修改记录，不会改写原 .txt。`)) return; const result=await api(`/api/dataset-workspaces/${state.active.workspace_id}/source-captions/apply`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(preview.payload)}); $('#datasetSourceCaptionResult').textContent=`已接续 ${result.changed} 张到 ${profile}；修改记录 ${result.snapshot}。`; state.sourceCaptionPreview=null; $('#datasetSourceCaptionApply').disabled=true; await loadReport(); }
@@ -539,7 +301,8 @@ WORKSPACE_SCRIPT = r"""
   async function copyExport(versionId, button) { const target=deviceName(); if(!confirm(`把版本 ${versionId} 复制到已挂载的 ${target} 共享目录？\n目标按数据集名和版本号隔离，不会覆盖旧版本。`)) return; button.disabled=true; button.textContent='正在复制并核对哈希…'; try { const result=await api(`/api/dataset-workspaces/${state.active.workspace_id}/exports/${encodeURIComponent(versionId)}/copy`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({node_id:'compute_5060ti'})}); $('#datasetCopyResult').textContent=result.status==='already_present'?`${target} 已存在 ${versionId}，没有覆盖。`:`已复制 ${result.file_count} 个文件到 ${target}，并完成哈希核对。`; await loadExports(); } finally { button.disabled=false; button.textContent=`复制到 ${target}`; } }
   async function rollbackSnapshot() { const id=$('#datasetSnapshot').value; if (!id || !confirm(`恢复说明文字修改记录 ${id}？当前内容也会先保存，之后仍可找回。`)) return; const result=await api(`/api/dataset-workspaces/${state.active.workspace_id}/snapshots/${encodeURIComponent(id)}/rollback`,{method:'POST'}); $('#datasetBulkResult').textContent=`已恢复 ${result.changed} 张；同时保存了当前内容，记录编号 ${result.snapshot}。`; await loadReport(); }
   function detailItem() { return state.pageItems[state.detailIndex]; }
-  async function renderDetailTags(item) { const caption=$('#datasetDetailAnima').value, tags=caption.split(',').map(value=>value.trim()).filter(Boolean), candidates=[...new Set([...(item.curation?.wd14?.general || []).map(value=>value.tag).filter(Boolean),...tags])], selected=new Set(tags); await window.ensureTagLabels?.(candidates); $('#datasetDetailTagChips').innerHTML=candidates.map(tag=>`<button class="${selected.has(tag)?'selected':''}" data-detail-tag="${escapeHtml(tag)}" aria-pressed="${selected.has(tag)}">${escapeHtml(window.displayCanonicalTag?.(tag) || tag)}</button>`).join(''); }
+  function detailContextKey() { return `${state.active?.workspace_id||''}:${detailItem()?.relative_path||''}`; }
+  async function renderDetailTags(item) { const context=detailContextKey(),caption=$('#datasetDetailAnima').value, tags=caption.split(',').map(value=>value.trim()).filter(Boolean), candidates=[...new Set([...(item.curation?.wd14?.general || []).map(value=>value.tag).filter(Boolean),...tags])], selected=new Set(tags); await window.ensureTagLabels?.(candidates); if(context!==detailContextKey()||caption!==$('#datasetDetailAnima').value) return; $('#datasetDetailTagChips').innerHTML=candidates.map(tag=>`<button class="${selected.has(tag)?'selected':''}" data-detail-tag="${escapeHtml(tag)}" aria-pressed="${selected.has(tag)}">${escapeHtml(window.displayCanonicalTag?.(tag) || tag)}</button>`).join(''); }
   function renderDetail() { const item=detailItem(); if (!item) return; const wd14=item.curation?.wd14 || {status:'untagged'}, vlm=item.curation?.krea2_vlm || {status:'empty'}, anima=item.curation?.captions?.anima || {}, krea=item.curation?.captions?.krea2 || {}, vlmTime=vlm.created_at?` · ${vlm.created_at.slice(0,16).replace('T',' ')}`:''; $('#datasetDetailImage').src=item.original_url; $('#datasetDetailName').textContent=item.relative_path; $('#datasetDetailMeta').textContent=`${item.width}×${item.height} · ${item.format} · ${(item.bytes/1024).toFixed(1)} KiB`; $('#datasetDetailStatus').value=item.review?.status || 'pending'; $('#datasetDetailCaption').value=item.caption || ''; $('#datasetDetailAnima').value=anima.current || ''; $('#datasetDetailKrea2').value=krea.current || ''; $('#datasetDetailKrea2Draft').value=vlm.draft || ''; restoreKrea2Locale(item); $('#datasetDetailKrea2Revision').value=''; $('#datasetDetailKrea2ReviseStatus').textContent='改写结果会放回英文草稿框，保存前仍可继续修改。'; $('#datasetDetailWD14').textContent=taggerDetailLabel(wd14); $('#datasetDetailKrea2VLM').textContent=vlm.status==='failed'?`失败：${vlm.error || '未知错误'}`:['completed','confirmed'].includes(vlm.status)?`${vlm.model || '人工保存草稿'}${vlmTime}${vlm.status==='confirmed'?' · 已确认':''}`:'尚无草稿'; $('#datasetDetailKrea2Warning').hidden=!vlm.safety_warning; $('#datasetDetailKrea2Warning').textContent=vlm.safety_warning || ''; $('#datasetDetailDraftConfirm').disabled=!vlm.draft; $('#datasetDetailHashes').textContent=`SHA-256：${item.sha256}\npHash：${item.phash || '—'}\n原始说明：${item.caption_path || '缺失'}\n来源文件：${item.relative_path}\nAnima 状态：${anima.status || 'empty'}\nKrea 2 状态：${krea.status || 'empty'}\n视觉草稿哈希：${vlm.source_sha256 || '—'}`; $('#datasetPrevious').disabled=state.detailIndex<=0; $('#datasetNext').disabled=state.detailIndex>=state.pageItems.length-1; $('#datasetFindSimilar').disabled=true; $('#datasetFindSimilarStatus').textContent='正在检查真实视觉索引……'; refreshSimilarStatus(item).catch(error=>$('#datasetFindSimilarStatus').textContent=error.message); renderDetailTags(item).catch(console.error); }
   async function refreshSimilarStatus(item) { const digest=item.sha256, result=await api(`/api/hybrid-search/source-status?source_sha256=${encodeURIComponent(digest)}`); if(detailItem()?.sha256!==digest) return; $('#datasetFindSimilar').disabled=!result.available; $('#datasetFindSimilarStatus').textContent=result.available?`已进入 ${result.indexes.length} 个真实索引，可以查相似图。`:'尚未进入真实视觉索引；请到智能检索建立本机索引。'; }
   function openDetail(index) { state.detailIndex=index; renderDetail(); $('#datasetDetail').showModal(); }
@@ -736,7 +499,7 @@ WORKSPACE_SCRIPT = r"""
     updateLocalTaggerCalibration();
   }
   window.addEventListener('optional-models-changed',refreshInstalledDatasetTaggers);
-  async function ensureWorkspace() { try { state.mode=localStorage.getItem('soda-dataset-mode')==='advanced'?'advanced':'simple'; } catch(error) { console.debug(error); } await Promise.all([loadModels(),loadTagCatalog(),loadWorkspaces(),loadTaggerConfig(),loadCaptionModes()]); if (state.active) { const running=await refreshJobs(); if (running) startPolling(); } renderJourney(); }
+  async function ensureWorkspace() { if(workspaceInit) return workspaceInit; workspaceInit=(async()=>{ if(!workspaceInitialized) { try { state.mode=localStorage.getItem('soda-dataset-mode')==='advanced'?'advanced':'simple'; } catch(error) { console.debug(error); } await Promise.all([loadModels(),loadTagCatalog(),loadWorkspaces(),loadTaggerConfig(),loadCaptionModes()]); workspaceInitialized=true; } if (state.active) { const running=await refreshJobs(); if (running) startPolling(); } renderJourney(); })(); try { await workspaceInit; } finally { workspaceInit=null; } }
   async function openDatasetWorkspace(workspaceId,step=0) { await loadWorkspaces(workspaceId); if(step) setDatasetStep(step,{preset:true,scroll:true}); const running=await refreshJobs(); if(running) startPolling(); }
   window.openDatasetWorkspace=openDatasetWorkspace;
   $('#datasetImportForm').addEventListener('submit',importWorkspace);
@@ -798,20 +561,21 @@ WORKSPACE_SCRIPT = r"""
   // 不记的话每切一次就把人调好的设定清空。
   $('#datasetCaptionOptionList').addEventListener('change',event=>{ const input=event.target.closest('[data-caption-option]'); if(input) state.captionOptions[input.dataset.captionOption]=input.checked; });
   $('#datasetDetailKrea2Translate').addEventListener('click',async()=>{
-    const source=krea2TranslationSource(), caption=source.caption;
+    const context=detailContextKey(),source=krea2TranslationSource(), caption=source.caption;
     const status=$('#datasetDetailKrea2LocaleStatus');
     if(!caption){ status.textContent='视觉草稿和正式 Krea 2 说明都是空的'; $('#datasetDetailKrea2Locale').value=''; return; }
     status.textContent=`正在翻译${source.label}……`;
     try {
       const result=await api('/api/captions/localize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({caption})});
+      if(context!==detailContextKey()||caption!==krea2TranslationSource().caption) return;
       $('#datasetDetailKrea2Locale').value=result.localized || '';
       const current=detailItem();
       if (current && result.localized) state.captionLocales[current.relative_path]={caption,localized:result.localized};
       status.textContent=result.localized?`已翻译${source.label}；仅供审核，交付仍使用英文`:'翻译服务没有返回结果；英文内容不受影响';
-    } catch(error) { $('#datasetDetailKrea2Locale').value=''; status.textContent=`翻译失败：${error.message}`; }
+    } catch(error) { if(context===detailContextKey()&&caption===krea2TranslationSource().caption) status.textContent=`翻译失败：${error.message}`; }
   });
   $('#datasetDetailKrea2Revise').addEventListener('click',async()=>{
-    const caption=$('#datasetDetailKrea2Draft').value.trim();
+    const context=detailContextKey(),caption=$('#datasetDetailKrea2Draft').value.trim();
     const instruction=$('#datasetDetailKrea2Revision').value.trim();
     const status=$('#datasetDetailKrea2ReviseStatus');
     if(!caption) return alert('草稿是空的。没有可改写的内容。');
@@ -820,6 +584,8 @@ WORKSPACE_SCRIPT = r"""
     button.disabled=true; status.textContent='正在改写……';
     try {
       const result=await api('/api/captions/revise',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({caption,instruction})});
+      if(context!==detailContextKey()) return;
+      if(caption!==$('#datasetDetailKrea2Draft').value.trim()||instruction!==$('#datasetDetailKrea2Revision').value.trim()) { status.textContent='生成期间内容已修改；当前编辑已保留，请重新改写。'; return; }
       $('#datasetDetailKrea2Draft').value=result.revised;
       // 旧译文对应的是改写前的草稿。留着会对不上。比没有更容易误导。
       $('#datasetDetailKrea2Locale').value='';
@@ -829,7 +595,7 @@ WORKSPACE_SCRIPT = r"""
       status.textContent='已改写。草稿只在这里改动。按下方按钮才会保存。';
     } catch(error) {
       // 改写失败绝不能动既有草稿。那是使用者手上唯一的一份。
-      status.textContent=`改写失败：${error.message}`;
+      if(context===detailContextKey()) status.textContent=`改写失败：${error.message}`;
     } finally { button.disabled=false; }
   });
   $('#datasetDetailTagChips').addEventListener('click',event=>{ const button=event.target.closest('[data-detail-tag]'); if (!button) return; const tag=button.dataset.detailTag, tags=$('#datasetDetailAnima').value.split(',').map(value=>value.trim()).filter(Boolean), selected=new Set(tags); selected.has(tag)?selected.delete(tag):selected.add(tag); $('#datasetDetailAnima').value=[...selected].join(', '); renderDetailTags(detailItem()).catch(console.error); });

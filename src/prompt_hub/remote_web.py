@@ -2,227 +2,11 @@ from __future__ import annotations
 
 from prompt_hub.local_model import DEFAULT_LM_STUDIO_URL
 from prompt_hub.pairing_web import PAIRING_HTML, PAIRING_SCRIPT, PAIRING_STYLES
+from prompt_hub.web_resources import read_web_asset
 
-REMOTE_STYLES = r"""
+REMOTE_STYLES = f"""
 <style>
-  .remote-page { margin-top: 18px; }
-  .remote-page .eyebrow, .remote-page .section-label, .remote-page .remote-form label { text-transform: none; }
-  .remote-page[hidden] { display: none; }
-  .remote-hero { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(300px,.7fr); border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
-  .remote-copy { min-height: 310px; padding: 46px; border-right: 1px solid var(--line); background: linear-gradient(130deg,transparent 0 72%,rgba(215,228,85,.38) 72%); }
-  .remote-copy h1 { margin: 16px 0 12px; font: 800 clamp(50px,7vw,92px)/.84 "Iowan Old Style",serif; letter-spacing: -.055em; }
-  .remote-copy p { max-width: 700px; color: var(--muted); line-height: 1.7; }
-  .remote-boundary { padding: 34px; background: var(--ink); color: var(--paper); }
-  .remote-boundary .section-label { color: #b9ae9f; }
-  .remote-boundary strong { display: block; margin: 14px 0; color: var(--acid); font: 800 24px "Iowan Old Style",serif; }
-  .remote-boundary p { color: #aaa99f; font-size: 11px; line-height: 1.65; }
-  .remote-section-tabs { position: sticky; top: 10px; z-index: 8; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1px; margin-top: 14px; border: 1px solid var(--line); background: var(--line); box-shadow: var(--shadow); }
-  .remote-section-tab { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 11px; align-items: center; min-width: 0; min-height: 68px; border: 0; background: #e7e0d2; color: var(--ink); padding: 12px 16px; text-align: left; cursor: pointer; }
-  .remote-section-tab:hover { background: #f6f0e5; }
-  .remote-section-tab[aria-selected="true"] { background: var(--ink); color: var(--paper); }
-  .remote-section-tab:focus-visible { position: relative; z-index: 1; outline: 3px solid var(--signal); outline-offset: -3px; }
-  .remote-section-tab-icon { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid currentColor; font: 900 11px monospace; }
-  .remote-section-tab-copy { min-width: 0; }
-  .remote-section-tab-copy small, .remote-section-tab-copy strong { display: block; }
-  .remote-section-tab-copy small { margin-bottom: 3px; opacity: .6; font: 800 7px monospace; letter-spacing: .08em; text-transform: uppercase; }
-  .remote-section-tab-copy strong { overflow: hidden; font: 800 16px "Iowan Old Style",serif; text-overflow: ellipsis; white-space: nowrap; }
-  .remote-section-tab-count { min-width: 32px; border: 1px solid currentColor; padding: 6px 7px; font: 900 8px monospace; text-align: center; }
-  .remote-section-tab[aria-selected="true"] .remote-section-tab-count { background: var(--acid); color: var(--ink); }
-  .remote-section-panel[hidden] { display: none; }
-  .remote-tag-feedback { margin-top: 14px; padding: 16px 20px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
-  .remote-tag-feedback .remote-result-actions { justify-content: flex-start; flex-wrap: wrap; }
-  .remote-tag-feedback p { margin: 12px 0 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
-  .remote-tag-feedback button { appearance: none; border: 1px solid var(--ink); padding: 10px 14px; background: var(--paper); color: var(--ink); font-family: inherit; font-weight: 700; font-size: 12px; cursor: pointer; }
-  .remote-tag-feedback button:hover { background: var(--ink); color: var(--paper); }
-  .remote-tag-feedback button:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
-  .remote-tag-feedback button:disabled { opacity: .65; cursor: wait; }
-  .remote-tag-feedback progress { display: block; width: min(100%,420px); height: 8px; margin-top: 12px; accent-color: var(--signal); }
-  .remote-tag-feedback progress[hidden] { display: none; }
-  .remote-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
-  .remote-card { border: 1px solid var(--line); background: var(--paper); padding: 22px; box-shadow: var(--shadow); }
-  .remote-card-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
-  .remote-card h2 { margin: 4px 0 14px; font: 800 28px "Iowan Old Style",serif; }
-  .remote-state { border: 1px solid var(--ink); background: var(--paper-deep); padding: 6px 8px; font: 900 8px monospace; }
-  .remote-state.ready { background: var(--acid); }
-  .remote-state.mount_missing, .remote-state.bridge_read_only, .remote-state.incompatible { background: var(--signal); color: white; }
-  .remote-form { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-  .remote-form label { display: grid; gap: 6px; color: var(--muted); font: 800 8px monospace; text-transform: uppercase; }
-  .remote-form label.wide { grid-column: 1/-1; }
-  .remote-form input, .remote-form select { min-width: 0; border: 1px solid var(--line); background: #fbf6ec; padding: 10px; }
-  .remote-check { display: flex !important; align-items: center; grid-template-columns: auto 1fr; }
-  .remote-check input { width: auto; }
-  .remote-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-  .remote-form[hidden], .remote-actions[hidden], .remote-page aside[hidden] { display: none; }
-  .remote-page[data-usage-mode="windows_local"] .remote-hero,
-  .remote-page[data-usage-mode="linux_local"] .remote-hero { grid-template-columns: 1fr; }
-  .remote-actions button { border: 1px solid var(--ink); background: transparent; padding: 9px 10px; font: 900 8px monospace; }
-  .remote-actions button.primary { border-color: var(--signal); background: var(--signal); color: white; }
-  .remote-actions button { cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
-  .remote-actions button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
-  .remote-actions button:active:not(:disabled) { transform: translateY(1px); }
-  .remote-actions button:disabled { cursor: wait; opacity: .55; }
-  .remote-actions button[aria-busy="true"] { opacity: 1; background: var(--ink); color: var(--paper); }
-  .remote-action-feedback { margin-top: 12px; padding: 12px 14px; border-left: 3px solid #4b6735; background: #e4e8d8; color: var(--ink); font-size: 11px; line-height: 1.65; }
-  .remote-action-feedback[data-tone="busy"] { border-color: var(--ink); background: var(--paper-deep); }
-  .remote-action-feedback[data-tone="error"], .remote-action-feedback[data-tone="warning"] { border-color: var(--signal); background: #efe0d6; }
-  .remote-action-feedback[hidden] { display: none; }
-  .remote-actions button[aria-busy="true"]::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: currentColor; }
-  @keyframes remote-pulse { 50% { opacity: .3; transform: scale(.7); } }
-  @keyframes remote-arrive { from { opacity: .25; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-  @media (prefers-reduced-motion: no-preference) {
-    .remote-actions button[aria-busy="true"]::before { animation: remote-pulse 1.2s ease-in-out infinite; }
-    .remote-action-feedback { animation: remote-arrive 220ms ease-out; }
-  }
-  @media (prefers-reduced-motion: reduce) { .remote-actions button { transition: none; } }
-  .remote-message { min-height: 40px; margin-top: 12px; border-left: 4px solid var(--acid); background: #e2dccd; padding: 9px 11px; font: 8px/1.55 monospace; }
-  .remote-worker-compatibility { margin-top: 8px; border-left: 4px solid var(--acid); background: #e7e0d2; padding: 8px 11px; color: var(--ink); font: 800 8px/1.55 monospace; }
-  .remote-worker-compatibility.update_recommended, .remote-worker-compatibility.incompatible { border-left-color: var(--signal); }
-  .remote-tasks { margin-top: 14px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
-  .remote-tasks-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; padding: 22px; border-bottom: 1px solid var(--line); }
-  .remote-tasks h2 { margin: 4px 0 0; font: 800 30px "Iowan Old Style",serif; }
-  .remote-tasks-head button, .remote-task-card button, .remote-task-more { border: 1px solid var(--ink); background: transparent; padding: 9px; font: 900 8px monospace; }
-  .remote-task-head-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
-  .remote-task-head-actions button.danger { border-color: var(--signal); color: var(--signal); }
-  .remote-task-guide { padding: 18px 22px; border-bottom: 1px solid var(--line); background: #e7e0d2; }
-  .remote-task-guide > strong { display: block; margin-bottom: 5px; font: 800 18px "Iowan Old Style",serif; }
-  .remote-task-guide > p { max-width: 900px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.65; }
-  .remote-task-summary { margin-top: 8px !important; color: var(--ink) !important; font-weight: 800; }
-  .remote-task-guide-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 13px; }
-  .remote-task-guide-grid div { border-left: 3px solid var(--signal); background: rgba(251,246,236,.72); padding: 10px 12px; }
-  .remote-task-guide-grid b { display: block; margin-bottom: 3px; font: 800 12px "Iowan Old Style",serif; }
-  .remote-task-guide-grid span { color: var(--muted); font-size: 9px; line-height: 1.5; }
-  .remote-task-list { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; background: var(--line); }
-  .remote-task-list-title { grid-column: 1/-1; margin: 0; background: #ded6c7; padding: 13px 17px; font: 800 18px/1.2 "Iowan Old Style",serif; }
-  .remote-task-more { grid-column: 1/-1; background: #e7e0d2; cursor: pointer; padding: 14px 17px; text-align: left; }
-  .remote-task-card { min-width: 0; background: #f2ecdf; padding: 15px; }
-  .remote-task-card strong, .remote-task-card span { display: block; overflow-wrap: anywhere; }
-  .remote-task-card strong { margin: 7px 0; font: 800 14px "Iowan Old Style",serif; }
-  .remote-task-card span { color: var(--muted); font: 8px/1.55 monospace; }
-  .remote-task-purpose, .remote-task-next, .remote-task-error { margin: 8px 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
-  .remote-task-next { border-left: 3px solid var(--acid); background: rgba(215,228,85,.16); padding: 8px 9px; color: var(--ink); }
-  .remote-task-error { border-left: 3px solid var(--signal); background: rgba(211,77,49,.08); padding: 8px 9px; color: var(--ink); }
-  .remote-task-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-  .remote-task-actions button { background: var(--ink); color: var(--paper); }
-  .remote-task-actions button:disabled { cursor: wait; opacity: .62; }
-  .remote-task-tech { margin-top: 10px; border-top: 1px dashed #aaa293; padding-top: 8px; }
-  .remote-task-tech summary { color: var(--muted); cursor: pointer; font: 800 9px monospace; }
-  .remote-task-tech span { margin-top: 7px; }
-  .remote-task-state { width: fit-content; padding: 5px 7px; background: var(--paper-deep); color: var(--ink) !important; }
-  .remote-task-state.completed, .remote-task-state.returned { background: var(--acid); }
-  .remote-task-state.dismissed { background: #d8d0c2; }
-  .remote-task-state.failed, .remote-task-state.canceled { background: var(--signal); color: white !important; }
-  .remote-task-archive { grid-column: 1/-1; background: #e7e0d2; padding: 0; }
-  .remote-task-archive summary { display: flex; justify-content: space-between; gap: 16px; align-items: center; cursor: pointer; padding: 14px 17px; }
-  .remote-task-archive summary strong { font: 800 13px "Iowan Old Style",serif; }
-  .remote-task-archive summary span { color: var(--muted); font: 8px/1.4 monospace; }
-  .remote-task-archive ul { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin: 0; padding: 1px 0 0; background: var(--line); list-style: none; }
-  .remote-task-archive li { min-width: 0; background: #f2ecdf; padding: 10px 17px; color: var(--muted); font: 8px/1.5 monospace; overflow-wrap: anywhere; }
-  .remote-task-history { grid-column: 1/-1; background: #ded6c7; }
-  .remote-task-history > summary { cursor: pointer; padding: 14px 17px; font: 800 18px/1.2 "Iowan Old Style",serif; }
-  .remote-task-history-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; background: var(--line); }
-  .remote-lora { margin-top: 14px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
-  .remote-lora-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; padding: 22px; border-bottom: 1px solid var(--line); }
-  .remote-lora h2 { margin: 4px 0 0; font: 800 30px "Iowan Old Style",serif; }
-  .remote-lora-search { display: flex; gap: 7px; }
-  .remote-lora-search input { border: 1px solid var(--line); background: #fbf6ec; padding: 9px; }
-  .remote-lora-tools { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
-  .remote-lora-search button, .remote-lora-tools > button { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); padding: 9px; font: 900 8px monospace; }
-  .remote-lora-tools > button { background: var(--signal); border-color: var(--signal); }
-  .remote-lora-search button.secondary { background: transparent; color: var(--ink); }
-  .remote-lora-body { display: grid; grid-template-columns: 238px minmax(0,1fr); min-height: 390px; }
-  .remote-lora-tree { border-right: 1px solid var(--line); background: #e7e0d2; padding: 16px 12px 22px; }
-  .remote-lora-tree-title { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 0 4px 12px; color: var(--muted); font: 900 8px monospace; text-transform: uppercase; letter-spacing: .08em; }
-  .remote-lora-tree ul { margin: 0; padding: 0; list-style: none; }
-  .remote-tree-root + .remote-tree-root { margin-top: 3px; }
-  .remote-tree-row { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 3px; align-items: center; }
-  .remote-tree-toggle, .remote-tree-filter { min-width: 0; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
-  .remote-tree-toggle { width: 22px; height: 27px; padding: 0; font: 900 10px monospace; }
-  .remote-tree-filter { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 7px 8px; text-align: left; font: 800 10px/1.2 monospace; }
-  .remote-tree-filter:hover, .remote-tree-filter.active { background: var(--ink); color: var(--paper); }
-  .remote-tree-filter span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .remote-tree-filter small { flex: 0 0 auto; color: inherit; font: 700 8px monospace; opacity: .65; }
-  .remote-tree-all { grid-column: 1/-1; margin-bottom: 8px; }
-  .remote-tree-children { margin: 2px 0 7px 25px !important; padding-left: 7px !important; border-left: 1px solid #aaa293; }
-  .remote-tree-children[hidden] { display: none; }
-  .remote-tree-children .remote-tree-filter { position: relative; padding: 6px 8px; font-size: 9px; }
-  .remote-tree-children .remote-tree-filter::before { content: ''; position: absolute; left: -8px; top: 50%; width: 7px; border-top: 1px solid #aaa293; }
-  .remote-lora-results { min-width: 0; }
-  .remote-lora-result-head { position: sticky; top: 92px; z-index: 4; display: flex; justify-content: space-between; gap: 14px; align-items: center; min-height: 45px; padding: 10px 15px; border-bottom: 1px solid var(--line); background: #f2ecdf; }
-  .remote-lora-result-head p { margin: 0; color: var(--muted); font: 800 9px/1.5 monospace; }
-  .remote-lora-result-head button { border: 0; border-bottom: 1px solid var(--ink); background: transparent; padding: 4px 0; font: 900 8px monospace; }
-  .remote-result-actions, .remote-pagination { display: flex; align-items: center; gap: 10px; }
-  .remote-pagination[hidden] { display: none; }
-  .remote-pagination span { min-width: 86px; color: var(--muted); text-align: center; font: 800 8px monospace; }
-  .remote-pagination button:disabled { cursor: default; opacity: .35; }
-  .remote-lora-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; background: var(--line); }
-  .remote-lora-card { min-width: 0; background: #f2ecdf; padding: 15px; }
-  .remote-lora-preview { position: relative; display: block; width: calc(100% + 30px); aspect-ratio: 4/3; margin: -15px -15px 13px; overflow: hidden; border: 0; border-bottom: 1px solid var(--line); background: #d9d1c2; color: var(--muted); cursor: pointer; }
-  .remote-lora-preview img { width: 100%; height: 100%; object-fit: cover; transition: transform .24s ease, filter .24s ease; }
-  .remote-lora-preview:hover img { transform: scale(1.025); filter: contrast(1.04); }
-  .remote-lora-preview-count { position: absolute; right: 9px; bottom: 9px; border: 1px solid rgba(255,255,255,.55); background: rgba(20,19,17,.82); color: white; padding: 5px 7px; font: 900 8px monospace; }
-  .remote-lora-placeholder { display: grid; place-items: center; width: calc(100% + 30px); aspect-ratio: 4/3; margin: -15px -15px 13px; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(135deg,#e4ddcf 0 9px,#ddd4c5 9px 10px); color: #8b8275; font: 900 8px monospace; letter-spacing: .08em; text-transform: uppercase; }
-  .remote-lora-card h3 { margin: 0 0 8px; overflow-wrap: anywhere; font: 800 16px "Iowan Old Style",serif; }
-  .remote-lora-card p { color: var(--muted); font: 8px/1.6 monospace; overflow-wrap: anywhere; }
-  .remote-source-link { display: inline-flex; align-items: center; margin-top: 10px; border-bottom: 1px solid currentColor; color: var(--signal); font: 900 8px/1.5 monospace; text-decoration: none; }
-  .remote-source-link:hover, .remote-source-link:focus-visible { color: var(--ink); }
-  .remote-lora-breadcrumb { display: block; margin-bottom: 7px; color: var(--signal); font: 900 8px/1.4 monospace; text-transform: none; overflow-wrap: anywhere; }
-  .remote-model-card { min-height: 170px; }
-  .remote-endpoint-panel { margin-top: 14px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
-  .remote-endpoint-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; padding: 22px; border-bottom: 1px solid var(--line); }
-  .remote-endpoint-head h2 { margin: 4px 0 0; font: 800 30px "Iowan Old Style",serif; }
-  .remote-endpoint-presets, .remote-endpoint-actions, .remote-endpoint-row-actions, .remote-endpoint-model-actions { display: flex; flex-wrap: wrap; gap: 7px; }
-  .remote-endpoint-presets button, .remote-endpoint-actions button, .remote-endpoint-row-actions button, .remote-endpoint-model-actions button { border: 1px solid var(--ink); background: transparent; padding: 9px 10px; font: 900 8px monospace; }
-  .remote-endpoint-presets button.active, .remote-endpoint-actions button.primary, .remote-endpoint-model-actions button.primary { border-color: var(--signal); background: var(--signal); color: white; }
-  .remote-endpoint-panel button.dirty { box-shadow: 0 0 0 3px var(--acid) inset; }
-  .remote-endpoint-body { display: grid; grid-template-columns: minmax(300px,.9fr) minmax(0,1.1fr); gap: 1px; background: var(--line); }
-  .remote-endpoint-editor, .remote-endpoint-list { min-width: 0; background: #f2ecdf; padding: 18px; }
-  .remote-endpoint-editor .remote-form { margin-top: 12px; }
-  .remote-endpoint-model-toolbar { position: sticky; top: 84px; z-index: 6; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; margin-top: 12px; border: 1px solid var(--line); background: #e7e0d2; padding: 9px; }
-  .remote-endpoint-model-toolbar > input, .remote-endpoint-model-toolbar > button { grid-column: 1 / -1; width: 100%; }
-  .remote-endpoint-model-toolbar > button { border: 1px solid var(--signal); background: var(--signal); color: white; padding: 10px 12px; font: 900 12px/1.4 monospace; cursor: pointer; }
-  .remote-endpoint-model-toolbar > button:disabled { opacity: .55; cursor: not-allowed; }
-  @media (max-width: 1100px) { .remote-endpoint-body { grid-template-columns: minmax(0,1fr); } }
-  .remote-endpoint-model-toolbar strong { font: 900 9px monospace; white-space: nowrap; }
-  .remote-endpoint-model-toolbar input { min-width: 0; border: 1px solid var(--line); background: #fbf6ec; padding: 9px; }
-  .remote-endpoint-models { display: grid; gap: 7px; min-height: 180px; max-height: min(52vh,560px); margin-top: 12px; overflow-y: auto; padding-right: 3px; }
-  .remote-endpoint-models:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
-  .remote-endpoint-model { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(160px,240px); gap: 12px; align-items: center; border: 1px solid var(--line); background: #fbf6ec; padding: 9px; }
-  .remote-endpoint-model input[type="checkbox"] { flex: 0 0 auto; width: auto; margin: 0; }
-  .remote-endpoint-model label { display: flex; justify-content: start; align-items: center; gap: 7px; min-width: 0; color: var(--ink); font: 800 10px monospace; text-transform: none; }
-  .remote-endpoint-model-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-  .remote-endpoint-model-vision { white-space: nowrap; }
-  .remote-endpoint-model input[type="text"] { min-width: 0; border: 1px solid var(--line); background: var(--paper); padding: 7px; }
-  .remote-endpoint-model-footer { justify-content: end; margin-top: 10px; }
-  .remote-endpoint-unsaved { min-height: 18px; margin: 8px 0 0; color: var(--signal); font: 900 8px/1.5 monospace; }
-  .remote-endpoint-list { display: grid; gap: 9px; align-content: start; }
-  .remote-endpoint-assist { grid-column: 1 / -1; border-top: 1px solid var(--line); background: #f2ecdf; padding: 18px; }
-  .remote-endpoint-assist h3 { margin: 4px 0 0; font: 800 16px "Iowan Old Style",serif; }
-  .remote-endpoint-assist .remote-hint { margin: 6px 0 0; color: var(--muted); font: 8px/1.6 monospace; }
-  .remote-endpoint-assist .remote-form { margin-top: 12px; }
-  .remote-endpoint-row { border: 1px solid var(--line); background: #fbf6ec; padding: 12px; }
-  .remote-endpoint-row strong, .remote-endpoint-row span { display: block; overflow-wrap: anywhere; }
-  .remote-endpoint-row strong { font: 800 16px "Iowan Old Style",serif; }
-  .remote-endpoint-row span { margin-top: 5px; color: var(--muted); font: 8px/1.6 monospace; }
-  .remote-model-type { display: inline-block; margin-bottom: 13px; border: 1px solid var(--ink); background: var(--acid); padding: 5px 7px; font: 900 8px monospace; text-transform: uppercase; }
-  .remote-model-size { display: inline-block; margin-left: 5px; color: var(--muted); font: 800 8px monospace; }
-  .remote-empty { grid-column: 1/-1; padding: 38px; text-align: center; }
-  .remote-empty strong { display: block; font: 800 22px "Iowan Old Style",serif; }
-  .remote-empty span { display: block; margin-top: 8px; color: var(--muted); font-size: 10px; }
-  .remote-preview-dialog { width: min(1040px,calc(100vw - 32px)); max-height: calc(100vh - 32px); border: 1px solid var(--line); background: var(--paper); color: var(--ink); padding: 0; box-shadow: 14px 14px 0 rgba(20,19,17,.25); }
-  .remote-preview-dialog::backdrop { background: rgba(20,19,17,.82); backdrop-filter: blur(3px); }
-  .remote-preview-dialog-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 18px; align-items: center; border-bottom: 1px solid var(--line); background: var(--paper); padding: 15px 18px; }
-  .remote-preview-dialog-head h3 { margin: 0; font: 800 24px "Iowan Old Style",serif; }
-  .remote-preview-dialog-head p { margin: 3px 0 0; color: var(--muted); font: 800 8px monospace; }
-  .remote-preview-dialog-head button { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); padding: 9px 12px; font: 900 8px monospace; }
-  .remote-preview-gallery { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; background: var(--line); }
-  .remote-preview-gallery a { min-width: 0; background: #ddd5c7; }
-  .remote-preview-gallery img { display: block; width: 100%; height: min(62vh,680px); object-fit: contain; }
-  @media (max-width: 1050px) { .remote-lora-grid, .remote-task-list, .remote-task-history-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-  @media (max-width: 820px) { .remote-lora-head { display: block; } .remote-lora-tools { display: grid; grid-template-columns: auto minmax(0,1fr); width: 100%; margin-top: 14px; } .remote-lora-search { display: grid; grid-template-columns: minmax(150px,1fr) auto auto; } }
-  @media (max-width: 540px) { .remote-lora-body { grid-template-columns: 1fr; } .remote-lora-tree { border-right: 0; border-bottom: 1px solid var(--line); } }
-  @media (max-width: 620px) { .remote-hero, .remote-grid, .remote-lora-grid, .remote-task-list, .remote-task-guide-grid, .remote-preview-gallery, .remote-endpoint-body, .remote-task-archive ul { grid-template-columns: 1fr; } .remote-copy { min-height: 0; padding: 30px 22px; border-right: 0; border-bottom: 1px solid var(--line); } .remote-boundary { padding: 24px 22px; } .remote-section-tab { grid-template-columns: 1fr; justify-items: center; gap: 4px; min-height: 74px; padding: 9px 5px; text-align: center; } .remote-section-tab-icon { width: 26px; height: 26px; } .remote-section-tab-copy { width: 100%; } .remote-section-tab-copy small { display: none; } .remote-section-tab-copy strong { font-size: 12px; line-height: 1.05; overflow-wrap: anywhere; white-space: normal; } .remote-section-tab-count { min-width: 0; border: 0; padding: 0; opacity: .65; } .remote-section-tab[aria-selected="true"] .remote-section-tab-count { background: transparent; color: inherit; } .remote-form { grid-template-columns: 1fr; } .remote-form label.wide { grid-column: auto; } .remote-lora-head, .remote-tasks-head, .remote-endpoint-head { display: block; } .remote-lora-tools, .remote-lora-search { display: grid; grid-template-columns: 1fr; width: 100%; } .remote-lora-tools { justify-content: stretch; margin-top: 12px; } .remote-lora-search, .remote-tasks-head button { margin-top: 5px; } .remote-lora-result-head { align-items: start; flex-direction: column; } .remote-result-actions { width: 100%; justify-content: space-between; } .remote-preview-gallery img { height: auto; max-height: 72vh; } .remote-endpoint-model-toolbar { top: 8px; grid-template-columns: 1fr 1fr; } .remote-endpoint-model-toolbar strong, .remote-endpoint-model-toolbar input, .remote-endpoint-model-actions { grid-column: 1/-1; } .remote-endpoint-model { grid-template-columns: minmax(0,1fr) auto; gap: 8px; } .remote-endpoint-model input[type="text"] { grid-column: 1/-1; } }
-  @media (max-width: 620px) { .remote-task-history-grid { grid-template-columns: 1fr; } .remote-task-head-actions { display: grid; justify-content: stretch; margin-top: 8px; } }
-</style>
+{read_web_asset("remote.css")}</style>
 """
 
 REMOTE_HTML = rf"""
@@ -273,7 +57,7 @@ REMOTE_SCRIPT = r"""
   const remoteStateLabels={ready:'共享目录已就绪',mount_missing:'共享目录未挂载',mount_ready_bridge_unprepared:'需要创建任务文件夹',bridge_read_only:'共享目录不可写',not_configured:'尚未配置'};
   async function api(url,options={}) { const response=await fetch(url,options); const payload=await response.json().catch(()=>({})); if(!response.ok) throw new Error(payload.detail||`请求失败: ${response.status}`); return payload; }
   function setRemoteTabCount(view,count) { const target=$(`[data-remote-view="${view}"] .remote-section-tab-count`); if(target) target.textContent=String(count); }
-  function setRemoteView(view,{focus=false}={}) { if(!['tasks','loras','models','endpoints'].includes(view)) return; state.remoteView=view; document.querySelectorAll('[data-remote-view]').forEach(tab=>{ const active=tab.dataset.remoteView===view; tab.setAttribute('aria-selected',String(active)); tab.tabIndex=active?0:-1; if(active&&focus) tab.focus(); }); document.querySelectorAll('[data-remote-panel]').forEach(panel=>{ panel.hidden=panel.dataset.remotePanel!==view; }); ensureRemoteViewData(view).catch(error=>console.error(error)); if(view==='tasks') scheduleTaskPoll(); }
+  function setRemoteView(view,{focus=false}={}) { if(!['tasks','loras','models','endpoints'].includes(view)) return; state.remoteView=view; document.querySelectorAll('[data-remote-view]').forEach(tab=>{ const active=tab.dataset.remoteView===view; tab.setAttribute('aria-selected',String(active)); tab.tabIndex=active?0:-1; if(active&&focus) tab.focus(); }); document.querySelectorAll('[data-remote-panel]').forEach(panel=>{ panel.hidden=panel.dataset.remotePanel!==view; }); ensureRemoteViewData(view).catch(error=>{ const target=view==='models'?'#remoteModelStatus':view==='loras'?'#remoteLoraStatus':'#remoteTaskSummary'; $(target).textContent=`读取失败：${error.message}，请重新读取或切换页面重试。`; }); if(view==='tasks') scheduleTaskPoll(); }
   window.openModelEndpoints=()=>{ setRemoteView('endpoints'); return window.setPromptHubView?.('remote'); };
   function combinedNodes() { return defaults.map(fallback=>({...fallback,...(state.nodes.find(item=>item.node_id===fallback.node_id)||{})})); }
   function nodeCard(node) { const mountPlaceholder='/Volumes/PromptHub-Windows',roleLabel=node.role==='compute_5060ti'?'Windows 远程设备':node.role,saved=state.nodes.some(item=>item.node_id===node.node_id); return `<article class="remote-card" data-remote-node="${escapeHtml(node.node_id)}"><div class="remote-card-head"><div><span class="section-label">${escapeHtml(roleLabel)}</span><h2>${escapeHtml(node.label)}</h2></div><span class="remote-state" data-remote-state>${saved?'正在检查':'尚未配置'}</span></div><div class="remote-form"><label>主机名或局域网 IP<input data-node-field="host" value="${escapeHtml(node.host||'')}" placeholder="等待填写"></label><label>设备显示名<input data-node-field="label" value="${escapeHtml(node.label)}"></label><label>Windows 共享名称<input data-node-field="smb_share" value="${escapeHtml(node.smb_share||'')}" placeholder="例如 PromptHub-5060Ti"></label><label class="wide">Mac 已连接的 Windows 文件夹<input data-node-field="smb_mount" value="${escapeHtml(node.smb_mount||'')}" placeholder="${mountPlaceholder}"></label><label class="remote-check wide"><input data-node-field="enabled" type="checkbox" ${node.enabled?'checked':''}> 启用这台设备</label></div><div class="remote-actions"><button class="primary" data-remote-action="save">保存设备信息</button><button data-remote-action="diagnose">检查是否连接成功</button><button data-remote-action="prepare">创建任务文件夹</button><button data-remote-action="connect">连接 Windows</button></div><div class="remote-message" data-remote-message>${saved?'正在自动检查共享目录与 Worker 状态…':`尚未配置。先在 Finder 连接 ${escapeHtml(node.label||deviceName())} 的共享文件夹，再填写这里。`}</div><div class="remote-worker-compatibility" data-remote-worker-version>${saved?'正在读取 Worker 版本…':'保存设备后显示 Worker 版本。'}</div></article>`; }
@@ -297,9 +81,10 @@ REMOTE_SCRIPT = r"""
   function loraCard(item) { const tags=(item.tags||[]).slice(0,12).map(tag=>window.displayCanonicalTag?.(tag)||tag),location=loraLocation(item),previews=item.preview_urls||[],visual=previews.length?`<button class="remote-lora-preview" type="button" data-lora-preview="${escapeHtml(item.lora_id)}" aria-label="查看 ${escapeHtml(item.name)} 的 ${previews.length} 张视觉参照"><img src="${escapeHtml(previews[0])}" alt="${escapeHtml(item.name)} 预览图" loading="lazy"><span class="remote-lora-preview-count">${previews.length} 张</span></button>`:'<div class="remote-lora-placeholder">暂无本地预览图</div>'; return `<article class="remote-lora-card">${visual}<span class="remote-lora-breadcrumb">${escapeHtml(location.root)} / ${escapeHtml(location.category)}</span><span class="section-label">${escapeHtml(item.model_family||'未识别')}</span><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.relative_path)}<br>适用底模：${escapeHtml(item.base_model||'未标注')}<br>触发词：${escapeHtml((item.trigger_words||[]).join(', ')||'未标注')}<br>标签：${escapeHtml(tags.join(', ')||'未标注')}</p>${civitaiLink(item)}</article>`; }
   function filterLoras() { const needle=loraKey(state.loraQuery); state.loras=state.catalog.filter(item=>{ const location=loraLocation(item); if(state.loraRoot&&loraKey(location.root)!==state.loraRoot) return false; if(state.loraCategory&&loraKey(location.category)!==state.loraCategory) return false; if(!needle) return true; const searchable=[item.name,item.relative_path,item.base_model,item.model_family,item.source_url,item.metadata?.civitai_model_id,item.metadata?.civitai_version_id,...(item.trigger_words||[]),...(item.tags||[])].join(' ').toLocaleLowerCase(); return searchable.includes(needle); }); }
   function renderLoras(resetPage=false) { filterLoras(); renderLoraTree(); if(resetPage) state.loraPage=1; const pageSize=catalogPageSize(),pageCount=Math.max(1,Math.ceil(state.loras.length/pageSize)); state.loraPage=Math.min(Math.max(state.loraPage,1),pageCount); const start=(state.loraPage-1)*pageSize,pageItems=state.loras.slice(start,start+pageSize),tree=loraTreeData(),root=tree.find(item=>item.key===state.loraRoot),category=root?.categories.find(item=>item.key===state.loraCategory),path=[root?.label,category?.label].filter(Boolean).join(' / ')||'全部目录',query=state.loraQuery?` · 搜索“${state.loraQuery}”`:''; $('#remoteLoraResultStatus').textContent=`${path}${query} · ${state.loras.length?`显示 ${start+1}–${start+pageItems.length} / `:''}${state.loras.length} 个`; $('#remoteLoraResetPath').hidden=!state.loraRoot&&!state.loraQuery; updateCatalogPagination('lora',state.loraPage,pageCount,state.loras.length); $('#remoteLoraGrid').innerHTML=pageItems.length?pageItems.map(loraCard).join(''):state.catalog.length?'<div class="remote-empty"><strong>当前筛选没有结果</strong><span>可以切换左侧目录，或清除搜索条件。</span></div>':'<div class="remote-empty"><strong>还没有收到 Windows 的 LoRA 清单</strong><span>保持 Worker 与 ComfyUI 运行，点击“更新清单”；资料库只保存清单，不复制模型文件。</span></div>'; }
-  async function loadNodes() { state.nodes=await api('/api/remote-nodes'); const primary=state.nodes.find(item=>item.node_id==='compute-5060ti')||state.nodes.find(item=>item.role==='compute_5060ti'); if(primary?.label) window.setPromptHubDeviceName?.(primary.label); renderNodes(); }
+  let remoteInit=null;
+  async function loadNodes() { state.nodes=await api('/api/remote-nodes'); state.nodesLoaded=true; const primary=state.nodes.find(item=>item.node_id==='compute-5060ti')||state.nodes.find(item=>item.role==='compute_5060ti'); if(primary?.label) window.setPromptHubDeviceName?.(primary.label); renderNodes(); }
   function scheduleTaskPoll() { clearTimeout(state.taskTimer); const active=state.tasks.some(item=>['recorded','queued','running','returned'].includes(item.status)),delay=active?1500:5000; state.taskTimer=setTimeout(()=>{ if(document.hidden||$('#remotePage').hidden||state.remoteView!=='tasks') return scheduleTaskPoll(); loadTasks().catch(error=>{ $('#remoteTaskSummary').textContent=`暂时无法刷新任务：${error.message}；正在重试。`; scheduleTaskPoll(); }); },delay); }
-  async function loadTasks() { if(state.taskLoading) return state.taskLoading; state.taskLoading=(async()=>{ const groups=await Promise.all(state.nodes.map(async node=>{ try { const tasks=await api(`/api/remote-nodes/${encodeURIComponent(node.node_id)}/tasks?limit=100`); return tasks.map(item=>({...item,node_id:node.node_id,node_label:node.label})); } catch(error) { return []; } })); state.tasks=groups.flat().sort((a,b)=>String(b.updated_at||b.created_at).localeCompare(String(a.updated_at||a.created_at))); renderTasks(); scheduleTaskPoll(); })(); try { await state.taskLoading; } finally { state.taskLoading=null; } }
+  async function loadTasks() { if(state.taskLoading) return state.taskLoading; state.taskLoading=(async()=>{ const errors=[]; const groups=await Promise.all(state.nodes.map(async node=>{ try { const tasks=await api(`/api/remote-nodes/${encodeURIComponent(node.node_id)}/tasks?limit=100`); return tasks.map(item=>({...item,node_id:node.node_id,node_label:node.label})); } catch(error) { errors.push(`${node.label}：${error.message}`); return []; } })); state.tasks=groups.flat().sort((a,b)=>String(b.updated_at||b.created_at).localeCompare(String(a.updated_at||a.created_at))); renderTasks(); if(errors.length) $('#remoteTaskSummary').textContent=`部分任务未能读取：${errors.join('；')}；正在重试。`; scheduleTaskPoll(); })(); try { await state.taskLoading; } finally { state.taskLoading=null; } }
   async function loadLoras(query=state.loraQuery) {
     if(state.loraLoading) return state.loraLoading;
     const read=window.fetchJsonWithTimeout||api;
@@ -309,7 +94,7 @@ REMOTE_SCRIPT = r"""
       try {
         const status=await read('/api/windows-loras/status');
         $('#remoteLoraStatus').textContent='正在加载 LoRA 条目…';
-        const result=await read('/api/windows-loras?limit=500');
+        const result=await window.loadPromptHubResourceCatalog('/api/windows-loras', {limit:500, read});
         state.catalog=result.results||[];
         setRemoteTabCount('loras',state.catalog.length);
         state.loraQuery=query;
@@ -377,7 +162,7 @@ REMOTE_SCRIPT = r"""
   function modelCard(item) { const location=modelLocation(item),typeLabel=modelTypeLabels[item.asset_type]||item.asset_type||'未分类模型',previews=item.preview_urls||[],visual=previews.length?`<button class="remote-lora-preview" type="button" data-model-preview="${escapeHtml(item.asset_id)}" aria-label="查看 ${escapeHtml(item.name)} 的 ${previews.length} 张底模示例图"><img src="${escapeHtml(previews[0])}" alt="${escapeHtml(item.name)} 底模示例图" loading="lazy"><span class="remote-lora-preview-count">${previews.length} 张</span></button>`:'<div class="remote-lora-placeholder">暂无底模示例图</div>'; return `<article class="remote-lora-card remote-model-card">${visual}<span class="remote-model-type">${escapeHtml(typeLabel)}</span><span class="remote-model-size">${escapeHtml(formatModelSize(item.size_bytes))}</span><span class="remote-lora-breadcrumb">${escapeHtml(location.folder)} / ${escapeHtml(item.root_id||'未记录位置')}</span><span class="section-label">${escapeHtml(item.model_family||'未标注模型族')}</span><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.relative_path)}<br>修改时间：${escapeHtml(item.modified_at||'未知')}</p>${civitaiLink(item)}</article>`; }
   function filterModels() { const needle=modelKey(state.modelQuery); state.models=state.modelsCatalog.filter(item=>{ const location=modelLocation(item); if(state.modelType&&modelKey(location.type)!==state.modelType) return false; if(state.modelFolder&&modelKey(location.folder)!==state.modelFolder) return false; if(!needle) return true; return [item.name,item.relative_path,item.root_id,item.asset_type,item.model_family,item.source_url,item.metadata?.civitai_model_id,item.metadata?.civitai_version_id].join(' ').toLocaleLowerCase().includes(needle); }); }
   function renderModels(resetPage=false) { filterModels(); renderModelTree(); if(resetPage) state.modelPage=1; const pageSize=catalogPageSize(),pageCount=Math.max(1,Math.ceil(state.models.length/pageSize)); state.modelPage=Math.min(Math.max(state.modelPage,1),pageCount); const start=(state.modelPage-1)*pageSize,pageItems=state.models.slice(start,start+pageSize),tree=modelTreeData(),type=tree.find(item=>item.key===state.modelType),folder=type?.folders.find(item=>item.key===state.modelFolder),path=[type?.label,folder?.label].filter(Boolean).join(' / ')||'全部模型',query=state.modelQuery?` · 搜索“${state.modelQuery}”`:''; $('#remoteModelResultStatus').textContent=`${path}${query} · ${state.models.length?`显示 ${start+1}–${start+pageItems.length} / `:''}${state.models.length} 个`; $('#remoteModelResetPath').hidden=!state.modelType&&!state.modelQuery; updateCatalogPagination('model',state.modelPage,pageCount,state.models.length); $('#remoteModelGrid').innerHTML=pageItems.length?pageItems.map(modelCard).join(''):state.modelsCatalog.length?'<div class="remote-empty"><strong>当前筛选没有模型</strong><span>可以切换左侧类型或文件夹，也可以清除搜索条件。</span></div>':'<div class="remote-empty"><strong>还没有收到 Windows 的模型清单</strong><span>保持 Worker 与 ComfyUI 运行，点击“更新清单”；资料库只保存名称、目录、大小和时间，不复制模型文件。</span></div>'; }
-  async function loadModels(query=state.modelQuery) { const status=await api('/api/windows-models/status'); const counts=Object.entries(status.type_counts||{}).map(([key,value])=>`${modelTypeLabels[key]||key} ${value}`).join(' · '); $('#remoteModelStatus').textContent=status.available?`${status.count} 个模型 · ${status.with_preview_count||0} 个有示例图 · ${status.with_source_count||0} 个可以返回 Civitai · 共 ${status.preview_count||0} 张预览 · ${counts||'未分类'} · 不复制模型文件`:'还没有收到清单。保持 ComfyUI 与 Worker 运行，然后点击“更新清单”。'; const result=await api('/api/windows-models?limit=2000'); state.modelsCatalog=result.results||[]; state.modelLoaded=true; setRemoteTabCount('models',state.modelsCatalog.length); state.modelQuery=query; if(!state.modelTreeReady) { modelTreeData().forEach(type=>state.collapsedModelTypes.add(type.key)); state.modelTreeReady=true; } renderModels(true); }
+  async function loadModels(query=state.modelQuery) { const status=await api('/api/windows-models/status'); const counts=Object.entries(status.type_counts||{}).map(([key,value])=>`${modelTypeLabels[key]||key} ${value}`).join(' · '); $('#remoteModelStatus').textContent=status.available?`${status.count} 个模型 · ${status.with_preview_count||0} 个有示例图 · ${status.with_source_count||0} 个可以返回 Civitai · 共 ${status.preview_count||0} 张预览 · ${counts||'未分类'} · 不复制模型文件`:'还没有收到清单。保持 ComfyUI 与 Worker 运行，然后点击“更新清单”。'; const result=await window.loadPromptHubResourceCatalog('/api/windows-models', {limit:2000, read:api}); state.modelsCatalog=result.results||[]; state.modelLoaded=true; setRemoteTabCount('models',state.modelsCatalog.length); state.modelQuery=query; if(!state.modelTreeReady) { modelTreeData().forEach(type=>state.collapsedModelTypes.add(type.key)); state.modelTreeReady=true; } renderModels(true); }
   function endpointProviderLabel(value) { return {lm_studio:'LM Studio',openai:'OpenAI',ollama:'Ollama',openai_compatible:'自定义'}[value]||value; }
   function endpointSelectedCount() { return state.discoveredEndpointModels.filter(model=>model.enabled).length; }
   function editingEndpointLabel() {
@@ -546,7 +331,7 @@ REMOTE_SCRIPT = r"""
       }));
     } finally { liveConnectionBusy=false; }
   }
-  async function ensure() { applyUsageMode(); await loadNodes(); applyUsageMode(); await Promise.all([window.isPromptHubLocal?Promise.resolve():diagnoseSavedNodes(),loadCatalogCounts(),loadTasks(),loadEndpoints(),refreshLiveConnections()]); }
+  async function ensure() { if(remoteInit) return remoteInit; remoteInit=(async()=>{ applyUsageMode(); if(!state.nodesLoaded) await loadNodes(); applyUsageMode(); await Promise.all([window.isPromptHubLocal?Promise.resolve():diagnoseSavedNodes(),loadCatalogCounts(),loadTasks(),state.endpointDirty?Promise.resolve():loadEndpoints(),refreshLiveConnections()]); })(); try { await remoteInit; } finally { remoteInit=null; } }
   window.addEventListener('prompt-hub-pairing-saved',()=>loadNodes().then(diagnoseSavedNodes).catch(console.error));
   $('#remoteSectionTabs').addEventListener('click',event=>{ const tab=event.target.closest('[data-remote-view]'); if(tab) setRemoteView(tab.dataset.remoteView); });
   $('#remoteSectionTabs').addEventListener('keydown',event=>{ if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return; const tabs=[...document.querySelectorAll('[data-remote-view]')],current=tabs.indexOf(event.target.closest('[data-remote-view]')); if(current<0) return; event.preventDefault(); const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(current+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length; setRemoteView(tabs[next].dataset.remoteView,{focus:true}); });

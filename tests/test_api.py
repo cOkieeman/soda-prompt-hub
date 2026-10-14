@@ -328,7 +328,7 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
                 "导入失败:",
                 "保存失败:",
                 "读取失败:",
-                "暂无版本",
+                "路径与详情",
                 "!Drawing Desk",
                 "!>LOCKED<",
                 "!>UNLOCKED<",
@@ -433,7 +433,9 @@ def test_page_uses_scoped_headers_and_accessible_contrast(settings) -> None:
     assert "    header {" not in page.text
     assert "--muted: #5b5a53;" in page.text
     assert "--signal: #9a321f;" in page.text
-    assert ".comfy-head .section-label, .comfy-head label { color: #b9ae9f; }" in page.text
+    assert (
+        ".comfy-head .section-label, .comfy-head label { color: var(--on-ink-muted); }" in page.text
+    )
 
 
 def test_page_has_mobile_menu_and_workspace_resume_entry(settings) -> None:

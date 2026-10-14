@@ -1,7 +1,6 @@
 .model-installer { width: min(1080px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); box-sizing: border-box; padding: 0; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: 12px 12px 0 rgba(0,0,0,.18); overflow-y: auto; }
-.model-installer::backdrop { background: rgba(28,27,24,.68); backdrop-filter: blur(4px); }
 .model-installer-head { display: flex; justify-content: space-between; align-items: start; gap: 20px; padding: 30px 32px 24px; }
-.model-installer-head h2 { margin: 10px 0; font: 800 clamp(25px,3.2vw,40px)/1.2 "Iowan Old Style",serif; letter-spacing: -.035em; }
+.model-installer-head h2 { margin: 10px 0; font: 800 clamp(25px,3.2vw,40px)/1.2 var(--font-serif); letter-spacing: -.035em; }
 .model-installer-head p, .model-installer-foot p { margin: 8px 0 0; font-size: 12px; line-height: 1.7; color: var(--muted); }
 .model-installer button, .model-installer-entry button, .optional-model-link { cursor: pointer; border: 1px solid var(--ink); padding: 10px 13px; background: var(--ink); color: var(--paper); font-family: inherit; font-size: 12px; font-weight: 700; line-height: 1.4; transition: background .16s ease, transform .16s ease; }
 .model-installer button:active:not(:disabled) { transform: translateY(1px); }
@@ -9,32 +8,32 @@
 .model-installer button:focus-visible, .model-installer a:focus-visible, .model-installer-entry button:focus-visible, .optional-model-link:focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
 .model-installer button:disabled { opacity: .65; cursor: default; }
 .model-installer .model-close { flex-shrink: 0; background: transparent; color: var(--ink); }
-.model-host { display: grid; gap: 9px; background: var(--ink); color: #f5efdf; padding: 20px 32px; font-size: 12px; line-height: 1.6; }
+.model-host { display: grid; gap: 9px; background: var(--ink); color: var(--paper-surface); padding: 20px 32px; font-size: 12px; line-height: 1.6; }
 .model-host strong { color: var(--acid); font-size: 16px; }
-.model-host code { color: #d5cdbf; font-size: 11px; overflow-wrap: anywhere; }
+.model-host code { color: var(--paper-deep); font-size: 11px; overflow-wrap: anywhere; }
 .model-installer-guide { display: flex; gap: 30px; padding: 18px 32px; border-bottom: 1px solid var(--line); font-size: 12px; }
-.model-installer-guide b { margin-right: 7px; font-family: monospace; color: var(--muted); }
+.model-installer-guide b { margin-right: 7px; font-family: var(--font-mono); color: var(--muted); }
 .model-notice { margin: 0; padding: 15px 32px; font-size: 13px; line-height: 1.6; }
-.model-notice[data-error="true"] { color: #9a321f; background: #f4ddd3; }
+.model-notice[data-error="true"] { color: var(--signal); background: var(--signal-wash); }
 .model-install-list { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; margin: 0 32px 26px; background: var(--line); border: 1px solid var(--line); }
 .model-install-card { display: flex; flex-direction: column; gap: 16px; min-width: 0; background: var(--paper); padding: 22px; }
 .model-install-card[data-highlight="true"] { box-shadow: inset 0 4px var(--signal); }
 .model-install-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.model-install-number { font: 700 12px monospace; color: var(--muted); }
+.model-install-number { font: 700 12px var(--font-mono); color: var(--muted); }
 .model-install-badge { font-size: 11px; padding: 5px 8px; border: 1px solid var(--line); background: var(--paper-deep); }
 .model-install-card[data-state="ready"] .model-install-badge { color: var(--ink); background: var(--acid); }
-.model-install-card[data-state="failed"] .model-install-badge { color: #9a321f; background: #f4ddd3; }
+.model-install-card[data-state="failed"] .model-install-badge { color: var(--signal); background: var(--signal-wash); }
 .model-install-card[data-state="running"] .model-install-badge { color: var(--paper); background: var(--ink); }
 .model-install-card h3 { margin: 0; font-size: 18px; line-height: 1.4; }
 .model-install-card p { margin: 0; font-size: 12px; line-height: 1.75; }
 .model-install-purpose { color: var(--muted); min-height: 64px; }
-.model-install-size { font: 700 25px monospace; letter-spacing: -.04em; }
-.model-install-size small { font: 400 11px sans-serif; letter-spacing: 0; margin-left: 6px; color: var(--muted); }
-.model-install-progress { width: 100%; height: 7px; accent-color: #526b31; display: block; }
-.model-install-progress::-webkit-progress-bar { background: #d8d1c2; }
-.model-install-progress::-webkit-progress-value { background: #526b31; transition: width .25s ease; }
+.model-install-size { font: 700 25px var(--font-mono); letter-spacing: -.04em; }
+.model-install-size small { font: 400 11px var(--font-sans); letter-spacing: 0; margin-left: 6px; color: var(--muted); }
+.model-install-progress { width: 100%; height: 7px; accent-color: var(--signal); display: block; }
+.model-install-progress::-webkit-progress-bar { background: var(--paper-deep); }
+.model-install-progress::-webkit-progress-value { background: var(--signal); transition: width .25s ease; }
 .model-install-feedback { min-height: 60px; overflow-wrap: anywhere; }
-.model-install-card[data-state="failed"] .model-install-feedback { color: #9a321f; }
+.model-install-card[data-state="failed"] .model-install-feedback { color: var(--signal); }
 .model-install-card details { margin-top: auto; font-size: 11px; line-height: 1.8; }
 .model-install-card summary { cursor: pointer; color: var(--muted); }
 .model-install-card details code { display: block; margin-top: 6px; overflow-wrap: anywhere; }

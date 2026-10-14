@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import os
 import re
 import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from http.client import HTTPException as HTTPClientError
+from threading import RLock
 from typing import IO, TYPE_CHECKING, Literal, override
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -131,6 +134,7 @@ class ModelConnectionStore:
     def __init__(self, settings: Settings, *, fetcher: ModelFetcher | None = None) -> None:
         self.path = settings.library_root / "private" / "model-connections.json"
         self._fetcher = fetcher or _fetch_openai_models
+        self._write_lock = RLock()
 
     def initialize(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -225,6 +229,10 @@ class ModelConnectionStore:
         return [{"id": name, "name": name, "supports_vision": None} for name in names]
 
     def save_endpoint(self, values: Mapping[str, object]) -> dict[str, object]:
+        with self._write_lock:
+            return self._save_endpoint(values)
+
+    def _save_endpoint(self, values: Mapping[str, object]) -> dict[str, object]:
         endpoints = self.list_endpoints()
         endpoint_id = _clean_string(values.get("endpoint_id"), 80)
         provider = _provider_from_value(values.get("provider"))
@@ -266,6 +274,14 @@ class ModelConnectionStore:
         endpoint_id: str,
         model_values: list[Mapping[str, object]],
     ) -> dict[str, object]:
+        with self._write_lock:
+            return self._save_endpoint_models(endpoint_id, model_values)
+
+    def _save_endpoint_models(
+        self,
+        endpoint_id: str,
+        model_values: list[Mapping[str, object]],
+    ) -> dict[str, object]:
         endpoint = self.get_endpoint(endpoint_id)
         existing_legacy = {
             model.name: model.legacy_id for model in endpoint.models if model.legacy_id
@@ -288,6 +304,10 @@ class ModelConnectionStore:
         return self.get_endpoint(endpoint.endpoint_id).public()
 
     def delete(self, connection_id: str) -> dict[str, object]:
+        with self._write_lock:
+            return self._delete(connection_id)
+
+    def _delete(self, connection_id: str) -> dict[str, object]:
         _validate_endpoint_id(connection_id)
         endpoints = self.list_endpoints()
         retained = [item for item in endpoints if item.endpoint_id != connection_id]
@@ -331,6 +351,10 @@ class ModelConnectionStore:
 
     def set_caption_assist(self, connection_id: str) -> None:
         """记下选择。空字串代表清除。回到自动挑第一个。"""
+        with self._write_lock:
+            self._set_caption_assist(connection_id)
+
+    def _set_caption_assist(self, connection_id: str) -> None:
         value = connection_id.strip()
         if value and self.resolve(value) is None:
             message = "选择的模型连接不存在或已停用"
@@ -358,13 +382,16 @@ class ModelConnectionStore:
         }
         if keep:
             payload["caption_assist"] = keep
-        temporary.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        temporary.chmod(0o600)
-        temporary.replace(self.path)
-        self.path.chmod(0o600)
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                stream.write(
+                    json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+                )
+            temporary.replace(self.path)
+            self.path.chmod(0o600)
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 def validate_model_base_url(value: str) -> str:
@@ -627,7 +654,7 @@ def _fetch_openai_models(base_url: str, api_key: str) -> list[str]:
     except HTTPError as error:
         message = f"模型列表读取失败: 服务返回 HTTP {error.code}"
         raise ModelConnectionError(message) from error
-    except (URLError, TimeoutError) as error:
+    except (HTTPClientError, OSError) as error:
         message = "无法连接模型服务"
         raise ModelConnectionError(message) from error
     if len(body) > MAX_RESPONSE_BYTES:
@@ -635,7 +662,7 @@ def _fetch_openai_models(base_url: str, api_key: str) -> list[str]:
         raise ModelConnectionError(message)
     try:
         payload = json.loads(body)
-    except json.JSONDecodeError as error:
+    except (ValueError, RecursionError) as error:
         message = "模型服务没有返回有效 JSON"
         raise ModelConnectionError(message) from error
     if not isinstance(payload, dict):

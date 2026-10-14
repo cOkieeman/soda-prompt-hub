@@ -5,7 +5,7 @@ Windows 单机的数据则保存在 Windows，见[快速开始](QUICK_START.md)�
 
 ## 启动、停止与诊断
 
-从[Mac + Windows Worker Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914)
+从[Mac + Windows Worker Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0)
 下载 DMG，核对 SHA-256，将应用拖入 Applications。默认应用位置是：
 
 ```text
@@ -29,7 +29,7 @@ Windows 单机的数据则保存在 Windows，见[快速开始](QUICK_START.md)�
 
 ## 连接 Windows
 
-Windows 开启 ComfyUI 和独立 Soda Compute Worker。Mac WebUI“设备连接”按配对引导保存主机与共享名称，
+Windows 开启 ComfyUI 和独立 Soda Compute Worker。Mac WebUI“设置 → 设备连接”按配对引导保存主机与共享名称，
 在系统窗口完成 SMB 授权；密码由 macOS 钥匙串保存，不填写进 Prompt Hub。
 
 启动器每5秒检查连接。“共享已连接”只证明任务目录可访问；“已连接 · 可以计算”还要求 Worker
@@ -43,7 +43,7 @@ Windows 开启 ComfyUI 和独立 Soda Compute Worker。Mac WebUI“设备连接�
 2. 下载目标构建的 DMG，核对日期、tag 和 SHA-256。界面同为1.1.0不代表是同一构建。
 3. 从当前启动器选择“退出并停止服务”；失败时先处理日志中的原因。
 4. 用 DMG 中的新 App 覆盖 Applications 中的旧 App，不拖动个人资料目录。
-5. 从 Applications 打开新版，核对项目、配置与结果，再按[1.1.1 pre1 手动验收](acceptance/manual-1.1.1-pre1-20260914.md)检查。
+5. 从 Applications 打开新版，核对项目、配置与结果，再核对[1.2.0 发行验证范围](acceptance/release-1.2.0-20261005.md)。
 
 DMG 覆盖安装不会自动执行旧源码更新器的备份/失败回滚流程，应事先主动备份。
 完成备份与停服后，覆盖旧 `.app` 即可升级；删除 `.app` 只卸载程序，不主动删除个人资料。

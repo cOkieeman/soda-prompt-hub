@@ -2,6 +2,8 @@
 
 # ruff: noqa: RUF001, E501 -- embedded HTML/CSS/JavaScript, like remote_web.py
 
+from prompt_hub.web_resources import read_web_asset
+
 PAIRING_HTML = r"""
 <section class="pairing-entry" id="pairingEntry" hidden>
   <div><span class="eyebrow">FIRST CONNECTION / 首次连接</span><h2>让两台设备一起工作。</h2><p>从 Windows 准备，到 Mac 登录，再到逐项验收。每一步都在这里。</p></div>
@@ -37,22 +39,9 @@ PAIRING_HTML = r"""
 </dialog>
 """
 
-PAIRING_STYLES = r"""
+PAIRING_STYLES = f"""
 <style>
-.pairing-entry{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 30px;border-bottom:1px solid var(--line);background:#efefdf}
-.pairing-entry[hidden],.pairing-dialog [hidden]{display:none!important}
-.pairing-entry h2{margin:8px 0;font-size:24px}.pairing-entry p{margin:0}
-.pairing-dialog{width:min(660px,calc(100vw - 32px));max-height:85vh;box-sizing:border-box;border:1px solid #282822;background:#f6f3eb;color:#272922;padding:28px;overflow:auto}
-.pairing-dialog::backdrop{background:#20251f75;backdrop-filter:blur(4px)}
-.pairing-dialog header{display:flex;justify-content:space-between;align-items:start;gap:20px}.pairing-dialog h2{margin:8px 0 20px;font-size:30px}.pairing-dialog h3{font-size:22px;margin:24px 0 12px}
-.pairing-dialog p{font-size:14px;line-height:1.8}.pairing-dialog label{display:grid;gap:8px;margin:16px 0;font-size:14px}.pairing-dialog input{width:100%;box-sizing:border-box;padding:12px;background:#fffdf6;border:1px solid #a3a493;color:inherit;font:inherit}
-.pairing-dialog button,.pairing-entry button{appearance:none;border:1px solid #272922;background:transparent;color:inherit;font:inherit;padding:11px 16px;cursor:pointer}.pairing-dialog button:disabled{opacity:.5;cursor:wait}.pairing-dialog button:hover:not(:disabled),.pairing-entry button:hover{background:#d8ee87}.pairing-dialog button:focus-visible{outline:3px solid #768d34;outline-offset:3px}
-.pairing-track{display:flex;list-style:none;margin:0;padding:0;border-block:1px solid #b4b6a5;font-size:12px}.pairing-track li{flex:1;padding:12px 5px;color:#747868}.pairing-track [aria-current]{color:#20251f;background:#d8ee87}
-.pairing-checks{list-style:none;padding:0}.pairing-checks li{display:flex;gap:16px;justify-content:space-between;padding:13px 0;border-bottom:1px solid #c3c4b5}.pairing-checks [data-ok="true"] strong{color:#466612}.pairing-checks strong{font-size:13px}.pairing-dialog footer{border-top:1px solid #c3c4b5;margin-top:22px;padding-top:16px}.pairing-dialog details{margin:18px 0}.pairing-dialog summary{cursor:pointer;font-size:14px}.pairing-dialog section:not([hidden]){animation:pairing-in .22s ease-out}
-@keyframes pairing-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.pairing-dialog section:not([hidden]){animation:none}}
-@media(max-width:620px){.pairing-entry{align-items:start;flex-direction:column;padding:22px}.pairing-dialog{padding:20px}.pairing-track{font-size:11px}}
-</style>
+{read_web_asset("pairing.css")}</style>
 """
 
 PAIRING_SCRIPT = r"""

@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING
 
 from PIL import Image, ImageOps
 
+from prompt_hub.local_sources import mapped_catalogue_path, mapped_source_path
+from prompt_hub.style_explorers import style_media_root
+
 if TYPE_CHECKING:
     from prompt_hub.config import Settings
 
@@ -47,7 +50,9 @@ def media_type_for(path: Path) -> str:
 
 
 def build_kisega_thumbnails(settings: Settings) -> tuple[int, int]:
-    source_root = settings.git_sources_root / "Kisegaeningyou"
+    source_root = mapped_source_path(
+        settings, _KISEGA_SOURCE_ID, settings.git_sources_root / "Kisegaeningyou"
+    )
     target_root = settings.thumbnails_root / _KISEGA_SOURCE_ID
     generated = 0
     current = 0
@@ -96,7 +101,13 @@ def _media_request(
     relative: PurePosixPath,
 ) -> tuple[Path, Path, str] | None:
     if source_id == _KISEGA_SOURCE_ID and variant == "original":
-        return settings.git_sources_root / "Kisegaeningyou", Path(*relative.parts), ".png"
+        return (
+            mapped_source_path(
+                settings, _KISEGA_SOURCE_ID, settings.git_sources_root / "Kisegaeningyou"
+            ),
+            Path(*relative.parts),
+            ".png",
+        )
     if source_id == _KISEGA_SOURCE_ID and variant == "thumbnail":
         return (
             settings.thumbnails_root / _KISEGA_SOURCE_ID,
@@ -104,9 +115,21 @@ def _media_request(
             ".webp",
         )
     if source_id == _CLIO_SOURCE_ID and variant in {"original", "thumbnail"}:
-        return settings.git_sources_root / "clio-style-preview", Path(*relative.parts), ".jpg"
+        return (
+            mapped_source_path(
+                settings, _CLIO_SOURCE_ID, settings.git_sources_root / "clio-style-preview"
+            ),
+            Path(*relative.parts),
+            ".jpg",
+        )
     if source_id == _ANIMADEX_SOURCE_ID and variant in {"original", "thumbnail"}:
         return _animadex_media_request(settings, relative)
+    if variant in {"original", "thumbnail"}:
+        snapshot = relative.parts[:1] == ("snapshot",)
+        image_relative = PurePosixPath(*relative.parts[1:]) if snapshot else relative
+        style_root = style_media_root(settings, source_id, snapshot=snapshot)
+        if style_root is not None and image_relative.parts[:1] == ("images",):
+            return style_root, Path(*image_relative.parts), ".webp"
     return None
 
 
@@ -114,9 +137,16 @@ def _animadex_media_request(
     settings: Settings,
     relative: PurePosixPath,
 ) -> tuple[Path, Path, str] | None:
-    source_root = settings.git_sources_root / "AnimaDex"
+    source_root = mapped_source_path(
+        settings, _ANIMADEX_SOURCE_ID, settings.git_sources_root / "AnimaDex"
+    )
     if relative.parts[:1] == ("catalogue",):
-        return _animadex_data_root(source_root), Path(*relative.parts[1:]), ".webp"
+        return (
+            mapped_catalogue_path(settings, _ANIMADEX_SOURCE_ID)
+            or _animadex_data_root(source_root),
+            Path(*relative.parts[1:]),
+            ".webp",
+        )
     if relative.parts[:2] == ("samples", "images"):
         return source_root, Path(*relative.parts), ".webp"
     return None

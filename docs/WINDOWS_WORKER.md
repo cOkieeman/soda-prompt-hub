@@ -8,14 +8,14 @@ Windows Worker 是 Mac Prompt Hub 与 Windows 本机 ComfyUI 之间的任务执�
 
 ## 下载与首次配置
 
-1. 从[Mac + Windows Worker Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914)下载并运行 `Soda-Compute-Worker-1.1.1-Setup.exe`。
+1. 从[Mac + Windows Worker Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0)下载并运行 `Soda-Compute-Worker-1.2.0-Setup.exe`。
 2. 当前安装器未签名；若 SmartScreen 拦截，先核对 Release 页面公布的 SHA-256，再选择继续运行。
 3. 从开始菜单打开 `Soda Compute Worker`。
 4. 启动 ComfyUI，确认 <http://127.0.0.1:8188> 能打开。
 5. 在“设置”中确认 bridge、ComfyUI、LoRA 和模型目录。
 6. 有效配置下会自动启动接收服务；若未运行，按界面提示保存配置并启动。需要独立自检时先停Worker，不能把上次自检通过当实时在线。
 
-这套是2026-09-14的1.1.1 Pre-release，未正式签名且高成本人工验收待完成。
+这套是 1.2.0 Pre-release，未正式签名；已完成运行与界面验收，完整 Setup 生命周期仍待验证。
 Mac配对共享的首次授权由系统窗口处理；Worker窗口可收起到系统托盘，不显示命令窗口。
 
 安装器已经包含 Python 3.12 runtime，普通用户不需要安装 Python。只有维护包或图形界面无法启动时，

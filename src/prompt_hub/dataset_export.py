@@ -68,6 +68,8 @@ def create_dataset_export(
     if not project_id:
         raise DatasetExportError("项目缺少 project_id")
     compiled = compile_prompt(project, profile_id)
+    if compiled.get("scene_plan_stale"):
+        raise DatasetExportError("画面方案已过期; 请重新设计或清除旧方案后再导出数据集")
     default_caption = str(compiled.get("positive", "")).strip()
     if not default_caption:
         raise DatasetExportError("当前 Profile 没有可用的 positive prompt")

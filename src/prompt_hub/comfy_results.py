@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -15,6 +16,8 @@ from uuid import uuid4
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from prompt_hub.generation_evidence import inspect_generation_evidence
+
 if TYPE_CHECKING:
     from prompt_hub.background_jobs import JobContext
 
@@ -27,6 +30,9 @@ SUPPORTED_FORMATS = {
     "WEBP": (".webp", "image/webp"),
 }
 DISPOSITIONS = {"unreviewed", "candidate", "failed_test", "reference"}
+INVALID_METADATA_NUMBER_WARNING = (
+    "部分生成记录字段含无效数值; 已标为未知并保留其余字段, 记录可能不完整。"
+)
 
 
 class ComfyResultError(ValueError):
@@ -413,6 +419,8 @@ def inspect_comfy_image(raw: bytes, *, filename: str) -> dict[str, Any]:
             opened.load()
     except ComfyResultError:
         raise
+    except ValueError as error:
+        raise ComfyResultError("图片附加信息无效或过长; 请使用附加信息较少的图片副本") from error
     except (Image.DecompressionBombError, OSError, UnidentifiedImageError) as error:
         raise ComfyResultError("无法识别或读取这张图片") from error
     suffix, content_type = SUPPORTED_FORMATS[image_format]
@@ -438,16 +446,51 @@ def parse_generation_metadata(
     width: int,
     height: int,
 ) -> dict[str, Any]:
-    prompt = _json_value(raw_info.get("prompt"))
-    workflow = _json_value(raw_info.get("workflow"))
+    warnings: list[str] = []
+    prompt = _json_value(raw_info.get("prompt"), warnings=warnings)
+    workflow = _json_value(raw_info.get("workflow"), warnings=warnings)
     parameters = str(raw_info.get("parameters", ""))[:200_000]
+    saved_resource_metadata: dict[str, Any] = {}
+    for key, value in raw_info.items():
+        if key.casefold() not in {
+            "resources_json",
+            "lora_hashes",
+            "lora hashes",
+            "additional_hashes",
+            "civitai resources",
+            "civitai_resources",
+            "hashes",
+        }:
+            continue
+        bounded_value = value[:200_000] if isinstance(value, str) else value
+        saved_resource_metadata[key] = (
+            _json_value(bounded_value, warnings=warnings)
+            if key.casefold()
+            in {"resources_json", "civitai resources", "civitai_resources", "hashes"}
+            else bounded_value
+        )
     nodes = _prompt_nodes(prompt)
     extracted = _extract_nodes(nodes)
     if parameters:
         extracted = {**_parse_parameters(parameters), **{k: v for k, v in extracted.items() if v}}
-    source = "comfyui" if prompt or workflow else "parameters" if parameters else "none"
+    source = (
+        "comfyui"
+        if prompt or workflow
+        else "parameters"
+        if parameters
+        else "saved_resources"
+        if saved_resource_metadata
+        else "none"
+    )
+    evidence = inspect_generation_evidence(
+        prompt,
+        workflow,
+        parameters=parameters,
+        saved_metadata=saved_resource_metadata,
+    )
+    evidence["warnings"] = [*warnings, *evidence["warnings"]]
     return {
-        "metadata_present": bool(prompt or workflow or parameters),
+        "metadata_present": bool(prompt or workflow or parameters or saved_resource_metadata),
         "source": source,
         "seed": extracted.get("seed"),
         "steps": extracted.get("steps"),
@@ -465,6 +508,8 @@ def parse_generation_metadata(
         "prompt": prompt,
         "workflow": workflow,
         "parameters": parameters,
+        **({"saved_resource_metadata": saved_resource_metadata} if saved_resource_metadata else {}),
+        "generation_evidence": evidence,
     }
 
 
@@ -588,13 +633,28 @@ def _linked_text(value: Any, text_by_node: Mapping[str, str]) -> str:
     return ""
 
 
-def _json_value(value: Any) -> Any:
+def _json_value(value: Any, *, warnings: list[str] | None = None) -> Any:
     if isinstance(value, (dict, list)):
-        return value
+        # Reparse a copy so direct callers receive the same normalization without input mutation.
+        value = json.dumps(value)
     if not isinstance(value, str) or not value.strip():
         return None
+    warnings = warnings if warnings is not None else []
+
+    def invalid_constant(_constant: str) -> None:
+        if INVALID_METADATA_NUMBER_WARNING not in warnings:
+            warnings.append(INVALID_METADATA_NUMBER_WARNING)
+
+    def finite_float(text: str) -> float | None:
+        number = float(text)
+        if math.isfinite(number):
+            return number
+        return invalid_constant(text)
+
     try:
-        return json.loads(value)
+        # PNG records may use NaN cache markers or numeric overflow in arbitrary nested fields.
+        # Unknown values remain present as null; valid values and original PNG bytes are retained.
+        return json.loads(value, parse_constant=invalid_constant, parse_float=finite_float)
     except json.JSONDecodeError:
         return value[:200_000]
 

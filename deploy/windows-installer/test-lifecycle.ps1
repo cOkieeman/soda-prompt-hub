@@ -1,13 +1,19 @@
 ﻿param(
     [Parameter(Mandatory = $true)]
     [string]$InstallerRoot,
-    [string]$StatusPath = ""
+    [string]$StatusPath = "",
+    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\.."))
 )
 
 $ErrorActionPreference = "Stop"
 $installers = (Resolve-Path -LiteralPath $InstallerRoot).Path
-$desktopSetup = Join-Path $installers "Soda-Prompt-Hub-Desktop-1.1.1-Setup.exe"
-$workerSetup = Join-Path $installers "Soda-Compute-Worker-1.1.1-Setup.exe"
+$release = Get-Content -LiteralPath (Join-Path $RepositoryRoot "RELEASE.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+$version = [string]$release.product_version
+if ([string]::IsNullOrWhiteSpace($version)) {
+    throw "RELEASE.json is missing product_version."
+}
+$desktopSetup = Join-Path $installers "Soda-Prompt-Hub-Desktop-$version-Setup.exe"
+$workerSetup = Join-Path $installers "Soda-Compute-Worker-$version-Setup.exe"
 $desktopRoot = Join-Path $env:LOCALAPPDATA "Programs\Soda Prompt Hub"
 $workerRoot = Join-Path $env:LOCALAPPDATA "Programs\Soda Compute Worker"
 $desktopData = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Soda Prompt Hub"
@@ -161,7 +167,7 @@ try {
     $desktopProcess = Start-Process -FilePath (Join-Path $desktopRoot "Soda Prompt Hub.exe") -PassThru
     $workerProcess = Start-Process -FilePath (Join-Path $workerRoot "Soda Compute Worker.exe") -PassThru
     $health = Read-Health
-    if ([string]$health.version -ne "1.1.1") {
+    if ([string]$health.version -ne $version) {
         throw "Installed Desktop reported unexpected version: $($health.version)"
     }
     if ([string]$health.release_channel -ne "stable") {

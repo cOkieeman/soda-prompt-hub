@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Mapping
 from contextlib import suppress
+from http.client import HTTPException as HTTPClientError
 from io import BytesIO
 from typing import IO, TYPE_CHECKING, Any, override
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from PIL import Image, ImageOps
@@ -29,6 +31,7 @@ if TYPE_CHECKING:
 
 DEFAULT_LM_STUDIO_URL = "http://127.0.0.1:1234/v1"
 MAX_MODEL_RESPONSE_BYTES = 4 * 1024 * 1024
+MAX_CREATIVE_CONTEXT_BYTES = 512 * 1024
 SLOT_COMPLETION_MAX_TOKENS = 4096
 
 
@@ -38,6 +41,103 @@ class LocalModelError(RuntimeError):
 
 def caption_mode_contract() -> dict[str, Any]:
     return _caption_mode_contract()
+
+
+def request_creative_json(
+    *,
+    model: str,
+    system_prompt: str,
+    context: dict[str, Any],
+    image_path: Path | None = None,
+    max_tokens: int = 7000,
+    base_url: str = DEFAULT_LM_STUDIO_URL,
+    connections: ModelConnectionStore | None = None,
+) -> dict[str, Any]:
+    """Request a bounded JSON preview without applying model output."""
+    if not model.strip():
+        raise LocalModelError("请先选择模型")
+    external = _resolve_external_model(model, connections)
+    serialized = json.dumps(context, ensure_ascii=False)
+    if len(serialized.encode()) > MAX_CREATIVE_CONTEXT_BYTES:
+        raise LocalModelError(
+            "AI 创作上下文超过512 KiB，请减少参考图或候选资料后重试；本次未保存建议"
+        )
+    text_prompt = serialized + "\n/no_think"
+    if image_path is not None and external:
+        content = _external_vision_completion(
+            connection=external,
+            system_prompt=system_prompt,
+            text_prompt=text_prompt,
+            image_data_url=_image_data_url(image_path),
+            temperature=0.2,
+            max_tokens=max_tokens,
+        )
+    elif image_path is not None:
+        payload = {
+            "model": model,
+            "system_prompt": system_prompt,
+            "input": [
+                {"type": "image", "data_url": _image_data_url(image_path)},
+                {"type": "text", "content": text_prompt},
+            ],
+            "temperature": 0.2,
+            "max_output_tokens": max_tokens,
+            "reasoning": "off",
+            "stream": False,
+            "store": False,
+        }
+        server_root = base_url.rstrip("/").removesuffix("/v1")
+        response = _request_json(
+            f"{server_root}/api/v1/chat",
+            method="POST",
+            payload=payload,
+            timeout=180,
+            response_limit=MAX_MODEL_RESPONSE_BYTES,
+        )
+        _reject_truncated_response(response)
+        try:
+            content = "\n".join(
+                str(item.get("content", ""))
+                for item in response["output"]
+                if isinstance(item, dict) and item.get("type") == "message"
+            )
+        except (KeyError, TypeError) as error:
+            raise LocalModelError("视觉模型返回格式错误") from error
+    else:
+        payload = {
+            "model": external.model_name if external else model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text_prompt},
+            ],
+            "temperature": 0.35,
+            "max_tokens": max_tokens,
+            "stream": False,
+            "enable_thinking": False,
+            "chat_template_kwargs": {"enable_thinking": False},
+        }
+        response = _request_json(
+            f"{(external.base_url if external else base_url).rstrip('/')}/chat/completions",
+            method="POST",
+            payload=payload,
+            timeout=180,
+            api_key=external.api_key if external else "",
+            allow_redirects=external is None,
+            response_limit=MAX_MODEL_RESPONSE_BYTES,
+            service_name="外部模型服务" if external else "LM Studio",
+        )
+        try:
+            choice = response["choices"][0]
+            if choice.get("finish_reason") == "length":
+                raise LocalModelError("AI 输出被截断，本次建议未保存，请缩短描述或更换模型重试")
+            _reject_truncated_response(response)
+            content = str(choice["message"]["content"] or "")
+        except (KeyError, IndexError, AttributeError, TypeError) as error:
+            raise LocalModelError("模型返回格式错误") from error
+    try:
+        return _extract_json_object(content)
+    except json.JSONDecodeError as error:
+        raise LocalModelError("模型没有返回完整、可识别的 JSON，本次建议未保存") from error
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -122,7 +222,7 @@ def organize_slots(
         timeout=90,
         api_key=external.api_key if external else "",
         allow_redirects=external is None,
-        response_limit=MAX_MODEL_RESPONSE_BYTES if external else None,
+        response_limit=MAX_MODEL_RESPONSE_BYTES,
         service_name="外部模型服务" if external else "LM Studio",
     )
     try:
@@ -132,6 +232,7 @@ def organize_slots(
                 f"AI补全达到输出上限（{SLOT_COMPLETION_MAX_TOKENS} tokens），"
                 "回答被截断，本次建议未应用。可缩短创作描述或换用其他模型后手动重试。"
             )
+        _reject_truncated_response(response)
         content = choice["message"]["content"]
         suggested = _extract_json_object(str(content))
     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as error:
@@ -196,9 +297,10 @@ def expand_sourcing_queries(
         timeout=90,
         api_key=external.api_key if external else "",
         allow_redirects=external is None,
-        response_limit=MAX_MODEL_RESPONSE_BYTES if external else None,
+        response_limit=MAX_MODEL_RESPONSE_BYTES,
         service_name="外部模型服务" if external else "LM Studio",
     )
+    _reject_truncated_response(response)
     try:
         content = response["choices"][0]["message"]["content"]
         raw_queries = _extract_json_object(str(content))
@@ -280,6 +382,7 @@ def analyze_result_image(
             payload=payload,
             timeout=180,
         )
+        _reject_truncated_response(response)
         try:
             content = "\n".join(
                 str(item.get("content", ""))
@@ -392,6 +495,7 @@ def draft_krea2_caption(
             payload=payload,
             timeout=180,
         )
+        _reject_truncated_response(response)
         try:
             content = "\n".join(
                 str(item.get("content", ""))
@@ -506,6 +610,7 @@ def draft_anima_tags(
             payload=payload,
             timeout=180,
         )
+        _reject_truncated_response(response)
         provider = "LM Studio"
         try:
             content = "\n".join(
@@ -621,8 +726,11 @@ def revise_caption_with_model(
         payload=payload,
         timeout=CAPTION_REVISION_TIMEOUT,
         api_key=connection.api_key,
+        allow_redirects=False,
+        response_limit=MAX_MODEL_RESPONSE_BYTES,
         service_name="改写服务",
     )
+    _reject_truncated_response(response)
     try:
         revised = str(response["choices"][0]["message"]["content"]).strip()
     except (KeyError, IndexError, TypeError) as error:
@@ -640,7 +748,7 @@ def _request_json(
     timeout: float = 4,
     api_key: str = "",
     allow_redirects: bool = True,
-    response_limit: int | None = None,
+    response_limit: int | None = MAX_MODEL_RESPONSE_BYTES,
     service_name: str = "LM Studio",
 ) -> Any:
     data = json.dumps(payload).encode() if payload is not None else None
@@ -662,18 +770,22 @@ def _request_json(
             raise LocalModelError(f"{service_name}响应超过安全上限")
         return json.loads(body)
     except HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace").strip()[:800]
+        detail = error.read(8192).decode("utf-8", errors="replace").strip()
         try:
             parsed_detail = json.loads(detail)
             detail = str(parsed_detail.get("error", {}).get("message") or detail)
         except (AttributeError, json.JSONDecodeError):
             pass
+        if api_key:
+            detail = detail.replace(api_key, "[已隐藏凭据]")
+        detail = detail[:800]
         message = f"{service_name}返回 HTTP {error.code}"
         if detail:
             message += f"：{detail}"
         raise LocalModelError(message) from error
-    except (URLError, TimeoutError, json.JSONDecodeError) as error:
-        raise LocalModelError(f"无法连接{service_name}：{error}") from error
+    except (HTTPClientError, OSError, ValueError, RecursionError) as error:
+        detail = str(error).replace(api_key, "[已隐藏凭据]") if api_key else str(error)
+        raise LocalModelError(f"无法连接{service_name}：{detail}") from error
 
 
 def _resolve_external_model(
@@ -735,6 +847,7 @@ def _external_vision_completion(
     except (KeyError, IndexError, TypeError) as error:
         raise LocalModelError("外部视觉模型返回格式错误") from error
     if content.strip():
+        _reject_truncated_response(response)
         return content
     # 空内容配上 length。几乎总是被推理吃光了额度。
     # 只回「没有返回可识别的 JSON」的话。人会去怀疑提示词或模型能力。
@@ -743,6 +856,23 @@ def _external_vision_completion(
             "模型把输出额度用在内部推理上，没有留下内容。请调高说明长度，或换一个不做长推理的模型"
         )
     raise LocalModelError("外部视觉模型返回了空内容")
+
+
+def _reject_truncated_response(response: Any) -> None:
+    if not isinstance(response, Mapping):
+        return
+    records = [response, response.get("stats", {})]
+    for key in ("choices", "output"):
+        values = response.get(key, [])
+        if isinstance(values, list):
+            records.extend(values[:8])
+    truncated = {"length", "max_tokens", "max_output_tokens", "maxpredictedtokensreached"}
+    for record in records:
+        if isinstance(record, Mapping) and any(
+            str(record.get(key, "")).casefold() in truncated
+            for key in ("finish_reason", "stop_reason")
+        ):
+            raise LocalModelError("模型输出被截断，本次未保存，请缩短内容或更换模型后重试")
 
 
 def _image_data_url(path: Path) -> str:

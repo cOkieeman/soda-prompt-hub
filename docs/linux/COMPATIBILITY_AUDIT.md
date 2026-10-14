@@ -13,7 +13,7 @@ Soda Prompt Hub Linux 适配审计报告（第一阶段交付物）。
 | --- | --- |
 | 上游仓库 | `https://github.com/cOkieeman/soda-prompt-hub` |
 | 基线 commit | `e96249bc29b71cdf8efba52d232c368f5c466549`（`main`，2026-09-14 10:34 UTC） |
-| 软件版本 | `1.1.1`（`pyproject.toml`） |
+| 软件版本 | `1.1.1`（审计基线；当前分支已跟进到 `1.2.0`） |
 | 审计分支 | `linux/main`（基于 `upstream/main`） |
 | 审计日期 | 2026-09-14 |
 | 审计方式 | 只读静态分析（`git grep` 遍历 `upstream/main` 树），未修改任何上游文件 |

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from prompt_hub.creative import compile_prompt
 from prompt_hub.dataset_workspace import DatasetWorkspaceError
@@ -37,6 +37,7 @@ class ProjectJourneyError(ValueError):
 
 class ProjectDatasetSyncInput(BaseModel):
     profile_id: Literal["anima", "krea2"] = "anima"
+    expected_revision: int | None = Field(default=None, ge=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +103,11 @@ def create_project_journey_router(services: ProjectJourneyServices) -> APIRouter
         project = services.creative_store.get_project(project_id)
         if project is None:
             raise HTTPException(status_code=404, detail="Creative project not found")
+        if (
+            payload.expected_revision is not None
+            and project["revision"] != payload.expected_revision
+        ):
+            raise HTTPException(status_code=409, detail="项目已改变; 请重新读取后再同步数据集")
         try:
             synced = sync_project_results(
                 services.settings,
@@ -180,6 +186,9 @@ def _project_sync_context(
         message = "项目缺少有效的 project_id"
         raise ProjectJourneyError(message)
     compiled = {profile: compile_prompt(project, profile) for profile in ("anima", "krea2")}
+    if compiled[profile_id].get("scene_plan_stale"):
+        message = "画面方案已过期; 请重新设计或清除旧方案后再同步数据集"
+        raise ProjectJourneyError(message)
     default_caption = str(compiled[profile_id].get("positive", "")).strip()
     if not default_caption:
         message = f"当前 {profile_id.upper()} Prompt 还没有可用内容"
