@@ -16,7 +16,7 @@
     let sourceDetails = new Map();
     const sourceSetupSkipKey = 'soda-prompt-hub-source-setup-skipped';
     const sourceSyncUi = {busy:false,rebuilding:false,sources:[],jobs:[],job:null,loadSerial:0,localMessage:false,epoch:0};
-    const viewLabels = {home:'首页', creative:'创作台', prompts:'提示词库', gallery:'画廊', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'出图', management:'资料管理', remote:'设备连接'};
+    const viewLabels = {home:'首页', creative:'创作台', storyboard:'分镜', prompts:'提示词库', gallery:'画廊', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'出图', management:'资料管理', remote:'设备连接'};
 
     function setPromptHubDeviceName(value) {
       remoteDeviceName = String(value || '').trim() || 'Windows 绘图设备';
@@ -525,6 +525,7 @@
     const VIEW_MOTION_SELECTORS = {
       home: '#homePage .home-lead',
       creative: '#creativePage .creative-heading',
+      storyboard: '#storyboardPage .storyboard-heading',
       gallery: '#galleryPage .gallery-heading',
       discover: '#discoveryPage .discovery-hero',
       datasets: '#workspacePage .dataset-heading',
@@ -610,6 +611,7 @@
       const archiveMode = view === 'prompts' || view === 'characters';
       $('#homePage').hidden = view !== 'home';
       $('#creativePage').hidden = view !== 'creative';
+      $('#storyboardPage').hidden = view !== 'storyboard';
       $('#galleryPage').hidden = view !== 'gallery';
       $('#discoveryPage').hidden = view !== 'discover';
       $('#workspacePage').hidden = view !== 'datasets';
@@ -631,6 +633,9 @@
       } else if (view === 'creative' && window.ensureCreativeProject) {
         currentMode = view;
         await window.ensureCreativeProject();
+      } else if (view === 'storyboard' && window.ensureStoryboardProjects) {
+        currentMode = view;
+        await window.ensureStoryboardProjects();
       } else if (view === 'discover' && window.ensureHybridSearch) {
         currentMode = view;
         await window.ensureHybridSearch();
@@ -659,7 +664,7 @@
     window.setPromptHubView = setView;
 
     function showNavigationError(error) {
-      const targets = {creative:'#creativeSaveState', gallery:'#galleryStatus', datasets:'#datasetReviewToolsResult', remote:'#remoteTaskSummary', comfy:'#comfyStatus'};
+      const targets = {creative:'#creativeSaveState', storyboard:'#storyboardStatus', gallery:'#galleryStatus', datasets:'#datasetReviewToolsResult', remote:'#remoteTaskSummary', comfy:'#comfyStatus'};
       const target = $(targets[currentMode] || '#appNavCurrent');
       target.textContent = `页面读取失败：${error.message}。可以点击导航重试。`;
       console.error(error);
