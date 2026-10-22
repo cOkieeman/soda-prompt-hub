@@ -95,6 +95,8 @@ def create_workflow_router(
     ) -> dict[str, Any]:
         try:
             profile = store.get_profile(profile_id)
+            if profile["model_family"] == "moss":
+                raise WorkflowProfileError("请从分镜页面编译并投递 MOSS 工作流")
             project, compiled, generation = _project_values(
                 creative_store,
                 payload.project_id,

@@ -73,6 +73,11 @@ from prompt_hub.search_routes import create_search_router
 from prompt_hub.source_routes import create_source_router
 from prompt_hub.source_sync import SourceSyncService
 from prompt_hub.sourcing import allowed_safety_levels, source_candidates
+from prompt_hub.storyboard import StoryboardStore
+from prompt_hub.storyboard_ai import StoryboardAIService
+from prompt_hub.storyboard_editor import StoryboardEditorManager
+from prompt_hub.storyboard_generation import StoryboardGenerationService
+from prompt_hub.storyboard_routes import create_storyboard_router
 from prompt_hub.tag_completion_routes import create_tag_completion_router
 from prompt_hub.tag_completions import TAG_DOWNLOAD_JOB_TYPE, TagCompletionStore
 from prompt_hub.tag_locale import (
@@ -249,6 +254,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     web_capture = WebCaptureService(active_settings, database)
     remote_store = RemoteNodeStore(active_settings.remote_nodes_root)
     workflow_store = WorkflowProfileStore(active_settings.workflow_profiles_root)
+    storyboard_store = StoryboardStore(active_settings)
+    storyboard_ai = StoryboardAIService(storyboard_store, model_connections, database)
+    storyboard_editors = StoryboardEditorManager(storyboard_store)
+    storyboard_generation = StoryboardGenerationService(
+        storyboard_store, workflow_store, remote_store, comfy_store
+    )
     hybrid_search = HybridSearchService(database, embedding_store, remote_store)
     visual_catalog = VisualAssetCatalog(
         active_settings,
@@ -313,12 +324,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         embedding_store.initialize()
         remote_store.initialize()
         workflow_store.initialize()
+        storyboard_store.initialize()
         visual_config.initialize()
         tag_store.initialize()
         job_runner.start()
         try:
             yield
         finally:
+            storyboard_editors.close()
             job_runner.stop()
 
     application = FastAPI(
@@ -362,6 +375,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(create_search_router(hybrid_search))
     application.include_router(create_remote_router(remote_store))
     application.include_router(create_model_router(model_connections))
+    application.include_router(
+        create_storyboard_router(
+            storyboard_store, storyboard_ai, storyboard_editors, storyboard_generation
+        )
+    )
     application.include_router(
         create_gallery_router(
             active_settings, gallery_store, creative_store, job_runner, model_connections
