@@ -12,6 +12,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import uuid4
 
+from soda_storyboard.production.graphs import v2_graph
+
 PROFILE_FORMAT = "soda-workflow-profile-v1"
 PACKAGE_FORMAT = "soda-comfyui-package-v1"
 MAX_WORKFLOW_BYTES = 2 * 1024 * 1024
@@ -48,6 +50,41 @@ class WorkflowRule:
 
 
 RULES = {
+    "moss-soda-v2": WorkflowRule(
+        profile_id="moss-soda-v2",
+        model_family="moss",
+        required_nodes={
+            "620": "String Literal",
+            "622": "Any Switch (rgthree)",
+            "75": "String Literal",
+            "77": "Lora Loader (LoraManager)",
+            "81": "Image Saver",
+            "84": "Seed (rgthree)",
+            "150": "ResolutionPreset",
+            "135:105": "Int Literal",
+            "135:102": "Cfg Literal",
+            "135:513": "Sampler Selector",
+            "135:65": "VAELoader",
+            "135:66": "CLIPLoader",
+            "135:111": "UNet loader with Name (Image Saver)",
+            "135:516": "ModelSamplingAuraFlow",
+            "135:610": "SkipLayerGuidanceDiTSimple",
+            "148:139": "VAEDecode",
+            "148:146": "ImpactKSamplerBasicPipe",
+            "152:225": "Any Switch (rgthree)",
+            "152:343": "Any Switch (rgthree)",
+        },
+        output_node="81",
+        direct_image_node="148:139",
+        omitted_low_cost=("SeedVR2", "character LoRA stacks"),
+        model_inputs={
+            "diffusion_model": ("135:111", "unet_name"),
+            "vae": ("135:65", "vae_name"),
+            "text_encoder": ("135:66", "clip_name"),
+        },
+        lora_node="77",
+        sampler_node="148:146",
+    ),
     "anima-mansui": WorkflowRule(
         profile_id="anima-mansui",
         model_family="anima",
@@ -193,6 +230,8 @@ class WorkflowProfileStore:
     ) -> dict[str, Any]:
         profile = self.get_profile(profile_id)
         rule = _rule(profile_id)
+        if rule.model_family == "moss":
+            raise WorkflowProfileError("分镜工作流须使用 compile_moss_package 编译")
         raw = (self.root / profile_id / "source-workflow.json").read_bytes()
         if hashlib.sha256(raw).hexdigest() != profile["source_sha256"]:
             raise WorkflowProfileError("原始 workflow 哈希已变化，拒绝编译")
@@ -230,6 +269,48 @@ class WorkflowProfileStore:
             "controls": controls,
             "compiled_at": _now(),
             "api_prompt": workflow,
+        }
+
+    def compile_moss_package(
+        self,
+        *,
+        run_id: str,
+        prompt: str,
+        width: int,
+        height: int,
+        seed: int,
+        preset: str = "draft",
+        model: str | None = None,
+        config: Mapping[str, Any] | None = None,
+        lora: Mapping[str, Any] | None = None,
+        negative: str = "",
+    ) -> dict[str, Any]:
+        """Adapt an imported JSON-pass-through graph using the core library."""
+        profile = self.get_profile("moss-soda-v2")
+        raw = (self.root / "moss-soda-v2" / "source-workflow.json").read_bytes()
+        if hashlib.sha256(raw).hexdigest() != profile["source_sha256"]:
+            raise WorkflowProfileError("原始 workflow 哈希已变化，拒绝编译")
+        graph = v2_graph(
+            _parse_workflow(raw),
+            prompt,
+            config=dict(config or {}),
+            model=model,
+            preset=preset,
+            seed=_seed(seed),
+            width=int(_dimension(width) or 1024),
+            height=int(_dimension(height) or 1536),
+            lora=dict(lora) if lora else None,
+            prefix=f"PromptHub/storyboard/{run_id}",
+        )
+        graph["75"]["inputs"]["string"] = negative
+        return {
+            "format": PACKAGE_FORMAT,
+            "workflow_id": f"moss-soda-v2-{run_id}",
+            "profile_id": "moss-soda-v2",
+            "model_family": "moss",
+            "source_sha256": profile["source_sha256"],
+            "compiled_at": _now(),
+            "api_prompt": graph,
         }
 
     def save_run_package(
@@ -527,6 +608,8 @@ def _validate_workflow(workflow: Mapping[str, Mapping[str, Any]], rule: Workflow
             raise WorkflowProfileError(f"Profile 缺少节点 {node_id}")
         if node.get("class_type") != expected:
             raise WorkflowProfileError(f"节点 {node_id} 类型不匹配：需要 {expected}")
+    if rule.model_family == "moss" and workflow["622"]["inputs"] != {"any_02": ["620", 0]}:
+        raise WorkflowProfileError("Soda-MOSS-v2 必须先切到 JSON 直通，再导出 API Format")
 
 
 def _reject_credentials(value: Any) -> None:
