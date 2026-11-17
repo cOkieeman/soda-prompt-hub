@@ -94,7 +94,7 @@ try {
             throw "构建机缺少 uv，无法从 uv.lock 导出固定依赖。"
         }
         $requirements = Join-Path $temporaryRoot "runtime-requirements.txt"
-        & $uvPath export --frozen --extra moss --extra captioning --no-default-groups --no-emit-project `
+        & $uvPath export --frozen --no-default-groups --extra moss --extra captioning --no-emit-project `
             --format requirements-txt --no-hashes --emit-index-url --output-file $requirements `
             --project $repository
         if ($LASTEXITCODE -ne 0) {
@@ -126,13 +126,13 @@ try {
             $builder = Get-Command py.exe -ErrorAction SilentlyContinue
             if ($null -ne $builder) {
                 & $builder.Source -3.12 -m pip install --disable-pip-version-check `
-                    --no-deps --no-compile --requirement $requirements `
+                    --no-deps --no-compile --only-binary=:all: --no-binary=kohakugbc --requirement $requirements `
                     $projectWheels[0].FullName --target $sitePackages
             }
             else {
                 $builder = Get-Command python.exe -ErrorAction Stop
                 & $builder.Source -m pip install --disable-pip-version-check `
-                    --no-deps --no-compile --requirement $requirements `
+                    --no-deps --no-compile --only-binary=:all: --no-binary=kohakugbc --requirement $requirements `
                     $projectWheels[0].FullName --target $sitePackages
             }
             $pipExitCode = $LASTEXITCODE
