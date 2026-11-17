@@ -127,6 +127,13 @@ if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notm
     throw "WebView2 bootstrapper 的 Microsoft 签名校验失败。"
 }
 
+$vcRuntime = Join-Path $output "vc_redist.x64.exe"
+Invoke-WebRequest -UseBasicParsing -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $vcRuntime
+$vcSignature = Get-AuthenticodeSignature -FilePath $vcRuntime
+if ($vcSignature.Status -ne "Valid" -or $vcSignature.SignerCertificate.Subject -notmatch "Microsoft") {
+    throw "Visual C++ Runtime 的 Microsoft 签名校验失败。"
+}
+
 if ([string]::IsNullOrWhiteSpace($InnoCompiler)) {
     $candidates = @(
         (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
@@ -145,6 +152,7 @@ foreach ($definition in @(
 )) {
     & $InnoCompiler "/DPayloadRoot=$($definition.Payload)" "/DOutputRoot=$installerOutput" `
         "/DProductVersion=$version" "/DWebView2Bootstrapper=$webViewBootstrapper" `
+        "/DVcRuntimeInstaller=$vcRuntime" `
         (Join-Path $PSScriptRoot $definition.Script)
     if ($LASTEXITCODE -ne 0) {
         throw "Inno Setup 编译失败：$($definition.Script)"
@@ -158,6 +166,7 @@ $manifest = [ordered]@{
     signed = $false
     python_runtime = "3.12.10"
     git_runtime = (Get-Content -LiteralPath (Join-Path $desktopStage "GIT_RUNTIME.json") -Raw -Encoding UTF8 | ConvertFrom-Json)
+    visual_cpp_runtime_sha256 = (Get-FileHash -LiteralPath $vcRuntime -Algorithm SHA256).Hash.ToLowerInvariant()
     installers = @($installers | ForEach-Object {
         [ordered]@{
             file = $_.Name

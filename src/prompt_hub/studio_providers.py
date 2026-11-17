@@ -25,6 +25,7 @@ from prompt_hub.model_connections import (
 from prompt_hub.studio_store import StudioError, write_json
 
 MAX_RESPONSE_BYTES = 120 * 1024 * 1024
+_PROVIDER_LOCK = RLock()
 NOVELAI_CLIENT_HEADERS = {
     "User-Agent": "NAI-Launcher/1.0",
     "Origin": "https://novelai.net",
@@ -103,7 +104,7 @@ def multipart(fields: dict[str, Any], files: list[tuple[str, Path]]) -> tuple[by
 class ImageProviderStore:
     def __init__(self, root: Path) -> None:
         self.path = root / "private" / "image-providers.json"
-        self._lock = RLock()
+        self._lock = _PROVIDER_LOCK
 
     def _read(self) -> dict[str, Any]:
         if not self.path.exists():
@@ -129,6 +130,15 @@ class ImageProviderStore:
     def get_provider(self, identifier: str) -> dict[str, Any] | None:
         """Read a private record for trusted services, including account refresh."""
         return next((p for p in self._read()["providers"] if p["id"] == identifier), None)
+
+    def fill_caption_worker(self, defaults: dict[str, str]) -> None:
+        with self._lock:
+            config = self._read()
+            worker = config.setdefault("caption_worker", {})
+            for key, value in defaults.items():
+                if not worker.get(key):
+                    worker[key] = value
+            write_json(self.path, config)
 
     def save(  # noqa: C901 - protocol validation and dispatch stay together
         self, values: dict[str, Any], *, novelai_account: dict[str, Any] | None = None

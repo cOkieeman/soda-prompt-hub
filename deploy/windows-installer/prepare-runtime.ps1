@@ -94,8 +94,8 @@ try {
             throw "构建机缺少 uv，无法从 uv.lock 导出固定依赖。"
         }
         $requirements = Join-Path $temporaryRoot "runtime-requirements.txt"
-        & $uvPath export --frozen --no-default-groups --no-emit-project `
-            --format requirements-txt --no-hashes --output-file $requirements `
+        & $uvPath export --frozen --extra moss --extra captioning --no-default-groups --no-emit-project `
+            --format requirements-txt --no-hashes --emit-index-url --output-file $requirements `
             --project $repository
         if ($LASTEXITCODE -ne 0) {
             throw "uv export 失败，exit code $LASTEXITCODE。"
@@ -126,13 +126,13 @@ try {
             $builder = Get-Command py.exe -ErrorAction SilentlyContinue
             if ($null -ne $builder) {
                 & $builder.Source -3.12 -m pip install --disable-pip-version-check `
-                    --no-deps --no-compile --only-binary=:all: --requirement $requirements `
+                    --no-deps --no-compile --requirement $requirements `
                     $projectWheels[0].FullName --target $sitePackages
             }
             else {
                 $builder = Get-Command python.exe -ErrorAction Stop
                 & $builder.Source -m pip install --disable-pip-version-check `
-                    --no-deps --no-compile --only-binary=:all: --requirement $requirements `
+                    --no-deps --no-compile --requirement $requirements `
                     $projectWheels[0].FullName --target $sitePackages
             }
             $pipExitCode = $LASTEXITCODE
@@ -148,7 +148,7 @@ try {
     $embeddedPython = Join-Path $runtimeRoot "python.exe"
     # Self-test imports must not add bytecode files after the core manifest was sealed.
     if ($Product -eq "desktop") {
-        & $embeddedPython -B -c "import fastapi, mcp, numpy, onnxruntime, PIL, prompt_hub, uvicorn, win32api, pathlib, sys; assert prompt_hub.__version__ == '$version'; assert pathlib.Path(prompt_hub.__file__).resolve() == pathlib.Path(sys.executable).resolve().parents[2] / 'core/src/prompt_hub/__init__.py'"
+        & $embeddedPython -B -c "import fastapi, mcp, numpy, onnxruntime, PIL, prompt_hub, uvicorn, win32api, pathlib, sys; import torch, torchvision, transformers, sentence_transformers, timm, kohakugbc.machine, kohakugbc_data.dataset, pyarrow; assert not torch.version.cuda; assert prompt_hub.__version__ == '$version'; assert pathlib.Path(prompt_hub.__file__).resolve() == pathlib.Path(sys.executable).resolve().parents[2] / 'core/src/prompt_hub/__init__.py'"
     }
     else {
         & $embeddedPython -B -c "import json, pathlib, urllib.request"
@@ -174,6 +174,7 @@ try {
         python_version = $pythonVersion
         python_archive_sha256 = $pythonArchiveSha256
         dependency_source = if ($Product -eq "desktop") { "uv.lock" } else { "stdlib-only" }
+        dependency_extras = if ($Product -eq "desktop") { @("moss", "captioning") } else { @() }
     }
     [IO.File]::WriteAllText(
         (Join-Path $payload "PYTHON_RUNTIME.json"),

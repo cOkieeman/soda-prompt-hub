@@ -20,6 +20,16 @@ def create_optional_model_router(
     def get_models() -> dict[str, Any]:
         return installer.status()
 
+    @router.post("/api/optional-models/onboarding")
+    def complete_onboarding(values: dict[str, Any]) -> dict[str, Any]:
+        selected = values.get("selected", [])
+        if not isinstance(selected, list) or any(
+            not isinstance(identifier, str) or identifier not in installer.models
+            for identifier in selected
+        ):
+            raise HTTPException(status_code=422, detail="请选择有效的模型")
+        return installer.complete_onboarding(selected)
+
     @router.post("/api/optional-models/{model_id}/install", status_code=202)
     def install_model(model_id: str) -> dict[str, Any]:
         try:

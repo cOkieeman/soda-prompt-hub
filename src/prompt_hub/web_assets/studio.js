@@ -1308,6 +1308,7 @@
         const taggerMode = document.body.dataset.appView === "tagger";
         const items = state.images.filter(image => image.kind === "candidate" && (taggerMode ? image.review !== "excluded" : image.review === "approved") && !image.caption_confirmed && (!taggerMode || !state.captionSelection.size || state.captionSelection.has(image.item_id))).map(image => image.item_id);
         if (!items.length) return notice("目前沒有可打標的圖片。", true);
+        if (window.ensureCaptionModels && !await window.ensureCaptionModels($("#studioCaptionMethod").value)) return;
         for (let index=0; index<items.length; index+=200) {
           await api(`/projects/${state.project.project_id}/caption`, {method:"POST",body:{item_ids:items.slice(index,index+200), model:$("#studioCaptionModel").value, method:$("#studioCaptionMethod").value}});
         }

@@ -35,17 +35,24 @@ WebView2 bootstrapper 签名。
 
 1. 拒绝包含 `.venv`、`worker-config.json`、`__pycache__` 或 `.pyc` 的 payload。
 2. 校验并解压官方 Python 3.12.10 embeddable runtime。
-3. Desktop 依赖严格从仓库 `uv.lock` 导出并在构建机预装；`python312._pth` 同时固定指向包内
+3. Desktop 依赖严格从仓库 `uv.lock` 导出并在构建机预装，包含 `moss` 与 `captioning` 可选依赖，
+   Windows 使用固定版本的 CPU PyTorch。`python312._pth` 同时固定指向包内
    `core/src`，用户首次启动不联网 pip，也不依赖环境变量里的 `PYTHONPATH`。
 4. Worker 仅携带标准库 Python runtime。
    Desktop 另完整携带官方 MinGit 2.55.0.windows.5 x64，固定下载 URL 与 SHA-256，保留其全部
    DLL、HTTPS helper、CA 证书和许可证。`GIT_RUNTIME.json` 记录上游与哈希。构建机可用
    `-GitArchive` 指定离线 ZIP；最终用户不需要装 Git，不会修改系统 PATH 或关闭 TLS 验证。
    Desktop 便携构建同样准备 Git；当前 Desktop 发布仅支持 win-x64，不能混装 x64 Git 到 ARM64 包。
-5. 下载 WebView2 bootstrapper，并要求其 Authenticode 签名有效且属于 Microsoft。
+5. 下载 WebView2 和 Visual C++ Runtime 安装器，并验证 Microsoft Authenticode 签名。
+   Desktop 安装时仅在缺少 VC 运行库的设备上调用官方安装器。
 6. 生成两个 unsigned Setup `.exe` 及 `COMMERCIAL_RELEASE.json` SHA-256 清单。
 
 ## 安装与数据边界
+
+首次启动会弹出模型选择窗口，可勾选 WD14、摄影打标、CLIP、PixAI、SAM3 LiteText L 和 MiniLM。
+显示完整下载大小与安装位置，支持跳过、取消、断点续传和 SHA-256 校验。下载任务保存在本机，
+关闭窗口后继续执行。打标模型安装后自动填入工作器的空白设置，已有自定义设置会保留。
+SAM3 场景图需要另外在「管理连接」设置视觉 API，默认 CPU 推理，可在设置中指定其他工作器。
 
 - Desktop：`%LOCALAPPDATA%\Programs\Soda Prompt Hub`
 - Worker：`%LOCALAPPDATA%\Programs\Soda Compute Worker`

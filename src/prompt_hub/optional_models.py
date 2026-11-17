@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import platform
 import shutil
+import sys
 from dataclasses import dataclass
+from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -19,12 +21,15 @@ from prompt_hub.local_visual import (
     write_model_info,
 )
 from prompt_hub.optional_model_download import download_file
+from prompt_hub.studio_providers import ImageProviderStore
+from prompt_hub.studio_store import write_json
 from prompt_hub.visual_model import (
     DOWNLOAD_JOB_TYPE,
     VisualModelError,
     download_bundled_visual_model,
 )
 from prompt_hub.wd14 import WD14Tagger
+from prompt_hub.web_resources import read_web_asset
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -51,6 +56,7 @@ class OptionalModel:
     revision: str
     directory: str
     files: tuple[ModelFile, ...]
+    caption_key: str = ""
 
     @property
     def job_type(self) -> str:
@@ -115,6 +121,20 @@ OPTIONAL_MODELS = (
     ),
 )
 
+CAPTION_MODEL_KEYS = {
+    "pixai-tagger-v1.0": "pixai_model",
+    "sam3-litetext-l": "detector_model",
+    "all-MiniLM-L6-v2": "embedder_model",
+}
+OPTIONAL_MODELS += tuple(
+    OptionalModel(
+        **{key: value for key, value in entry.items() if key != "files"},
+        files=tuple(ModelFile(**file) for file in entry["files"]),
+        caption_key=CAPTION_MODEL_KEYS[entry["id"]],
+    )
+    for entry in json.loads(read_web_asset("caption_models.json"))
+)
+
 
 class OptionalModelInstaller:
     def __init__(self, settings: Settings, store: BackgroundJobStore) -> None:
@@ -130,11 +150,12 @@ class OptionalModelInstaller:
     def root(self, model: OptionalModel) -> Path:
         base = self.settings.models_root.resolve()
         root = base / model.directory
-        for path in (root, *root.parents):
-            if path == base:
-                break
-            if path.is_symlink():
-                raise VisualModelError("安装目录不能经过符号链接")
+        for target in (root, *(root / file.name for file in model.files)):
+            for path in (target, *target.parents):
+                if path == base:
+                    break
+                if path.is_symlink():
+                    raise VisualModelError("安装目录不能经过符号链接")
         if not root.resolve().is_relative_to(base):
             raise VisualModelError("安装目录必须位于模型目录内")
         return root
@@ -148,7 +169,25 @@ class OptionalModelInstaller:
             else platform.system(),
             "models_root": str(self.settings.models_root),
             "models": [self.model_status(model) for model in self.models.values()],
+            "onboarding": self.onboarding(),
+            "caption_runtime_available": find_spec("kohakugbc") is not None,
         }
+
+    def onboarding(self) -> dict[str, Any]:
+        path = self.settings.library_root / "private" / "model-onboarding.json"
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+            return {
+                "completed": bool(value.get("completed")),
+                "selected": value.get("selected", []),
+            }
+        except (OSError, ValueError, AttributeError):
+            return {"completed": False, "selected": []}
+
+    def complete_onboarding(self, selected: list[str]) -> dict[str, Any]:
+        value = {"completed": True, "selected": list(dict.fromkeys(selected))}
+        write_json(self.settings.library_root / "private" / "model-onboarding.json", value)
+        return value
 
     def model_status(self, model: OptionalModel) -> dict[str, Any]:
         state, reason = "missing", "未安装，用到时再装即可"
@@ -162,7 +201,14 @@ class OptionalModelInstaller:
                 and receipt.get("revision") == model.revision
                 and receipt.get("files") == stamps
             ):
-                state, reason = "ready", "文件校验和本机推理自检通过"
+                state, reason = (
+                    "ready",
+                    (
+                        "文件校验通过，已接入打标工作器"
+                        if model.caption_key
+                        else "文件校验和本机推理自检通过"
+                    ),
+                )
             elif stamps:
                 state, reason = "unverified", "发现已有文件，需校验并进行本机自检"
             elif any((root / file.name).exists() for file in model.files):
@@ -184,6 +230,7 @@ class OptionalModelInstaller:
             "state": state,
             "reason": reason,
             "job": job,
+            "caption_key": model.caption_key,
         }
 
     def handlers(self) -> dict[str, JobHandler]:
@@ -224,6 +271,7 @@ class OptionalModelInstaller:
                     f"https://huggingface.co/{model.repository}/resolve/"
                     f"{model.revision}/{file.remote_name or file.name}"
                 )
+                (root / file.name).parent.mkdir(parents=True, exist_ok=True)
                 download_file(
                     root / file.name,
                     url,
@@ -234,7 +282,7 @@ class OptionalModelInstaller:
                     total=model.size,
                 )
                 completed += file.size
-        context.update(model.size, model.size, "文件完整性校验通过，正在进行本机推理自检……")
+        context.update(model.size, model.size, "文件完整性校验通过，正在检查模型结构……")
         self_check(model, root)
         context.raise_if_cancelled()
         if model.id == "clip-vit-base-patch32":
@@ -246,7 +294,16 @@ class OptionalModelInstaller:
             raise VisualModelError("模型校验记录不能是符号链接")
         temporary.write_text(json.dumps(receipt), encoding="utf-8")
         temporary.replace(target)
+        self._configure_worker(model, root)
         return {"installed": True, "model_id": model.repository, "self_test": "passed"}
+
+    def _configure_worker(self, model: OptionalModel, root: Path) -> None:
+        if not model.caption_key:
+            return
+        defaults = {model.caption_key: str(root), "device": "cpu"}
+        if find_spec("kohakugbc") is not None:
+            defaults["python"] = sys.executable
+        ImageProviderStore(self.settings.library_root).fill_caption_worker(defaults)
 
 
 def _file_stamps(root: Path, model: OptionalModel) -> dict[str, Any]:
@@ -272,7 +329,11 @@ def _read_receipt(root: Path) -> dict[str, Any]:
 
 def self_check(model: OptionalModel, root: Path) -> None:
     try:
-        if model.id == "clip-vit-base-patch32":
+        if model.caption_key:
+            config = json.loads((root / "config.json").read_text(encoding="utf-8"))
+            if not config.get("model_type"):
+                raise ValueError("模型配置缺少类型")
+        elif model.id == "clip-vit-base-patch32":
             validate_custom_visual_model(
                 root / MODEL_FILENAME,
                 model_id=model.repository,

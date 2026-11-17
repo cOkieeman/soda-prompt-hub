@@ -80,7 +80,7 @@ jobs:
         run: uv sync --locked --extra moss
 
       - name: Test
-        run: uv run pytest -q
+        run: uv run --extra moss pytest -q
 
       - name: Deployment smoke (无 systemd 路径)
         run: |

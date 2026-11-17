@@ -13,6 +13,7 @@
 - 接入 PixAI → KohakuGBC 的标签、检测和视觉描述流程，支持 SAM3 LiteText 本地模型与视觉模型 API。
 - 完善深浅色、简体／繁体／英文、窄屏布局、页面路由及编辑草稿恢复，修复画廊导入替换和 Agent 回车发送。
 - 更新 Node 运行环境准备和桌面源码打包支持，Core、Desktop 与 Compute Worker 版本统一为 1.3.0。
+- Windows 完整安装包包含 MOSS 导出及 PixAI／KohakuGBC 的 CPU 依赖。首次打开可勾选模型下载，支持进度、取消、续传和校验，完成后自动填写打标模型路径，也可稍后从设置安装。
 - SAM3 LiteText 已完成少量 CPU 样例实测，部分检测置信度偏低，结果需逐图审核。官方 SAM3 权重仍需用户取得 Hugging Face 授权。
 
 ## [1.2.0] - 2026-10-05

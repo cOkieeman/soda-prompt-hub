@@ -430,7 +430,7 @@ def test_linux_workflow_runs_existing_checks_and_deployment_smoke() -> None:
         "uv run ruff format --check .",
         "uv run ruff check .",
         "uv run ty check src/",
-        "uv run pytest",
+        "uv run --extra moss pytest",
     ):
         assert command in workflow, f"linux.yml 缺少 {command}"
     assert "ubuntu-22.04" in workflow

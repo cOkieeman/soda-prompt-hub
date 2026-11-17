@@ -25,6 +25,15 @@ prompt-hub-mcp = "prompt_hub.mcp_server:main"
 
 [project.optional-dependencies]
 moss = ["kohakugbc-data>=0.2.0", "pyarrow>=15", "kohakuvault>=1.1"]
+captioning = [
+    "kohakugbc[torch] @ https://github.com/KohakuBlueleaf/KohakuGBC/archive/3202d9b95c21760c338ef5278faa1eb8ecb93ae1.zip",
+    "torch==2.15.0",
+    "torchvision==0.29.2",
+    "transformers==5.23.0",
+    "sentence-transformers==6.3.0",
+    "timm>=1.0.31",
+    "einops>=0.8",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.6,<0.13.0"]
@@ -43,6 +52,15 @@ test = [
 
 [tool.uv]
 default-groups = ["dev", "test"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'win32'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 line-length = 100

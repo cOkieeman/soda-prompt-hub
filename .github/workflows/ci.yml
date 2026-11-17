@@ -48,7 +48,7 @@ jobs:
         run: uv run ty check src/
 
       - name: Test
-        run: uv run pytest
+        run: uv run --extra moss pytest
 
       - name: Test frontend behavior
         run: node --test tests/frontend-studio.test.cjs
