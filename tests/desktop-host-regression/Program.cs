@@ -5,9 +5,9 @@ using System.Reflection;
 using System.Text;
 using SodaPromptHub.Desktop;
 
-// Run in an isolated container: this fixture owns loopback port 8765.
+// Run in an isolated environment: this fixture owns the Desktop Core port 8777.
 // A non-product health response ensures the test never opens a real browser.
-var listener = new TcpListener(IPAddress.Loopback, 8765);
+var listener = new TcpListener(IPAddress.Loopback, 8777);
 listener.Start();
 var server = Task.Run(async () =>
 {

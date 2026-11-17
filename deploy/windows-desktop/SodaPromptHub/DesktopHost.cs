@@ -534,11 +534,6 @@ internal sealed class DesktopHost : IDisposable
     private async Task<PythonCommand> EnsurePythonRuntimeAsync()
     {
         var localPython = Path.Combine(AppRoot, ".venv", "Scripts", "python.exe");
-        if (File.Exists(localPython) && await CanRunCoreAsync(new PythonCommand(localPython, [])))
-        {
-            return new PythonCommand(localPython, []);
-        }
-
         var configured = Environment.GetEnvironmentVariable("SODA_PROMPT_HUB_PYTHON");
         var candidates = new List<PythonCommand>();
         if (!string.IsNullOrWhiteSpace(configured) && Path.IsPathFullyQualified(configured) && File.Exists(configured))
@@ -549,6 +544,10 @@ internal sealed class DesktopHost : IDisposable
         if (File.Exists(bundledPython))
         {
             candidates.Add(new PythonCommand(bundledPython, []));
+        }
+        if (File.Exists(localPython))
+        {
+            candidates.Add(new PythonCommand(localPython, []));
         }
         candidates.Add(new PythonCommand("py.exe", ["-3.12"]));
         candidates.Add(new PythonCommand("python.exe", []));

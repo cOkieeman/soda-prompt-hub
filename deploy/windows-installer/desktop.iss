@@ -47,6 +47,9 @@ Source: "{#PayloadRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdir
 Source: "{#WebView2Bootstrapper}"; DestDir: "{tmp}"; DestName: "MicrosoftEdgeWebview2Setup.exe"; Flags: deleteafterinstall
 Source: "{#VcRuntimeInstaller}"; DestDir: "{tmp}"; DestName: "vc_redist.x64.exe"; Flags: deleteafterinstall
 
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\runtime\python"
+
 [Icons]
 Name: "{group}\Soda Prompt Hub"; Filename: "{app}\Soda Prompt Hub.exe"
 Name: "{autodesktop}\Soda Prompt Hub"; Filename: "{app}\Soda Prompt Hub.exe"; Tasks: desktopicon
