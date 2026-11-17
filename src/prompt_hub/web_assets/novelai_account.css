@@ -1,0 +1,24 @@
+#naiAccountButton { margin-left: auto; max-width: 100%; overflow-wrap: anywhere; }
+#naiAccountDialog { width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 22px; background: var(--paper); color: var(--ink); overflow-y: auto; }
+#naiAccountDialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+#naiAccountDialog h2 { margin: 0; font-size: 20px; }
+#naiAccountDialog #naiAccountClose { padding: 4px 8px; min-width: 36px; background: transparent; border: 0; }
+#naiAccountDialog label { font-size: 14px; }
+#naiAccountDialog input:not([type="checkbox"]), #naiAccountDialog select { width: 100%; min-width: 0; }
+#naiAccountForm, #naiCredentialsFields { display: grid; gap: 14px; }
+#naiAccountForm { margin-top: 18px; }
+.nai-login-modes { display: flex; gap: 8px; }
+.nai-login-modes button { flex: 1; }
+#naiAccountDialog button[aria-pressed="true"] { background: var(--acid); color: var(--on-acid); border-color: var(--acid); }
+#naiAccountDialog .nai-show-secret { display: flex; align-items: center; gap: 7px; }
+#naiAccountDialog dl { margin: 18px 0 12px; }
+#naiAccountCached { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
+#naiAccountDialog dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 7px 0; }
+#naiAccountDialog dt { color: var(--muted); font-size: 14px; }
+#naiAccountDialog dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-size: 14px; }
+#naiAccountDialog #naiAccountStatus { font-size: 14px; margin: 14px 0; overflow-wrap: anywhere; }
+#naiAccountDialog #naiAccountStatus:empty { display: none; }
+#naiAccountDialog #naiAccountStatus[data-error="true"] { color: var(--error-text); }
+#naiAccountDialog footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; }
+#naiAccountDialog footer a { color: var(--ink); text-underline-offset: 3px; }
+@media (max-width: 450px) { #naiAccountDialog { padding: 16px; } #naiAccountButton { margin-left: auto; } }

@@ -51,6 +51,7 @@ function Remove-RuntimeBuildArtifacts {
 try {
     if ($Product -eq "desktop") {
         & (Join-Path $PSScriptRoot "prepare-git.ps1") -PayloadRoot $payload -GitArchive $GitArchive
+        & (Join-Path $PSScriptRoot "prepare-node.ps1") -PayloadRoot $payload
     }
     if ([string]::IsNullOrWhiteSpace($PythonEmbedArchive)) {
         $PythonEmbedArchive = Join-Path $temporaryRoot "python-embed-amd64.zip"

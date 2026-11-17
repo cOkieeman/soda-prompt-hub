@@ -75,6 +75,7 @@ def create_gallery_router(
         model: Annotated[str, Query(max_length=1000)] = "",
         lora: Annotated[str, Query(max_length=1000)] = "",
         favorite: bool = False,
+        backend: Literal["", "comfyui", "novelai", "openai", "agent"] = "",
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=200)] = 48,
     ) -> dict[str, Any]:
@@ -85,6 +86,7 @@ def create_gallery_router(
             model=model,
             lora=lora,
             favorite=favorite,
+            backend=backend,
             offset=offset,
             limit=limit,
         )

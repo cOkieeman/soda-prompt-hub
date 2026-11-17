@@ -75,7 +75,7 @@ Windows Desktop 和 Worker 的主界面、托盘菜单都可以导出诊断 ZIP�
 
 ## 维护者发布检查
 
-1. 确认 `pyproject.toml`、根 `RELEASE.json` 和 Worker `RELEASE.json` 都是目标版本；当前源码为 `1.2.0 stable`。
+1. 确认 `pyproject.toml`、根 `RELEASE.json` 和 Worker `RELEASE.json` 都是目标版本，当前源码为 `1.3.0 stable`。
 2. 在 Windows 构建两个 Setup，并核对 Microsoft WebView2 bootstrapper 的有效签名。
 3. 在 Mac 构建自包含 DMG，运行 `hdiutil verify`，并验证 App 内 `MANIFEST.sha256`。
 4. 在 Windows 实机执行 `deploy/windows-installer/test-lifecycle.ps1`，验证覆盖安装、包内 Python、卸载保留

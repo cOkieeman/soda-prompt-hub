@@ -8,7 +8,7 @@
     let archivePage = 1;
     let archiveTotal = 0;
     let archiveSearchRun = 0, navigationRun = 0;
-    const archivePageSize = 12;
+    const archivePageSize = 48;
     let remoteDeviceName = __PROMPT_HUB_DEVICE_NAME_JSON__;
     let tagDisplayLanguage = 'zh';
     const tagLabelCache = new Map();
@@ -16,7 +16,7 @@
     let sourceDetails = new Map();
     const sourceSetupSkipKey = 'soda-prompt-hub-source-setup-skipped';
     const sourceSyncUi = {busy:false,rebuilding:false,sources:[],jobs:[],job:null,loadSerial:0,localMessage:false,epoch:0};
-    const viewLabels = {home:'首页', creative:'创作台', prompts:'提示词库', gallery:'画廊', discover:'智能检索', characters:'角色库', datasets:'数据集', lora:'LoRA 项目', comfy:'出图', management:'资料管理', remote:'设备连接'};
+    const viewLabels = {home:'首页', projects:'資料集生成', studio:'資料集工作臺', settings:'設定', creative:'创作台', prompts:'提示词库', gallery:'画廊', discover:'智能检索', characters:'角色库', datasets:'数据集', tagger:'打标器', lora:'LoRA 项目', comfy:'出图', management:'资料管理', remote:'设备连接'};
 
     function setPromptHubDeviceName(value) {
       remoteDeviceName = String(value || '').trim() || 'Windows 绘图设备';
@@ -234,10 +234,7 @@
       $('#homeSourceCount').textContent = formatNumber(stats.sources);
       $('#homeOcCount').textContent = formatNumber(stats.oc_manager?.characters);
       const product = version.product || {};
-      const dataVersion = version.data || {};
       $('#homeProgramVersion').textContent = `${product.version || '无法识别'} · ${product.release_channel_label || '版本未知'}`;
-      $('#homeDataVersion').textContent = dataVersion.summary || '尚未初始化';
-      $('#homeDataVersion').title = dataVersion.summary || '尚未初始化';
       $('#homeReleaseIdentity').textContent = `Soda Prompt Hub ${product.version || ''}（${product.release_channel_label || '版本未知'}）：`;
       $('#source').innerHTML = '<option value="">全部来源</option>' + sources.map(s => `<option value="${escapeHtml(s.source_id)}">${escapeHtml(s.name)}</option>`).join('');
       if ([...$('#source').options].some(option => option.value === selectedSource)) $('#source').value = selectedSource;
@@ -278,7 +275,7 @@
       fill('#animadexEyes', '全部瞳色', facets.eye_colors);
     }
 
-    async function handleSourceChange() {
+    async function handleSourceChange(resetPage = true) {
       const isAnimadex = $('#source').value === 'animadex';
       $('#animadexFilters').hidden = !isAnimadex;
       if (isAnimadex) await loadAnimadexFacets();
@@ -288,7 +285,7 @@
         $('#animadexEyes').value = '';
       }
       document.querySelectorAll('[data-source-quick]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.sourceQuick === $('#source').value)));
-      await searchPrompts();
+      await searchPrompts(resetPage);
     }
 
     function sourceSetupSignature(sources) {
@@ -433,6 +430,10 @@
       $('#archivePageStatus').textContent = `第 ${archivePage} / ${pageCount} 页 · 每页 ${archivePageSize} 条`;
       $('#archivePreviousPage').disabled = archivePage <= 1;
       $('#archiveNextPage').disabled = archivePage >= pageCount;
+      if (window.SodaPromptLibrary && currentMode === 'prompts') {
+        window.SodaPromptLibrary.render(currentResults);
+        return;
+      }
       $('#results').innerHTML = currentResults.map((item, index) => `
         <article class="card ${item.favorite ? 'is-favorite' : ''}" data-result-index="${index}" style="animation-delay:${Math.min(index * 25, 250)}ms">
           ${visualMarkup(item)}
@@ -457,6 +458,9 @@
       $('#status').textContent = '正在查找…';
       $('#results').classList.remove('character-results');
       if (resetPage) archivePage = 1;
+      if(currentMode==='prompts') {
+        try { sessionStorage.setItem('soda-prompt-filters',JSON.stringify({query:$('#query').value,kind:$('#kind').value,safety:$('#safety').value,source:$('#source').value,favorite:$('#favoritesOnly').getAttribute('aria-pressed'),visual:$('#onlyWithVisuals').getAttribute('aria-pressed'),page:archivePage})); } catch {}
+      }
       const params = new URLSearchParams({query: $('#query').value, kind: $('#kind').value, safety: $('#safety').value, source_id: $('#source').value, favorites_only: $('#favoritesOnly').getAttribute('aria-pressed'), has_visual: $('#onlyWithVisuals').getAttribute('aria-pressed'), category: $('#animadexCopyright').value, hair_color: $('#animadexHair').value, eye_color: $('#animadexEyes').value, limit: String(archivePageSize), offset: String((archivePage - 1) * archivePageSize)});
       const data = await fetchJsonWithTimeout('/api/search?' + params);
       if (run !== archiveSearchRun || currentMode === 'characters') return;
@@ -516,7 +520,11 @@
       $('#searchLabel').textContent = characterMode ? '查找角色' : '查找提示词和视觉参考';
       $('#archiveNotice').innerHTML = characterMode ? '<strong>OC 角色库：</strong>导入 OC Manager JSON 后，可以按角色名、世界、故事和外观查找角色。' : '<strong>提示词与视觉资料库：</strong>输入服装、动作、构图、场景或画风关键词。找到合适内容后可以收藏并记录实测备注。';
       $('#query').value = '';
-      if (!characterMode) await handleSourceChange();
+      if (!characterMode) {
+        await initialStats;
+        try {const saved=JSON.parse(sessionStorage.getItem('soda-prompt-filters')||'{}');for(const id of ['query','kind','safety','source'])if(saved[id]!==undefined)$('#'+id).value=saved[id];for(const [id,key] of [['favoritesOnly','favorite'],['onlyWithVisuals','visual']])if(saved[key]!==undefined)$('#'+id).setAttribute('aria-pressed',saved[key]);archivePage=saved.page||1;}catch{}
+        await handleSourceChange(false);
+      }
       if (characterMode) await loadOcWorlds();
       if (run !== navigationRun) return;
       if (characterMode) await runSearch();
@@ -601,14 +609,22 @@
     }
     window.playPromptHubStatusPulse = playPromptHubStatusPulse;
 
-    async function setView(view) {
+    async function setView(view, options = {}) {
+      if (window.SodaWorkbench?.handles(view)) { navigationRun++; currentMode=view; return window.SodaWorkbench.open(view, options); }
+      window.SodaWorkbench?.hide();
       if (!Object.hasOwn(viewLabels, view)) throw new Error('这个页面暂不可用');
       const run = ++navigationRun;
+      const route = window.PromptHubNavigation.commit(
+        options.route || {view}, options.historyMode || 'push'
+      );
+      document.body.dataset.appView = view;
+      const navigationView = view === 'studio' ? 'projects' : view;
       setNavMenu(false);
-      if ($('#appSettingsMenu')) $('#appSettingsMenu').open = false;
+      document.querySelectorAll('.app-settings-menu').forEach(menu => { menu.open = false; });
       $('#appNavCurrent').textContent = `当前：${viewLabels[view] || '首页'}`;
       const archiveMode = view === 'prompts' || view === 'characters';
       $('#homePage').hidden = view !== 'home';
+      $('#studioProjectsPage').hidden = view !== 'projects';
       $('#creativePage').hidden = view !== 'creative';
       $('#galleryPage').hidden = view !== 'gallery';
       $('#discoveryPage').hidden = view !== 'discover';
@@ -618,16 +634,26 @@
       $('#remotePage').hidden = view !== 'remote';
       $('#managementPage').hidden = view !== 'management';
       $('#archiveWorkspace').hidden = !archiveMode;
-      window.scrollTo({top: 0, behavior: 'auto'});
+      $('#studioPage').hidden = view !== 'studio';
+      $('#studioSettingsPage').hidden = view !== 'settings';
       playViewEnter(view);
       document.querySelectorAll('[data-view]').forEach(button => {
         if (button.classList.contains('app-nav-button')) {
-          button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false');
+          button.setAttribute('aria-current', button.dataset.view === navigationView ? 'page' : 'false');
         }
       });
       if (archiveMode) {
         await setMode(view);
-        if (run === navigationRun) $('#query').focus();
+        if (run === navigationRun) $('#query').focus({preventScroll: true});
+      } else if (view === 'projects' && window.ensureStudioHome) {
+        currentMode = view;
+        await window.ensureStudioHome();
+      } else if (view === 'studio' && window.ensureDatasetStudio) {
+        currentMode = view;
+        await window.ensureDatasetStudio(route);
+      } else if (view === 'settings' && window.ensureStudioSettings) {
+        currentMode = view;
+        await window.ensureStudioSettings();
       } else if (view === 'creative' && window.ensureCreativeProject) {
         currentMode = view;
         await window.ensureCreativeProject();
@@ -648,17 +674,19 @@
         await window.ensureComfyResults();
       } else if (view === 'remote' && window.ensureRemoteDevices) {
         currentMode = view;
-        await window.ensureRemoteDevices();
+        await window.ensureRemoteDevices(route);
       } else if (view === 'management') {
         currentMode = view;
         await Promise.all([loadSourceSyncStatus(), window.ensureSourceCenter ? window.ensureSourceCenter() : Promise.resolve()]);
       } else {
         currentMode = view;
       }
+      if (run === navigationRun) window.PromptHubNavigation.restore(route);
     }
     window.setPromptHubView = setView;
 
     function showNavigationError(error) {
+      window.PromptHubNavigation.restore(window.PromptHubNavigation.current());
       const targets = {creative:'#creativeSaveState', gallery:'#galleryStatus', datasets:'#datasetReviewToolsResult', remote:'#remoteTaskSummary', comfy:'#comfyStatus'};
       const target = $(targets[currentMode] || '#appNavCurrent');
       target.textContent = `页面读取失败：${error.message}。可以点击导航重试。`;
@@ -1001,9 +1029,10 @@
     $('#homeSourceInstall').addEventListener('click', installRecommendedSources);
     $('#homeSourceSkip').addEventListener('click', skipRecommendedSources);
     window.loadPromptHubStats = loadStats;
-    if (new URLSearchParams(window.location.search).get('view') === 'remote') {
-      window.addEventListener('load', () => setView('remote').catch(console.error), {once: true});
-    }
+    window.addEventListener('DOMContentLoaded', () => {
+      const route = window.PromptHubNavigation.read();
+      setView(route.view, {route, historyMode: 'replace'}).catch(showNavigationError);
+    }, {once: true});
     $('#tagLanguageToggle').addEventListener('click', window.toggleTagDisplayLanguage);
     document.addEventListener('click', event => { const menu=$('#appSettingsMenu'); if(menu?.open && !menu.contains(event.target) && !$('#languageSettings').contains(event.target)) menu.open=false; });
     document.addEventListener('keydown', event => { const menu=$('#appSettingsMenu'); if(event.key==='Escape' && menu?.open && $('#languageSettings').hidden) { menu.open=false; menu.querySelector('summary').focus(); } });
@@ -1019,4 +1048,5 @@
       }
     });
     window.addEventListener('resize', () => setLanguageSettings(false));
-    Promise.all([loadStats(), loadOcWorlds(), loadSourceSyncStatus(), searchPrompts()]).catch(error => { $('#status').textContent = '读取失败，请刷新页面'; console.error(error); });
+    const initialStats=loadStats();
+    Promise.all([initialStats, loadOcWorlds(), loadSourceSyncStatus()]).catch(error => { $('#status').textContent = '读取失败，请刷新页面'; console.error(error); });

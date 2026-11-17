@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --extra moss
 
       - name: Check formatting
         run: uv run ruff format --check .
@@ -77,7 +77,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --extra moss
 
       - name: Test
         run: uv run pytest -q

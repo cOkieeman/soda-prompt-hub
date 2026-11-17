@@ -103,9 +103,9 @@ def test_worker_stage_normalizes_powershell_before_manifest_hashing(tmp_path: Pa
         for entry in scripts:
             content = bundle.read(f"{archive_root}{entry['path']}")
             assert content.startswith(codecs.BOM_UTF8)
-            assert content.decode("utf-8-sig") == (_repository() / entry["path"]).read_text(
-                encoding="utf-8-sig"
-            )
+            assert content.decode("utf-8-sig").replace("\r\n", "\n") == (
+                _repository() / entry["path"]
+            ).read_text(encoding="utf-8-sig")
             assert hashlib.sha256(content).hexdigest() == entry["sha256"]
 
 

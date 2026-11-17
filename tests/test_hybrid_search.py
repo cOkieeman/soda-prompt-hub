@@ -40,7 +40,7 @@ def test_hybrid_search_keeps_keyword_results_when_embeddings_are_absent(
         payload = response.json()
         assert payload["semantic"]["status"] == "not_requested"
         assert payload["semantic"]["message"] == (
-            "当前按关键词查找本地资料。建立语义索引后，还可以匹配意思相近的内容。"  # noqa: RUF001
+            "当前按关键词查找本地资料。建立语义索引后，还可以匹配意思相近的内容。"
         )
         assert "embedding" not in payload["semantic"]["message"]
         groups = {item["key"]: item for item in payload["groups"]}
@@ -120,7 +120,7 @@ def test_hybrid_search_does_not_fake_incompatible_semantic_results(settings) -> 
         assert response.status_code == 200
         assert response.json()["semantic"]["status"] == "unavailable"
         assert response.json()["semantic"]["message"] == (
-            "现有语义索引不适用于本次查询，因此只显示关键词结果。"  # noqa: RUF001
+            "现有语义索引不适用于本次查询，因此只显示关键词结果。"
         )
         assert "embedding" not in response.json()["semantic"]["message"]
 

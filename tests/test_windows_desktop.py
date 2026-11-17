@@ -132,7 +132,7 @@ def test_staged_powershell_scripts_have_explicit_utf8_and_matching_hashes(tmp_pa
             content = bundle.read(f"{root}{entry['path']}")
             assert content.startswith(codecs.BOM_UTF8), entry["path"]
             original = (_repository() / entry["path"]).read_text(encoding="utf-8-sig")
-            assert content.decode("utf-8-sig") == original
+            assert content.decode("utf-8-sig").replace("\r\n", "\n") == original
             assert hashlib.sha256(content).hexdigest() == entry["sha256"]
 
 

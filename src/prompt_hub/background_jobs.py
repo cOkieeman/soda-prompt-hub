@@ -126,6 +126,7 @@ class BackgroundJobStore:
         status: str = "",
         limit: int = 50,
         job_type: str = "",
+        project_id: str = "",
     ) -> list[dict[str, Any]]:
         query = "SELECT * FROM background_jobs WHERE 1 = 1"
         values: list[Any] = []
@@ -135,6 +136,9 @@ class BackgroundJobStore:
         if job_type:
             query += " AND job_type = ?"
             values.append(job_type)
+        if project_id:
+            query += " AND json_extract(payload_json, '$.project_id') = ?"
+            values.append(project_id)
         query += " ORDER BY created_at DESC, rowid DESC LIMIT ?"
         values.append(limit)
         with self.connect() as connection:

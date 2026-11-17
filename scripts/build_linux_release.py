@@ -199,7 +199,8 @@ def _write_deterministic_tar_gz(package_root: Path, archive: Path) -> None:
             info.uname = "root"
             info.gname = "root"
             info.mtime = 0
-            info.mode = 0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644
+            executable = path.is_dir() or path.suffix == ".sh" or path.stat().st_mode & 0o111
+            info.mode = 0o755 if executable else 0o644
             if path.is_file():
                 with path.open("rb") as stream:
                     bundle.addfile(info, stream)

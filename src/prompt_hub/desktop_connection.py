@@ -1,11 +1,10 @@
+# ruff: noqa: RUF001
 """Read-only, freshness-aware summary for desktop connection indicators."""
 
 from __future__ import annotations
 
 import re
 import sys
-
-# ruff: noqa: RUF001
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any

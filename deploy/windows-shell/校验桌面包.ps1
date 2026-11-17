@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $manifestPath = Join-Path $PSScriptRoot "PACKAGE_MANIFEST.sha256"
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     Write-Host "[ERROR] PACKAGE_MANIFEST.sha256 不存在。请重新下载完整的图形启动器 ZIP。" -ForegroundColor Red

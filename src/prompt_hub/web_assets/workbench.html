@@ -1,0 +1,47 @@
+<section id="workbenchPage" class="workbench-page" hidden>
+  <p id="workbenchStatus" class="studio-notice" role="status" aria-live="polite" hidden></p>
+  <section id="workbenchCreation" hidden>
+    <nav class="workbench-switches" aria-label="生圖方式">
+      <button type="button" data-generation-engine="comfyui" aria-pressed="true">ComfyUI 工作流</button>
+      <button type="button" data-generation-engine="novelai" aria-pressed="false">NovelAI</button>
+      <button type="button" data-generation-engine="agent" aria-pressed="false">插件／Agent</button>
+      <button type="button" id="naiAccountButton" hidden>登入 NovelAI</button>
+    </nav>
+    <div id="workbenchGenerationHost"></div>
+    <div id="workbenchAgentHost" hidden></div>
+  </section>
+  <section id="workbenchTagger" hidden>
+    <section id="workbenchTaggerProjects">
+      <header class="workbench-heading"><h1>打标器</h1><div class="workbench-actions"><button type="button" id="workbenchTaggerNew" class="studio-primary">新建标注项目</button></div></header>
+      <p id="workbenchTaggerIntro">选择已有数据集项目，或新建项目后直接导入图片开始标注。</p>
+      <form id="workbenchTaggerCreate" class="workbench-form" hidden>
+        <label>项目名称<input name="title" required maxlength="160" autocomplete="off"></label>
+        <label>训练目标<select name="target"><option value="moss">MOSS · KohakuMossTrainer</option><option value="anima">Anima · Anima LoRA Studio</option><option value="krea2">Krea2 · Civitai</option><option value="h3">MiniMax H3 Image · Civitai</option></select></label>
+        <button type="submit" class="studio-primary">创建并开始标注</button><button type="button" id="workbenchTaggerCancel">取消</button>
+      </form>
+      <div id="workbenchTaggerList"></div>
+    </section>
+    <section id="workbenchTaggerEditor" hidden>
+      <header class="workbench-heading"><div class="workbench-actions"><button type="button" id="workbenchTaggerBack">标注项目</button><button type="button" id="workbenchTaggerGallery">从画廊加入图片</button></div></header>
+      <p id="workbenchTaggerFlow">导入图片后，选择标注方式并逐张核对草稿。新增图片会保留待审核状态。</p>
+      <div id="workbenchTaggerStudioHost"></div>
+    </section>
+  </section>
+  <section id="workbenchDatasets" hidden>
+    <header class="workbench-heading"><h1>資料集</h1><div class="workbench-actions"><button type="button" id="workbenchImportDataset">匯入資料夾／壓縮包</button><button type="button" id="workbenchNewDataset" class="studio-primary">建立資料集</button></div></header>
+    <form id="workbenchCreateDataset" class="workbench-form" hidden>
+      <label>資料集名稱<input name="title" required maxlength="160" autocomplete="off"></label>
+      <label>訓練目標<select name="target"><option value="moss">MOSS · KohakuMossTrainer</option><option value="anima">Anima · Anima LoRA Studio</option><option value="krea2">Krea2 · Civitai</option><option value="h3">MiniMax H3 Image · Civitai</option></select></label>
+      <button type="submit" class="studio-primary">建立</button><button type="button" id="workbenchCancelDataset">取消</button>
+    </form>
+    <div id="workbenchDatasetList"></div>
+    <div id="workbenchDatasetTools" hidden>
+      <div class="workbench-actions"><button type="button" id="workbenchDatasetBack">資料集列表</button><button type="button" id="workbenchDatasetRename">重新命名</button><button type="button" id="workbenchDatasetGallery">從畫廊加入</button><button type="button" id="workbenchDatasetGenerate">前往創作台補圖</button></div>
+      <nav class="workbench-switches" aria-label="資料集工作區"><button type="button" data-dataset-section="review">圖片與挑選</button><button type="button" data-dataset-section="caption">標註與審核</button><button type="button" data-dataset-section="export">匯出</button><button type="button" data-dataset-section="jobs">任務與記錄</button></nav>
+    </div>
+    <div id="workbenchDatasetHost"></div>
+    <div id="workbenchDirectoryHost"></div>
+    <div id="workbenchDatasetJobs" hidden><h2>任務與記錄</h2></div>
+  </section>
+</section>
+<dialog id="workbenchDatasetDialog" class="workbench-dialog"><form id="workbenchAddImages"><header class="workbench-heading"><h2>加入資料集</h2><button type="button" id="workbenchCloseAdd">關閉</button></header><label>選擇資料集<select name="project" id="workbenchTargetDataset"></select></label><details><summary>建立新資料集</summary><label>名稱<input name="new_title" maxlength="160"></label><label>訓練目標<select name="target"><option value="moss">MOSS</option><option value="anima">Anima</option><option value="krea2">Krea2</option><option value="h3">MiniMax H3 Image</option></select></label></details><p id="workbenchAddCount"></p><button type="submit" class="studio-primary">加入</button><p id="workbenchAddStatus" role="status"></p><button type="button" id="workbenchOpenAdded" hidden>開啟資料集</button></form></dialog>

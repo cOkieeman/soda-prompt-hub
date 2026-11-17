@@ -70,9 +70,7 @@ const window={loadPromptHubResourceCatalog,ensureTagLabels:(tags,options)=>{
   assert.deepEqual(pageOffsets.slice(-2),[0,500]);
 })().catch(error=>{console.error(error);process.exitCode=1;});
 """
-    subprocess.run(  # noqa: S603
-        [node, "-e", catalog_helper + REMOTE_SCRIPT[start:end] + harness], check=True
-    )
+    subprocess.run([node, "-e", catalog_helper + REMOTE_SCRIPT[start:end] + harness], check=True)  # noqa: S603 - local configured executable, argument list and no shell
 
 
 def test_tag_label_retry_progress_abort_and_cache_race() -> None:

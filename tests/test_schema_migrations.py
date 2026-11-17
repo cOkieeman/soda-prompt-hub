@@ -24,11 +24,11 @@ def test_main_database_records_component_versions_idempotently(tmp_path) -> None
     with sqlite3.connect(database_path) as connection:
         assert schema_versions(connection) == {
             "background_jobs": 1,
-            "creative_store": 2,
+            "creative_store": 3,
             "prompt_database": 1,
         }
         count = connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-    assert count == 4
+    assert count == 5
 
 
 def test_legacy_creative_database_records_lineage_migration(tmp_path) -> None:
@@ -48,7 +48,7 @@ def test_legacy_creative_database_records_lineage_migration(tmp_path) -> None:
             for row in connection.execute("PRAGMA table_info(creative_projects)").fetchall()
         }
         assert "lineage_json" in columns
-        assert schema_versions(connection) == {"creative_store": 2}
+        assert schema_versions(connection) == {"creative_store": 3}
 
 
 def test_embedding_database_has_independent_schema_version(tmp_path) -> None:

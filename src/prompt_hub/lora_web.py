@@ -1,8 +1,106 @@
-from prompt_hub.web_resources import read_web_asset
-
-LORA_STYLES = f"""
+LORA_STYLES = r"""
 <style>
-{read_web_asset("lora.css")}</style>
+  .lora-page { display: grid; gap: 18px; }
+  .lora-page .eyebrow, .lora-page .section-label, .lora-page .lora-form label, .lora-page .lora-fieldset { text-transform: none; }
+  .lora-hero { display: grid; grid-template-columns: 1.2fr .8fr; background: var(--paper); box-shadow: var(--shadow); }
+  .lora-hero-copy { padding: clamp(30px, 5vw, 58px); }
+  .lora-hero-copy h1 { margin: 18px 0; font-size: clamp(48px, 7vw, 88px); }
+  .lora-hero-copy p { max-width: 720px; color: var(--muted); line-height: 1.7; }
+  .lora-flow { padding: 30px; background: var(--inverse-bg); color: var(--inverse-text); }
+  .lora-flow .section-label { color: var(--inverse-muted); }
+  .lora-flow ol { margin: 24px 0 0; padding: 0; list-style: none; counter-reset: steps; }
+  .lora-flow li { counter-increment: steps; display: grid; grid-template-columns: 38px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(236,232,220,.2); font-size: .875rem; line-height: 1.5; }
+  .lora-flow li::before { content: "0" counter(steps); color: var(--acid); font: 800 1rem/1.45 var(--font-ui); }
+  .lora-desk { display: grid; grid-template-columns: minmax(280px, .32fr) minmax(0, 1fr); gap: 18px; }
+  .lora-sidebar, .lora-main { background: var(--paper); box-shadow: var(--shadow); padding: 26px; min-width: 0; }
+  .lora-main { display: grid; gap: 18px; align-content: start; }
+  .lora-form { display: grid; gap: 12px; }
+  .lora-form label, .lora-fieldset { display: grid; gap: 6px; color: var(--muted); font: 700 .875rem/1.3 var(--font-ui); letter-spacing: .04em; }
+  .lora-form input:not([type="checkbox"]):not([type="radio"]), .lora-form select, .lora-form textarea { width: 100%; border: 1px solid var(--line); background: var(--paper-deep); padding: 10px; color: var(--ink); }
+  .lora-form textarea { min-height: 72px; resize: vertical; }
+  .lora-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .lora-checks label { display: inline-flex; grid-template-columns: auto 1fr; align-items: center; gap: 6px; padding: 8px; border: 1px solid var(--line); background: var(--paper-deep); cursor: pointer; }
+  .lora-checks input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 16px; margin: 0; padding: 0; accent-color: var(--signal); }
+  .lora-format-help { margin: 0; color: var(--muted); font: .875rem/1.55 var(--font-ui); }
+  .lora-delivery-readiness { display: grid; gap: 9px; margin: 12px 0; }
+  .lora-delivery-format { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--line); background: var(--paper-deep); }
+  .lora-delivery-format.ready { border-color: #52735d; box-shadow: inset 4px 0 0 #52735d; }
+  .lora-delivery-format.blocked { border-color: #b66a58; box-shadow: inset 4px 0 0 var(--signal); }
+  .lora-delivery-format strong, .lora-delivery-format span { display: block; }
+  .lora-delivery-format strong { font: 800 .875rem/1.35 var(--font-ui); }
+  .lora-delivery-format span { margin-top: 5px; color: var(--muted); font: .875rem/1.5 var(--font-ui); }
+  .lora-delivery-format button { border: 1px solid var(--ink); padding: 8px 10px; background: transparent; color: var(--ink); font: 800 .875rem/1.2 var(--font-ui); cursor: pointer; }
+  .lora-primary, .lora-secondary { border: 1px solid var(--ink); padding: 11px 13px; cursor: pointer; font: 800 .875rem/1.45 var(--font-ui); letter-spacing: .06em; }
+  .lora-primary { background: var(--signal-fill); color: var(--on-signal); border-color: var(--signal); }
+  .lora-secondary { background: transparent; color: var(--ink); }
+  .lora-project-list { margin-top: 24px; display: grid; gap: 8px; }
+  .lora-project-button { width: 100%; border: 1px solid var(--line); background: var(--paper-deep); padding: 12px; cursor: pointer; text-align: left; }
+  .lora-project-button[aria-current="true"] { border-color: var(--signal); box-shadow: inset 4px 0 0 var(--signal); }
+  .lora-project-button strong, .lora-project-button small { display: block; }
+  .lora-project-button small { margin-top: 6px; color: var(--muted); font: 700 .875rem/1.4 var(--font-ui); }
+  .lora-empty { min-height: 360px; display: grid; place-items: center; text-align: center; border: 1px dashed var(--line); color: var(--muted); padding: 30px; }
+  .lora-project-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+  .lora-project-head h2 { margin: 5px 0; font: 700 38px/1 "Iowan Old Style", serif; }
+  .lora-project-head p { margin: 0; color: var(--muted); font: 700 .875rem/1.5 var(--font-ui); overflow-wrap: anywhere; }
+  .lora-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .lora-stat { padding: 13px; background: var(--inverse-bg); color: var(--inverse-text); }
+  .lora-stat strong, .lora-stat span { display: block; }
+  .lora-stat strong { color: var(--acid); font: 800 24px/1 var(--font-ui); }
+  .lora-stat span { margin-top: 7px; color: var(--inverse-muted); font-size: .875rem; }
+  .lora-journey { position: sticky; top: 10px; z-index: 6; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 1px; border: 1px solid var(--line); background: var(--line); box-shadow: var(--shadow); }
+  .lora-journey button { min-width: 0; border: 0; background: var(--paper-deep); padding: 11px 8px; color: var(--ink); text-align: left; cursor: pointer; }
+  .lora-journey button[aria-current="step"] { background: var(--inverse-bg); color: var(--inverse-text); }
+  .lora-journey button span, .lora-journey button strong { display: block; }
+  .lora-journey button span { color: var(--signal); font: 800 .875rem var(--font-ui); }
+  .lora-journey button[aria-current="step"] span { color: var(--acid); }
+  .lora-journey button strong { margin-top: 4px; overflow: hidden; font: 800 .875rem/1.25 "Iowan Old Style",serif; text-overflow: ellipsis; white-space: nowrap; }
+  .lora-step-panel[hidden] { display: none; }
+  .lora-panel { border-top: 6px solid var(--ink); background: var(--paper-deep); padding: 18px; }
+  .lora-panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .lora-panel h3 { margin: 0; font: 700 24px/1 "Iowan Old Style", serif; }
+  .lora-workspace-picker { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .lora-workspace-picker select { min-width: 0; border: 1px solid var(--line); background: var(--paper-deep); padding: 10px; }
+  .lora-source-grid, .lora-asset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+  .lora-source-card, .lora-asset-card { background: var(--paper-deep); border: 1px solid var(--line); min-width: 0; overflow: hidden; }
+  .lora-source-card img, .lora-asset-card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--paper-deep); display: block; }
+  .lora-source-card label { display: grid; grid-template-columns: auto 1fr; gap: 7px; padding: 9px; align-items: start; font-size: .875rem; overflow-wrap: anywhere; cursor: pointer; }
+  .lora-asset-body { padding: 10px; display: grid; gap: 8px; }
+  .lora-asset-name { margin: 0; font: 700 .875rem/1.4 var(--font-ui); overflow-wrap: anywhere; }
+  .lora-asset-body select { width: 100%; border: 1px solid var(--line); background: var(--field-bg); padding: 7px; font-size: .875rem; }
+  .lora-coverage-editor summary { cursor: pointer; color: var(--signal); font: 800 .875rem/1.4 var(--font-ui); }
+  .lora-chip-group { margin-top: 8px; }
+  .lora-chip-group strong { display: block; margin-bottom: 4px; font-size: .875rem; }
+  .lora-chip-group label { display: inline-flex; gap: 3px; align-items: center; margin: 2px; padding: 5px; background: var(--paper-deep); font-size: .875rem; cursor: pointer; }
+  .lora-matrix { display: grid; gap: 10px; }
+  .lora-matrix-row { display: grid; grid-template-columns: 86px 1fr; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .lora-matrix-row > strong { color: var(--signal); font: 800 .875rem/1.4 var(--font-ui); }
+  .lora-matrix-items { display: flex; flex-wrap: wrap; gap: 5px; }
+  .lora-matrix-item { padding: 6px 8px; background: var(--paper-deep); color: var(--muted); font-size: .875rem; }
+  .lora-matrix-item.complete { background: var(--acid); color: var(--on-acid); }
+  .lora-warning { padding: 10px; border-left: 4px solid var(--signal); background: var(--paper-deep); color: var(--error-text); font-size: .875rem; line-height: 1.5; }
+  .lora-coverage-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
+  .lora-coverage-result { margin: 0 0 12px; padding: 10px; border-left: 4px solid var(--acid); background: var(--paper-deep); color: var(--muted); font: .875rem/1.5 var(--font-ui); }
+  .lora-review-badge { width: fit-content; padding: 4px 6px; background: var(--acid); color: var(--on-acid); font: 800 .875rem/1.45 var(--font-ui); }
+  .lora-pagination { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 0 0 14px; }
+  .lora-pagination[hidden] { display: none; }
+  .lora-pagination button { border: 1px solid var(--ink); background: transparent; padding: 8px 10px; color: var(--ink); font: 800 .875rem var(--font-ui); cursor: pointer; }
+  .lora-pagination button:disabled { cursor: default; opacity: .35; }
+  .lora-pagination span { min-width: 120px; color: var(--muted); text-align: center; font: 800 .875rem var(--font-ui); }
+  @media (max-width: 900px) {
+    .lora-hero, .lora-desk { grid-template-columns: 1fr; }
+    .lora-source-grid, .lora-asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .lora-sidebar, .lora-main { padding: 18px; }
+    .lora-stats { grid-template-columns: repeat(2, 1fr); }
+    .lora-source-grid, .lora-asset-grid { grid-template-columns: 1fr; }
+    .lora-project-head { display: block; }
+    .lora-journey { grid-template-columns: repeat(5,1fr); }
+    .lora-journey button { padding: 9px 4px; text-align: center; }
+    .lora-journey button strong { font-size: .875rem; }
+    .lora-matrix-row { grid-template-columns: 1fr; }
+  }
+</style>
 """
 
 LORA_HTML = r"""

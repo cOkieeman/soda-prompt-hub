@@ -36,6 +36,16 @@
     const loraSourceStatus=loraSource.status||'missing';
     const models=confirmed?records(final.models).filter(resourceName):[],loras=['recorded','partial'].includes(loraSourceStatus)?records(final.loras).filter(resourceName):[];
     const prompts=Object.fromEntries(['positive','negative'].map(kind=>{
+      const generation = asset.hub_generation;
+      if (generation) {
+        const request = generation.request || {};
+        const submitted = kind === 'positive'
+          ? (generation.backend === 'novelai' ? request.input : request.prompt)
+          : request.parameters?.uc;
+        if (typeof submitted === 'string') return [kind,{text:submitted,submitted:true}];
+        const assembled = generation.prompt?.[kind];
+        if (typeof assembled === 'string') return [kind,{text:assembled,assembled:true}];
+      }
       const exact=final[kind],saved=final.saved_export_prompts?.[kind];
       if(exact?.status==='exact'&&typeof exact.text==='string') return [kind,{text:exact.text,savedExport:false}];
       if(saved?.status==='saved_export'&&typeof saved.text==='string') return [kind,{text:saved.text,savedExport:true}];
@@ -66,7 +76,9 @@
     const promptHtml=Object.entries({positive:'最终正向 Prompt',negative:'最终负向 Prompt'}).map(([kind,label])=>{
       const prompt=evidence.prompts[kind],text=prompt.text;
       const content=text===null?'<p class="gallery-note">无法确认最终 Prompt</p>':text===''?'<p class="gallery-note">已记录为空</p>':`<pre>${esc(text)}</pre>`;
-      return `<section class="gallery-prompt-record"><div><h4>${label}</h4><button type="button" data-gallery-copy-prompt="${kind}" ${text===null?'disabled':''}>复制</button></div>${prompt.savedExport?'<p class="gallery-note">图片保存的 Prompt（无法核对编码输入）</p>':''}${content}</section>`;
+      const title = prompt.submitted ? (kind === 'positive' ? '提交的正向 Prompt' : '提交的负向 Prompt')
+        : prompt.assembled ? (kind === 'positive' ? '组合的正向 Prompt' : '组合的负向 Prompt') : label;
+      return `<section class="gallery-prompt-record"><div><h4>${title}</h4><button type="button" data-gallery-copy-prompt="${kind}" ${text===null?'disabled':''}>复制</button></div>${prompt.savedExport?'<p class="gallery-note">图片保存的 Prompt（无法核对编码输入）</p>':''}${content}</section>`;
     }).join('');
     const sampleFields=[['seed','Seed'],['steps','Steps'],['cfg','CFG'],['sampler','Sampler'],['scheduler','Scheduler'],['denoise','Denoise']];
     const samplingHtml=evidence.sampling.length?evidence.sampling.map((sample,index)=>`<article class="gallery-sampling-record">${evidence.sampling.length>1?`<h4>采样记录 ${index+1}</h4>`:''}<dl><div><dt>${evidence.structured?'基础生成尺寸':'元数据尺寸（未核对）'}</dt><dd>${valueMarkup(sample.width&&sample.height?`${sample.width} × ${sample.height}`:null)}</dd></div>${sampleFields.map(([key,label])=>`<div><dt>${label}</dt><dd>${valueMarkup(sample[key]??(key==='sampler'?sample.sampler_name:undefined))}</dd></div>`).join('')}</dl></article>`).join(''):'<p class="gallery-note">未记录采样参数</p>';
@@ -83,10 +95,12 @@
     q('#galleryPageCount').textContent=`${from}–${to} / ${state.total} 张`;
     q('#galleryPrevious').disabled=state.offset===0; q('#galleryNext').disabled=state.offset+state.limit>=state.total;
     document.querySelectorAll('[data-gallery-kind]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.galleryKind===state.kind)));
+    window.dispatchEvent(new CustomEvent('soda-gallery-rendered',{detail:{items:state.items}}));
   }
   async function loadAssets() {
     const run=++state.run;
     const params=new URLSearchParams({kind:state.kind,q:q('#galleryQuery').value.trim(),album:q('#galleryAlbum').value,model:q('#galleryModelFilter').value,lora:q('#galleryLoraFilter').value,favorite:String(q('#galleryFavoriteOnly').checked),offset:String(state.offset),limit:String(state.limit)});
+    params.set('backend',q('#galleryBackend')?.value || '');
     const result=await api(`/api/gallery/assets?${params}`);
     if(run!==state.run) return;
     state.items=result.items||[]; state.total=Number(result.total)||0;
@@ -165,7 +179,6 @@
     q('#gallerySaveAnalysis').hidden=!pending;
   }
   async function openAsset(assetId,opener) {
-    if(!state.items.some(item=>item.asset_id===assetId)) return;
     const run=++state.detailRun; state.opener=opener||document.activeElement;
     let asset;
     try { asset=await api(`/api/gallery/assets/${encodeURIComponent(assetId)}`); }
@@ -180,9 +193,9 @@
     q('#galleryAssetTitle').value=asset.title||asset.filename||''; q('#galleryAssetKind').value=asset.kind; q('#galleryAssetFavorite').checked=Boolean(asset.favorite);
     q('#galleryAssetAuthor').value=asset.author||''; q('#galleryAssetSource').value=safeLink(asset.source_url)||''; q('#galleryAssetTags').value=(asset.tags||[]).join('，'); q('#galleryAssetAlbums').value=(asset.albums||[]).join('，'); q('#galleryAssetNote').value=asset.note||'';
     const metadata=asset.metadata||{}; q('#galleryMetadata').textContent=Object.keys(metadata).length?JSON.stringify(metadata,null,2):'无生成元数据。'; renderGeneration(asset);
-    renderAnalysis(asset.analysis); message(asset.analysis_stale||asset.analysis?.stale?'旧分析已过期，不会用于 AI 场景与画风建议。请连接原目录，重新分析并确认保存。':'',true); q('#galleryDetailDialog').showModal(); await loadModelsAndProjects();
+    renderAnalysis(asset.analysis); message(asset.analysis_stale||asset.analysis?.stale?'旧分析已过期，不会用于 AI 场景与画风建议。请连接原目录，重新分析并确认保存。':'',true); if(!q('#galleryDetailDialog').open) q('#galleryDetailDialog').showModal(); window.dispatchEvent(new CustomEvent('soda-gallery-opened',{detail:asset})); await loadModelsAndProjects();
   }
-  function closeAsset() { if(state.deleteBusy) return; cancelDelete(); state.detailRun++; state.active=null; state.analysis=null; q('#galleryDetailDialog').close(); if(state.opener?.isConnected) state.opener.focus(); else q('#galleryRefresh').focus(); }
+  function closeAsset() { if(state.deleteBusy) return; cancelDelete(); state.detailRun++; state.active=null; state.analysis=null; q('#galleryDetailDialog').close(); if(state.opener?.isConnected) state.opener.focus({preventScroll:true}); else q('#galleryRefresh').focus({preventScroll:true}); window.dispatchEvent(new Event('soda-gallery-closed')); }
   function requestDelete(asset=state.active,opener=null) {
     if(!asset?.asset_id||state.deleteBusy) return;
     state.deleteTarget=asset.asset_id; state.deleteOpener=opener;
@@ -251,6 +264,7 @@
     message(state.active?.analysis_stale||state.active?.analysis?.stale?'图片已加入参考；旧分析已过期，不会用于 AI 建议，请重新分析并确认保存。':state.active?.analysis&&Object.keys(state.active.analysis).length?'已按所选用途加入参考；可以进入项目继续设计场景。':'图片已加入参考。尚未确认图像分析，AI 设计时先参考备注与标签；可在这里分析并保存。',true);
   }
   window.loadGallery=async function() { await Promise.all([loadAlbums(),loadFacets(),loadRoots(),refreshJobs()]); await loadAssets(); };
+  window.SodaGallery={open:openAsset,close:closeAsset,items:()=>state.items,renderGeneration};
 
   q('#gallerySearchForm').addEventListener('submit',event=>{ event.preventDefault(); state.offset=0; loadAssets().catch(error); });
   q('#galleryAlbum').addEventListener('change',()=>{ state.offset=0; loadAssets().catch(error); });

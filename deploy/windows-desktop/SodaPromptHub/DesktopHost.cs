@@ -69,7 +69,7 @@ internal sealed class DesktopHost : IDisposable
             if (health.Reachable)
             {
                 errorTitle = "端口被其他服务占用";
-                errorDetail = "127.0.0.1:8765 已响应，但不是 Soda Prompt Hub。启动器没有覆盖或停止它。";
+                errorDetail = "127.0.0.1:8777 已响应，但不是 Soda Prompt Hub。启动器没有覆盖或停止它。";
             }
             else
             {
@@ -99,8 +99,8 @@ internal sealed class DesktopHost : IDisposable
 
         var coreState = health.IsPromptHub ? externalCore ? "EXTERNAL" : "READY" : starting ? "STARTING" : "STOPPED";
         var coreDetail = health.IsPromptHub
-            ? externalCore ? "已有本机 Core · 不接管" : $"PID {OwnedCoreId()} · 127.0.0.1:8765"
-            : "127.0.0.1:8765";
+            ? externalCore ? "已有本机 Core · 不接管" : $"PID {OwnedCoreId()} · 127.0.0.1:8777"
+            : "127.0.0.1:8777";
         var stepTitle = health.IsPromptHub
             ? "本机工作台已经准备好"
             : starting
@@ -154,7 +154,7 @@ internal sealed class DesktopHost : IDisposable
         if (health.Reachable)
         {
             checkedOnce = true;
-            lastError = "端口 8765 已由其他服务使用。";
+            lastError = "端口 8777 已由其他服务使用。";
             return await GetStatusAsync();
         }
 
@@ -337,7 +337,7 @@ internal sealed class DesktopHost : IDisposable
         {
             throw new InvalidOperationException("Core 尚未就绪，不能打开工作台。 ");
         }
-        OpenPath("http://127.0.0.1:8765/");
+        OpenPath("http://127.0.0.1:8777/");
     }
 
     internal void OpenLogs()
@@ -433,7 +433,7 @@ internal sealed class DesktopHost : IDisposable
     private async Task ConfigureLocalNodeAsync()
     {
         EnsureBridgeDirectories();
-        var contract = await httpClient.GetFromJsonAsync<JsonObject>("http://127.0.0.1:8765/api/compute/contract");
+        var contract = await httpClient.GetFromJsonAsync<JsonObject>("http://127.0.0.1:8777/api/compute/contract");
         var capabilities = contract?["roles"]?["compute_5060ti"]?["capabilities"]?.DeepClone()
             ?? new JsonArray("comfyui_generate", "lora_catalog_snapshot", "model_catalog_snapshot");
         var node = new JsonObject
@@ -447,11 +447,11 @@ internal sealed class DesktopHost : IDisposable
             ["notes"] = "由 Soda Prompt Hub Desktop 配置的本机 bridge。",
         };
         using var put = await httpClient.PutAsJsonAsync(
-            "http://127.0.0.1:8765/api/remote-nodes/compute-5060ti",
+            "http://127.0.0.1:8777/api/remote-nodes/compute-5060ti",
             node);
         put.EnsureSuccessStatusCode();
         using var prepare = await httpClient.PostAsync(
-            "http://127.0.0.1:8765/api/remote-nodes/compute-5060ti/prepare",
+            "http://127.0.0.1:8777/api/remote-nodes/compute-5060ti/prepare",
             content: null);
         prepare.EnsureSuccessStatusCode();
     }
@@ -462,7 +462,7 @@ internal sealed class DesktopHost : IDisposable
         try
         {
             if (!(await ReadHealthAsync()).IsPromptHub) return;
-            using var healthResponse = await httpClient.GetAsync("http://127.0.0.1:8765/api/health");
+            using var healthResponse = await httpClient.GetAsync("http://127.0.0.1:8777/api/health");
             using var healthDocument = JsonDocument.Parse(await healthResponse.Content.ReadAsStringAsync());
             var database = healthDocument.RootElement.GetProperty("database").GetString() ?? "";
             if (!Path.GetFullPath(database).StartsWith(Path.GetFullPath(LibraryRoot) + Path.DirectorySeparatorChar,
@@ -652,7 +652,7 @@ internal sealed class DesktopHost : IDisposable
         info.ArgumentList.Add("--host");
         info.ArgumentList.Add("127.0.0.1");
         info.ArgumentList.Add("--port");
-        info.ArgumentList.Add("8765");
+        info.ArgumentList.Add("8777");
         ApplyCoreEnvironment(info);
         return info;
     }
@@ -709,7 +709,7 @@ internal sealed class DesktopHost : IDisposable
     {
         try
         {
-            using var response = await httpClient.GetAsync("http://127.0.0.1:8765/api/health");
+            using var response = await httpClient.GetAsync("http://127.0.0.1:8777/api/health");
             if (!response.IsSuccessStatusCode)
             {
                 return new HealthResult(true, false, null, null);

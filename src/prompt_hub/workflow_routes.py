@@ -54,7 +54,7 @@ def create_workflow_router(
 
     @router.get("/api/workflow-profiles")
     def list_workflow_profiles() -> list[dict[str, Any]]:
-        return store.list_profiles()
+        return [profile for profile in store.list_profiles() if not profile.get("generic")]
 
     @router.get("/api/workflow-profiles/{profile_id}")
     def get_workflow_profile(profile_id: str) -> dict[str, Any]:

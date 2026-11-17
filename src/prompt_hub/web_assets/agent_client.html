@@ -1,0 +1,53 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;padding:0;background:transparent;color:inherit;font:14px/1.5 sans-serif;overflow-wrap:anywhere}
+button,input,select,textarea{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;padding:5px 8px}
+button{cursor:pointer}button:focus-visible,input:focus-visible{outline:2px solid var(--accent,#d6e74a);outline-offset:2px}
+button:disabled{opacity:.5;cursor:default}#clientError{margin:0;font-size:12px}#clientRoot{display:grid;gap:8px;padding:4px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style><script src="/api/agent/client-react.js"></script></head>
+<body><div id="clientRoot"></div><p id="clientError" role="status"></p>
+<script>
+(() => {
+  "use strict";
+  const {React,ReactDOM,jsxRuntime}=window.SodaReact;
+  const roots=[];
+  let state={projections:{}};
+  function notify(type,extra={}){parent.postMessage({source:"soda-agent-client",type,...extra},"*");}
+  function render(){for(const entry of roots)entry.root.render(React.createElement(entry.component,{
+    useProjection:key=>{const value=state.projections[key];return value&&typeof value==="object"&&"running" in value?{...value,running:state.pending||value.running}:value;},sessionId:state.sessionId,pending:state.pending,
+  }));}
+  const slots={
+    inject(_name,callback){return callback();},
+    register(definition,component){
+      const mount=document.createElement("div");mount.dataset.slot=definition.name;mount.dataset.order=definition.order||0;
+      const siblings=[...document.querySelectorAll("[data-slot]")];
+      document.querySelector("#clientRoot").insertBefore(mount,siblings.find(item=>Number(item.dataset.order)>Number(mount.dataset.order))||null);
+      const entry={root:ReactDOM.createRoot(mount),component};roots.push(entry);render();
+      return()=>{entry.root.unmount();mount.remove();roots.splice(roots.indexOf(entry),1);};
+    },
+  };
+  const context={slots,effect:callback=>callback(),get:name=>context[name],inject:(names,callback)=>{
+    if(names.every(name=>context[name]!==undefined))return callback(context);
+    throw Error("Unsupported client service: "+names.filter(name=>context[name]===undefined).join(", "));
+  }};
+  window.__ModuleLoader__={load(definition){
+    try {
+      const modules={react:React,"react-dom/client":ReactDOM,"react/jsx-runtime":jsxRuntime};
+      const plugin=definition.factory(name=>{if(!modules[name])throw Error("Unsupported client module: "+name);return modules[name];});
+      plugin.apply(context);notify("ready");
+    }catch(error){document.querySelector("#clientError").textContent=error.message;notify("error",{message:error.message});}
+  }};
+  addEventListener("message",event=>{
+    if(event.source!==parent||event.data?.source!=="soda-agent-host")return;
+    state=event.data;
+    document.body.style.color=state.color;document.body.style.fontFamily=state.font;
+    document.documentElement.style.colorScheme=state.theme;
+    document.documentElement.style.setProperty("--accent",state.accent);
+    render();
+  });
+  new ResizeObserver(()=>notify("height",{height:Math.ceil(document.body.getBoundingClientRect().height)})).observe(document.body);
+  addEventListener("error",event=>{document.querySelector("#clientError").textContent=event.message;notify("error",{message:event.message});});
+})();
+</script><script src="__CLIENT_SOURCE__"></script></body></html>

@@ -192,12 +192,28 @@ class GalleryStore:
         model: str = "",
         lora: str = "",
         favorite: bool = False,
+        backend: str = "",
         offset: int = 0,
         limit: int = 48,
     ) -> dict[str, Any]:
         self._refresh_generation_evidence()
         conditions = ["1 = 1"]
         values: list[Any] = []
+        if backend:
+            if backend == "agent":
+                conditions.append(
+                    "(json_extract(image_json, '$.hub_generation.recipe.creation_origi"
+                    "n') = 'agent' OR EXISTS (SELECT 1 FROM json_each(image_json,'$.hu"
+                    "b_generations') WHERE json_extract(value,'$.recipe.creation_origi"
+                    "n')='agent'))"
+                )
+            else:
+                conditions.append(
+                    "(json_extract(image_json, '$.hub_generation.backend') = ? OR EXIS"
+                    "TS (SELECT 1 FROM json_each(image_json,'$.hub_generations') WHERE"
+                    " json_extract(value,'$.backend')=?))"
+                )
+                values.extend([backend, backend])
         if kind != "all":
             conditions.append("kind = ?")
             values.append(_valid_kind(kind))
@@ -731,6 +747,27 @@ class GalleryStore:
             if offset >= page["total"] or not page["items"]:
                 return
 
+    def record_generation(self, asset_id: str, provenance: Mapping[str, Any]) -> None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT image_json FROM gallery_assets WHERE asset_id=?", (asset_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(asset_id)
+            image = json.loads(row["image_json"])
+            records = image.get("hub_generations", [])
+            if image.get("hub_generation") and not records:
+                records = [image["hub_generation"]]
+            if not any(item.get("job_id") == provenance.get("job_id") for item in records):
+                records.append(dict(provenance))
+            image["hub_generations"] = records
+            image["hub_generation"] = dict(provenance)
+            connection.execute(
+                "UPDATE gallery_assets SET image_json=?, updated_at=? WHERE asset_id=?",
+                (_dump(image), _now(), asset_id),
+            )
+            connection.commit()
+
     def link_project(self, asset_id: str, project: Mapping[str, Any]) -> dict[str, Any]:
         asset = self.require_asset(asset_id)
         with self.connect() as connection:
@@ -771,6 +808,24 @@ class GalleryStore:
                 image["project_snapshot"] = {
                     key: value for key, value in snapshot.items() if key != "generation"
                 }
+            for key in ("hub_generation", "hub_generations"):
+                records = image.get(key)
+                if records:
+
+                    def summary(record: dict[str, Any]) -> dict[str, Any]:
+                        return {
+                            "backend": record.get("backend"),
+                            "job_id": record.get("job_id"),
+                            "recipe": {
+                                "creation_origin": record.get("recipe", {}).get("creation_origin")
+                            },
+                        }
+
+                    image[key] = (
+                        [summary(record) for record in records]
+                        if isinstance(records, list)
+                        else summary(records)
+                    )
         asset_id = row["asset_id"]
         with self.connect() as connection:
             origins = connection.execute(

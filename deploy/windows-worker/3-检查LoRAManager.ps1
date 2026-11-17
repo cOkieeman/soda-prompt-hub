@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$PluginPath = "D:\ComfyUI\custom_nodes\comfyui-lora-manager",
     [string]$LoraPath = "D:\ComfyUI\models\loras",
     [string]$BridgeRoot = "D:\PromptHub-Bridge\prompt-hub"

@@ -1,21 +1,22 @@
 # Soda Prompt Hub
 
-Soda Prompt Hub 是一套本机优先的 AI 绘图创作与数据集整理工具。Mac 或 Windows Desktop 都可以独立
-保存提示词、视觉参照、OC、创作项目、结果图、Caption、审核记录和冻结版本；Windows Worker 可以把
-经过确认的任务交给本机 ComfyUI，也可以与另一台设备配合。LoRA 正式训练仍在 Windows 的训练工具中完成。
+Soda Prompt Hub 是一套本机优先的 AI 绘图创作与数据集整理工具。Mac 或 Windows Desktop 都可以独立保存提示词、视觉参照、OC、创作项目、结果图、Caption、审核记录和冻结版本。
+Windows Worker 可以把经过确认的任务交给本机 ComfyUI，也可以与另一台设备配合。LoRA 正式训练仍在 Windows 的训练工具中完成。
 
-当前版本为 `1.2.0`，三端安装包见 [1.2.0 Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0)。
-安装包标为 **Pre-release**：已完成双端运行与维护者界面验收，完整安装生命周期及平台签名仍待完成。
+当前源码版本为 `1.3.0`，新版安装包尚未发布。2026-09-14 第一版以 **Pre-release** 发布，
+未正式平台签名；软件里显示的 stable 不代表这批安装包已经完成原生人工验收。
 版本与构建标识的区别见[正式版本体系](docs/RELEASES.md)。
 
-1.2.0 加入场景提案、画幅建议、真实 LoRA 辅助、个人画廊与生成记录；详见[创作指南](docs/CREATIVE_AI_GUIDE.md)。
+1.3.0 将 ComfyUI、NovelAI 与插件／Agent 集成到创作台，图片统一进入画廊和数据集，并新增独立场景图打标器。
+打标支持 PixAI、KohakuGBC 与 SAM3 LiteText，通过本地检测模型和视觉模型 API 生成可审核的标签、描述、框线与关系。
+此前的场景提案、画幅建议、LoRA 辅助和生成记录见[创作指南](docs/CREATIVE_AI_GUIDE.md)。
 
 ## 下载：先选使用方式
 
 | 使用方式 | 下载 | 要运行的应用 |
 | --- | --- | --- |
-| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
-| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
+| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
+| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-windows-standalone-20260914) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
 
 Mac 包面向 Apple Silicon（arm64），Windows 包面向 x64。下载 Release 的 Assets 中的 DMG / Setup，
 不是 GitHub 自动生成的 Source code ZIP。每套附有 `SHA256SUMS` 和手动验收说明。
@@ -45,7 +46,7 @@ Linux 支持由社区适配分支提供，状态为 **Experimental**，不随官
 4. 启动台显示 Core 已就绪后打开工作台，确认实时 Worker / ComfyUI 状态。最终用户无需预装 Python、`uv`、Git 或 `.NET SDK`。
 5. 按需安装资料库和可选模型；外部 AI 服务的 URL、Key 与模型在“设备连接 → 模型服务”配置。
 
-完整安装步骤见[快速开始](docs/QUICK_START.md)，测试范围见[1.2.0 发行验证](docs/acceptance/release-1.2.0-20261005.md)。
+完整安装步骤见[快速开始](docs/QUICK_START.md)，1.1.1 候选测试见[pre1 手动验收](docs/acceptance/manual-1.1.1-pre1-20260914.md)。
 
 程序默认只监听本机 `127.0.0.1`。新用户的个人资料默认保存在：
 
@@ -111,7 +112,7 @@ macOS 钥匙串保存，Prompt Hub 不读取密码。更完整的文件关系见
 | 页面打不开、共享盘断开或任务不动 | [常见问题与排错](docs/TROUBLESHOOTING.md) |
 | 版本号、更新通道和发布检查 | [正式版本体系](docs/RELEASES.md) |
 | 查看长期开发边界和历史路线 | [开发计划](DEVELOPMENT_PLAN.md) |
-| 安装新包后手动验收两种模式 | [1.2.0 发行验证](docs/acceptance/release-1.2.0-20261005.md) |
+| 安装新包后手动验收两种模式 | [1.1.1 pre1 验收清单](docs/acceptance/manual-1.1.1-pre1-20260914.md) |
 
 ## 当前边界
 
@@ -135,5 +136,4 @@ uv run --no-sync prompt-hub serve --host 127.0.0.1 --port 8765
 
 ## 许可证
 
-代码采用 [MIT License](LICENSE)。第三方提示词、图片、模型、工作流和数据集继续遵循各自来源的
-许可证或使用条款，不因本项目采用 MIT 而被重新授权。
+代码采用 [MIT License](LICENSE)。第三方提示词、图片、模型、工作流和数据集继续遵循各自来源的许可证或使用条款，不因本项目采用 MIT 而被重新授权。

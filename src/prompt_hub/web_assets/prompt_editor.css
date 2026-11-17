@@ -1,0 +1,11 @@
+.studio-prompt-suggestions { position: fixed; z-index: 1500; max-height: 190px; overflow: auto; border: 1px solid var(--line); background: var(--paper); color: var(--ink); box-shadow: var(--shadow); }
+.studio-prompt-suggestions[hidden] { display: none; }
+.studio-prompt-suggestions button { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: var(--paper); color: var(--ink); border: 0; padding: 9px 12px; }
+.studio-prompt-suggestions button[aria-selected="true"] { background: var(--acid); color: var(--on-acid); }
+.studio-prompt-suggestions small { color: inherit; }
+.studio-prompt-history { width: min(680px, calc(100vw - 24px)); }
+.studio-prompt-history header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.studio-prompt-history > div { display: grid; gap: 8px; }
+.studio-prompt-history [data-history-entry] { text-align: left; display: grid; gap: 6px; padding: 12px; background: var(--field-bg); color: var(--ink); border: 1px solid var(--line); }
+.studio-prompt-history time { color: var(--muted); font-size: 12px; }
+.studio-prompt-history [data-history-entry] span { max-height: 140px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

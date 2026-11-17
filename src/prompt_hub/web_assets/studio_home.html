@@ -1,0 +1,14 @@
+<section class="studio-home" id="studioProjectsPage" hidden>
+  <header class="studio-page-heading">
+    <div><h1>資料集生成</h1><p>從參考圖到可交付的訓練集。</p></div>
+    <button class="studio-primary" id="studioNewProject" type="button">新建資料集</button>
+  </header>
+  <form id="studioCreateForm" class="studio-create-form" hidden>
+    <label>專案名稱<input name="title" maxlength="160" required autocomplete="off" placeholder="例如 森林水彩畫風"></label>
+    <label>訓練目標<select name="target"><option value="moss">MOSS</option><option value="anima">Anima</option><option value="krea2">Krea 2</option><option value="h3">MiniMax H3 Image</option></select></label>
+    <button type="submit" class="studio-primary">建立專案</button>
+    <button type="button" id="studioCancelCreate">取消</button>
+  </form>
+  <p class="studio-notice" id="studioHomeStatus" role="status"></p>
+  <div id="studioProjectList" class="studio-project-list"></div>
+</section>

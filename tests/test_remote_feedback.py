@@ -14,7 +14,7 @@ def test_remote_actions_have_persistent_feedback_and_unlock_after_failure() -> N
     if not node:
         pytest.skip("Node.js is required for frontend behavior checks")
     start = REMOTE_SCRIPT.index("  async function act(")
-    end = REMOTE_SCRIPT.index("  async function ensure()", start)
+    end = REMOTE_SCRIPT.index("  async function ensure(", start)
     harness = r"""
 const assert = require('node:assert/strict');
 let resolveRequest;

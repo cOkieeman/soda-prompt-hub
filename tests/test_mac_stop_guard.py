@@ -1,3 +1,4 @@
+# ruff: noqa: S603
 from __future__ import annotations
 
 import os
@@ -8,7 +9,6 @@ from pathlib import Path
 import pytest
 
 # All subprocess targets are the compiled guard or a temporary fixture process.
-# ruff: noqa: S603
 
 pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="macOS process identity")
 

@@ -19,13 +19,17 @@ def test_web_shell_assembles_packaged_assets() -> None:
     assert "__PROMPT_HUB_BASE_SCRIPT__" not in INDEX_HTML
     assert "__PROMPT_HUB_I18N_SCRIPT__" not in INDEX_HTML
     assert styles in INDEX_HTML
-    assert script in INDEX_HTML
+    assert re.sub(r"<button\b(?![^>]*\btype\s*=)", '<button type="button"', script) in INDEX_HTML
     assert i18n_script in INDEX_HTML
 
     creative_styles = asset_root.joinpath("creative.css").read_text(encoding="utf-8")
     creative_script = asset_root.joinpath("creative.js").read_text(encoding="utf-8")
     assert creative_styles in INDEX_HTML
-    assert creative_script in INDEX_HTML
+    assert (
+        re.sub(r"<button\b(?![^>]*\btype\s*=)", '<button type="button"', creative_script)
+        in INDEX_HTML
+    )
+    assert re.search(r"<button\b(?![^>]*\btype\s*=)", INDEX_HTML) is None
 
 
 def test_web_shell_keeps_device_name_escaping() -> None:
@@ -51,6 +55,13 @@ def test_web_shell_exposes_persistent_interface_language_switcher() -> None:
     assert "traditionalProtectedPatterns" in INDEX_HTML
 
 
+def test_tagger_has_a_standalone_navigation_entry_and_route_host() -> None:
+    assert 'data-view="tagger">打标器</button>' in INDEX_HTML
+    assert 'id="workbenchTagger"' in INDEX_HTML
+    assert 'id="workbenchTaggerStudioHost"' in INDEX_HTML
+    assert '"tagger"' in INDEX_HTML
+
+
 def test_interface_language_preserves_user_defined_device_name() -> None:
     assert "data-remote-device-name data-i18n-ignore" in INDEX_HTML
     assert "\uff1b <span data-remote-device-name data-i18n-ignore>" in INDEX_HTML
@@ -69,7 +80,7 @@ def test_english_local_search_has_no_mixed_language_copy() -> None:
 def test_mobile_remote_tabs_keep_long_labels_inside_each_tab() -> None:
     assert ".remote-section-tab-copy { width: 100%; }" in REMOTE_STYLES
     assert (
-        ".remote-section-tab-copy strong { font-size: 12px; line-height: 1.05; "
+        ".remote-section-tab-copy strong { font-size: .875rem; line-height: 1.05; "
         "overflow-wrap: anywhere; white-space: normal; }"
     ) in REMOTE_STYLES
 
