@@ -1,9 +1,9 @@
 # 快速开始
 
-先选一种使用方式；1.2.0 安装包标为 Pre-release，运行与界面已验收，完整安装生命周期与平台签名仍待完成。
+先选择使用方式。Windows 1.3.0 安装包以 Pre-release 发布，已验证覆盖升级、随包运行环境和资料保留，完整全新系统安装与卸载生命周期及平台签名仍待完成。新版页面与模型选择步骤见[图文指南](../README.md)。
 
-- [Windows 单机版](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0)：只装 Desktop Setup，不另开独立 Worker。
-- [Mac + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0)：Mac 装 DMG，Windows 装 Worker Setup。
+- [Windows 1.3.0](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.3.0) 单机使用 Desktop Setup，另一台计算设备使用 Compute Worker Setup。
+- [Mac 1.2.0](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0-ui-20261012) 使用现有 DMG，配套 Worker 与版本信息见该发行页。
 
 下载 Assets 中的安装器并核对 `SHA256SUMS`。遇到安全阻止或“已损坏”提示，先查看
 [安装说明](COMMERCIAL_RELEASE.md)与[排错](TROUBLESHOOTING.md)，不要关闭系统安全保护。

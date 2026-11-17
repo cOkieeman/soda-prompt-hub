@@ -15,6 +15,7 @@
 - 更新 Node 运行环境准备和桌面源码打包支持，Core、Desktop 与 Compute Worker 版本统一为 1.3.0。
 - Windows 完整安装包包含 MOSS 导出及 PixAI／KohakuGBC 的 CPU 依赖。首次打开可勾选模型下载，支持进度、取消、续传和校验，完成后自动填写打标模型路径，也可稍后从设置安装。
 - SAM3 LiteText 已完成少量 CPU 样例实测，部分检测置信度偏低，结果需逐图审核。官方 SAM3 权重仍需用户取得 Hugging Face 授权。
+- 发布 Windows 1.3.0 Desktop／Compute Worker 预发布安装包与完整源码包，附运行依赖清单、构建来源及 SHA-256。新增匹配新版前端的图文 README 和六类可选模型说明。
 
 ## [1.2.0] - 2026-10-05
 

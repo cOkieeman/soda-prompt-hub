@@ -12,10 +12,10 @@
 
 ## 安装与首次启动
 
-**版本状态（2026-11-17）**　当前分支为 `1.3.0`，Windows Desktop／Worker 安装包已构建，尚未发布到 GitHub Release。已公开的 Windows UI 安装包为 [1.2.0 预发布版](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0-ui-20261012)，界面与本文有差异。可在[发行页](https://github.com/cOkieeman/soda-prompt-hub/releases)查看公开下载，提前运行 1.3 请使用本分支源码。
+**Windows 1.3.0 预发布版（2026-11-17）**　从 [1.3.0 发行页](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.3.0)下载安装包、源代码和 `SHA256SUMS.txt`。安装器尚未签名，已在 Windows 实机验证 1.2.0 覆盖升级、随包运行环境和资料保留，完整全新系统安装与卸载生命周期仍待验证。Mac 继续使用 [1.2.0 发行版](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0-ui-20261012)。
 
-1. Windows x64 单机选择 `Soda-Prompt-Hub-Desktop-1.3.0-Setup.exe`。升级前备份个人资料并退出旧版服务，再运行安装器。
-2. 安装包包含 Python、Node、Git 和 CPU 打标运行依赖，并按需安装 VC++ Runtime 与 WebView2。独立的 `Soda-Compute-Worker-1.3.0-Setup.exe` 用于另一台计算设备。
+1. Windows x64 单机下载 [Desktop 1.3.0 Setup](https://github.com/cOkieeman/soda-prompt-hub/releases/download/v1.3.0/Soda-Prompt-Hub-Desktop-1.3.0-Setup.exe)。升级前备份个人资料并退出旧版服务，再运行安装器。
+2. 安装包包含 Python、Node、Git 和 CPU 打标运行依赖，并按需安装 VC++ Runtime 与 WebView2。另一台计算设备可下载独立的 [Compute Worker 1.3.0 Setup](https://github.com/cOkieeman/soda-prompt-hub/releases/download/v1.3.0/Soda-Compute-Worker-1.3.0-Setup.exe)。
 3. 打开 Soda Prompt Hub，等启动器显示 Core 就绪，再进入工作台。首次弹窗可勾选本地模型，也可以点「稍后再说」。
 4. 按使用方式接入 ComfyUI 或 API，再到「创作台」试一张图。个人资料默认位于 `%USERPROFILE%\Documents\Soda Prompt Hub\prompt-library`，模型位于同级 `models`。
 
@@ -122,7 +122,7 @@ TXT 保存文本说明，JSON 可保留标签、区域和关系等结构。MOSS 
 ## 从源码运行
 
 ```bash
-git clone --branch codex/v1.3-creation-dataset-tagger https://github.com/cOkieeman/soda-prompt-hub.git
+git clone --branch v1.3.0 https://github.com/cOkieeman/soda-prompt-hub.git
 cd soda-prompt-hub
 uv sync
 uv run --no-sync prompt-hub serve --host 127.0.0.1 --port 8765
