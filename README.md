@@ -1,139 +1,137 @@
 # Soda Prompt Hub
 
-Soda Prompt Hub 是一套本机优先的 AI 绘图创作与数据集整理工具。Mac 或 Windows Desktop 都可以独立保存提示词、视觉参照、OC、创作项目、结果图、Caption、审核记录和冻结版本。
-Windows Worker 可以把经过确认的任务交给本机 ComfyUI，也可以与另一台设备配合。LoRA 正式训练仍在 Windows 的训练工具中完成。
+把提示词、参考图、出图和训练集准备放在同一个本地工作台里。创作台提供 **ComfyUI、NovelAI、插件／Agent** 三种入口，图片汇入画廊，选入数据集后继续挑图、打标、审核和导出。
 
-当前源码版本为 `1.3.0`，新版安装包尚未发布。2026-09-14 第一版以 **Pre-release** 发布，
-未正式平台签名；软件里显示的 stable 不代表这批安装包已经完成原生人工验收。
-版本与构建标识的区别见[正式版本体系](docs/RELEASES.md)。
+**1.3.0 图文指南** · 深色／浅色／跟随系统 · 简体中文／繁體中文／English。外观与语言都从右上角「设置」切换。
 
-1.3.0 将 ComfyUI、NovelAI 与插件／Agent 集成到创作台，图片统一进入画廊和数据集，并新增独立场景图打标器。
-打标支持 PixAI、KohakuGBC 与 SAM3 LiteText，通过本地检测模型和视觉模型 API 生成可审核的标签、描述、框线与关系。
-此前的场景提案、画幅建议、LoRA 辅助和生成记录见[创作指南](docs/CREATIVE_AI_GUIDE.md)。
+![1.3 创作台的 NovelAI 界面，左侧编辑提示词和参数，右侧查看结果](docs/images/1.3/creative-novelai.png)
 
-## 下载：先选使用方式
+> 本文截图来自 1.3.0 实际运行界面，使用独立示例资料库。画廊和提示词库中的画作为导入参考，打标框线与描述为手工示例。示例素材来源见文末。
 
-| 使用方式 | 下载 | 要运行的应用 |
-| --- | --- | --- |
-| Mac 管理 Windows | [Mac 启动器 + Windows Worker](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-mac-windows-20260914) | Mac 安装 DMG；Windows 安装并打开 Soda Compute Worker |
-| Windows 单机 | [Windows Desktop](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.1.1-windows-standalone-20260914) | 只安装并打开 Soda Prompt Hub，自动管理本机 Core / Worker |
+[安装与首次启动](#安装与首次启动) · [三种创作入口](#三种创作入口) · [提示词库](#提示词库) · [画廊](#画廊) · [数据集与打标器](#数据集与打标器) · [文档导航](#文档导航)
 
-Mac 包面向 Apple Silicon（arm64），Windows 包面向 x64。下载 Release 的 Assets 中的 DMG / Setup，
-不是 GitHub 自动生成的 Source code ZIP。每套附有 `SHA256SUMS` 和手动验收说明。
-Windows 单机**不需要另开独立 Worker，也不需要 SMB 配对**。两套请分开测试，避免同时运行时混淆任务。
+## 安装与首次启动
 
-### Linux（实验性，非官方构建）
+**版本状态（2026-11-17）**　当前分支为 `1.3.0`，Windows Desktop／Worker 安装包已构建，尚未发布到 GitHub Release。已公开的 Windows UI 安装包为 [1.2.0 预发布版](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0-ui-20261012)，界面与本文有差异。可在[发行页](https://github.com/cOkieeman/soda-prompt-hub/releases)查看公开下载，提前运行 1.3 请使用本分支源码。
 
-Linux 支持由社区适配分支提供，状态为 **Experimental**，不随官方 DMG / Setup 发布：
+1. Windows x64 单机选择 `Soda-Prompt-Hub-Desktop-1.3.0-Setup.exe`。升级前备份个人资料并退出旧版服务，再运行安装器。
+2. 安装包包含 Python、Node、Git 和 CPU 打标运行依赖，并按需安装 VC++ Runtime 与 WebView2。独立的 `Soda-Compute-Worker-1.3.0-Setup.exe` 用于另一台计算设备。
+3. 打开 Soda Prompt Hub，等启动器显示 Core 就绪，再进入工作台。首次弹窗可勾选本地模型，也可以点「稍后再说」。
+4. 按使用方式接入 ComfyUI 或 API，再到「创作台」试一张图。个人资料默认位于 `%USERPROFILE%\Documents\Soda Prompt Hub\prompt-library`，模型位于同级 `models`。
 
-| 能力 | Linux 状态 |
+![首次启动时选择本地模型并查看大小和下载操作，安装路径已隐藏](docs/images/1.3/optional-models.png)
+
+本地模型按用途选择。WD14／真人打标生成标签，CLIP 用于相似图检索，PixAI 生成动漫标签，SAM3 LiteText 检测物件框，MiniLM 合并相似对象与关系。勾选 SAM3 会同时勾选 MiniLM。场景图描述还需接入视觉模型 API。下载支持进度、取消、续传和 SHA-256 校验，完整清单见[可选本地模型](docs/OPTIONAL_MODELS.md)。
+
+需要补装时打开「设置 → 设备连接 → 管理可选模型」。打标工作器默认使用 CPU，使用 NVIDIA GPU 时，在「设置 → 图片 API 与本机工具 → PixAI / KohakuGBC 标注工作器」指定已配置 CUDA 的 Python 环境并选择设备。批量打标由你在打标器提交。
+
+## 三种创作入口
+
+### ComfyUI 工作流
+
+1. 启动自己的 ComfyUI，在「创作台 → ComfyUI 工作流」导入 **API 格式 JSON 工作流**，选择工作流并核对服务地址。ComfyUI 中所需节点和模型需已安装。
+2. 分别填写「主题与风格、正文、负面词、后缀与署名」。常用参数与后处理按工作流呈现，节点映射可在「高级工作流设置」核对。
+3. 需要批量变化时展开「随机词与批次」，选择手写、Wildcard 或 Raffle，管理词库并设置锁定项。先预览本批提示词，确认后点击「生成」，在队列和进度区查看状态。
+
+![ComfyUI 创作入口，分栏提示词、批次预览和常用参数](docs/images/1.3/creative-comfyui.png)
+
+例如在随机词库 `lighting` 中每行填一种光线，在正文写 `a quiet room, __lighting__`。可选择每张重新抽词，或固定一组词只改变出图种子。Raffle 使用「设置 → 图片 API 与本机工具」中配置的本机 ComfyUI 词池目录。
+
+### NovelAI
+
+点击创作台顶部「NovelAI」，再点右上角「登录 NovelAI」。支持 Token 登录和邮箱／密码登录，第三方 NovelAI 图片服务从账号窗口的「第三方 API 连接」进入配置。登录后选择模型，填写正面、负面和固定词，再调整尺寸、种子与采样参数。
+
+![NovelAI 账号窗口，提供 Token 和邮箱密码登录入口](docs/images/1.3/novelai-login.png)
+
+角色、图生图、局部重绘、扩图、风格迁移和精准参考在左侧展开；可用项随所选模型变化。参考图按对应区域加入，生成后可从结果区前往画廊。
+
+### 插件／Agent
+
+点击「插件／Agent」打开对话窗口。右侧「管理连接」可配置聊天／视觉模型和图片 API。聊天端点填写 Base URL、API Key 后可拉取模型，再勾选保存。图片服务在「设置 → 图片 API 与本机工具」填写，支持 GPT／Niu 类图片 API 和 NovelAI。
+
+![设置页中的聊天视觉模型入口、图片 API 表单和本机工具配置](docs/images/1.3/connections.png)
+
+![Agent 对话入口，左侧会话，中间消息与参考图，右侧预设和生图工具](docs/images/1.3/creative-agent.png)
+
+选择聊天模型，按需安装并勾选预设／Skill，再输入需求或加入参考图。Agent 可生成提示词，也可调用已接入的生图工具。Enter 发送，Shift+Enter 换行。预设提供提示指南，带工具的套件还需要相应运行依赖和连接配置，执行情况可在「工具执行记录」查看。
+
+## 提示词库
+
+按画风、角色、服饰与标签、完整提示词或修饰词筛选，点击卡片加入右侧组合。可调整权重与顺序、切换 NovelAI／SD 语法、复制原文，并选择字段「应用到创作台」。小图保留完整比例，查看详情后可打开大图。
+
+![紧凑提示词卡片和右侧组合编辑，可选择插入创作台的字段](docs/images/1.3/prompt-library.png)
+
+已有本地素材先在「设置 → 资料管理」接入，再通过「同步本地画风预览」更新。来源格式与支持的画风目录见[画风资料来源](docs/STYLE_SOURCES.md)。智能检索和角色库可从顶部导航进入。
+
+## 画廊
+
+ComfyUI、NovelAI、图片 API 和 Agent 的结果在本地画廊统一查看，可按生成来源筛选。也可添加图片或映射已有目录，整理作品、参考、图集和收藏。点击图片查看大图、提示词构成和可读取的生成记录。带 Hub 创作记录的图片可「送到创作台」，替换相应提示词字段。
+
+![本地画廊中筛选生成来源、查看图片并勾选加入数据集](docs/images/1.3/gallery.png)
+
+勾选图片后点「加入数据集」，选择已有数据集，或展开「建立新数据集」填写名称与训练目标。单图详情也有相同入口。
+
+<details><summary>查看画廊加入数据集的操作窗口</summary>
+
+![将所选图片加入已有数据集，或创建并命名新数据集](docs/images/1.3/gallery-to-dataset.png)
+
+</details>
+
+「在线画廊」提供 Danbooru、Safebooru、Gelbooru、AI TAG 与 QuickTagCloud 来源。使用 Danbooru 时，先选该来源，再展开下方「Danbooru 帐号」，填写用户名与 API Key，点击「验证并保存」。
+
+## 数据集与打标器
+
+1. 在「数据集」建立并命名项目，选择训练目标。可以从画廊选图、导入已有图片／文件夹／压缩包，也能前往创作台补图。
+2. 在「图片与挑选」逐张采用或淘汰，检查近似图片。在「任务与记录」查看生成和标注任务。
+3. 打开「标注与审核」，或从独立「打标器」进入同一项目。选择标注方式和视觉模型，生成草稿后逐图核对。
+
+![数据集工作区，包含挑图、标注、导出和任务记录](docs/images/1.3/dataset-review.png)
+
+打标器左侧是图片列表，中间是可缩放画布，右侧是标签、描述、物件和关系。支持新增框线、拖动与缩放框、修改标签和关系、按置信度筛选、导入同名 TXT／JSON，以及导出标注 PNG。
+
+![独立打标器展示手工示例框线、全图标签、描述和关系](docs/images/1.3/tagger.png)
+
+使用 **PixAI tags + KohakuGBC** 时，先由 PixAI 提供标签，SAM3 LiteText 检测物件，再通过所选视觉 API 生成描述和关系。先安装对应本地模型并配置视觉 API，完成后检查框线和内容，勾选「已逐图审核并确认」并保存标注。
+
+在数据集「导出」选择格式并创建交付包，导出包含已采用且标注已确认的图片、标注与版本清单。
+
+| 训练工具／用途 | 导出选择 |
 | --- | --- |
-| Core：资料库、创作、审核、数据集整理 | 支持 |
-| systemd 用户服务、安装 / 更新 / 卸载脚本 | 支持 |
-| 应用菜单启动器 | 支持：点击后启动或复用 Core，并在默认浏览器打开工作台 |
-| Compute Worker（ComfyUI 出图执行端） | **实验性支持**（`install.sh --with-worker`，见 [Linux Worker](docs/linux/WORKER.md)） |
-| SMB 双机配对 | 暂不支持（Linux 用本地桥接目录代替） |
-| LoRA 正式训练 | 暂不支持（仅 Windows） |
+| MOSS · KohakuMossTrainer | `MOSS 原生 GBC + JSON + TXT`，保留场景图并生成训练器数据配置 |
+| Anima · Anima LoRA Studio | 按训练配置使用 TXT caption，或同时留存 JSON |
+| Krea2／MiniMax H3 Image · Civitai | 按目标训练页面要求整理图片与 TXT caption |
 
-分支做了什么、怎么用、怎么验证见[Linux 适配说明](docs/linux/README.md)；
-具体步骤见[安装](docs/linux/INSTALL.md)与[更新](docs/linux/UPDATE.md)。
+TXT 保存文本说明，JSON 可保留标签、区域和关系等结构。MOSS 原生 GBC 使用专门的数据结构，Hub 会在导出时回读核对。交付包准备好后，交给对应训练工具配置训练参数。
 
-## 五分钟开始
+<details><summary>查看训练集导出界面</summary>
 
-1. 按上表下载，核对校验和，备份已有资料并正常退出旧服务，再安装对应应用。
-2. Windows 单机：启动 ComfyUI，再打开 Soda Prompt Hub，在启动器设置填写本机 ComfyUI 地址。
-3. Mac 管理 Windows：Windows 打开 ComfyUI 和独立 Soda Compute Worker；Mac 打开应用，按“设备连接”的配对引导完成共享授权。
-4. 启动台显示 Core 已就绪后打开工作台，确认实时 Worker / ComfyUI 状态。最终用户无需预装 Python、`uv`、Git 或 `.NET SDK`。
-5. 按需安装资料库和可选模型；外部 AI 服务的 URL、Key 与模型在“设备连接 → 模型服务”配置。
+![选择 MOSS 原生 GBC 或 JSON、TXT 格式并创建交付包](docs/images/1.3/dataset-export.png)
 
-完整安装步骤见[快速开始](docs/QUICK_START.md)，1.1.1 候选测试见[pre1 手动验收](docs/acceptance/manual-1.1.1-pre1-20260914.md)。
-
-程序默认只监听本机 `127.0.0.1`。新用户的个人资料默认保存在：
-
-| 管理端 | 个人资料目录 |
-| --- | --- |
-| Mac | `~/Documents/Soda Prompt Hub/prompt-library` |
-| Windows 单机 | `%USERPROFILE%\Documents\Soda Prompt Hub\prompt-library` |
-| Linux | `~/.local/share/soda-prompt-hub/library`（由 `PROMPT_HUB_LIBRARY_ROOT` 决定） |
-
-程序和个人资料彼此独立。重新安装或更新程序不会主动移动、删除提示词、图片、数据库或模型。
-
-启动器不显示 Terminal。关闭窗口或“收起窗口”不会停止服务；Mac 用“退出并停止服务”，
-Windows 单机用“退出并停止本机服务”。只退出启动器可以保留服务。
-日志、数据目录和故障处理入口见[安装说明](docs/COMMERCIAL_RELEASE.md)与[排错](docs/TROUBLESHOOTING.md)。
-
-## 它能做什么
-
-- 从灵感、OC 或参考图建立绘图项目，并输出 Anima tags 与 Krea 2 自然语言 Prompt。
-- AI 提供场景、镜头与画幅方案，以及真实本地 LoRA 搭配；支持个人作品与参考画廊、按用途分析和方案复盘，见[创作辅助指南](docs/CREATIVE_AI_GUIDE.md)。
-- 检索本地提示词库、视觉参照、网页收藏和 OC Manager JSON；可按来源快速切换，并只查看带图资料。
-- 使用 AnimaDex 的角色、画师和作品缩略图作视觉参照；完整目录仍由用户使用自己的导出 token 下载到本机。
-- 导入 Krea2、Anima、Illustrious Style Explorer 与 Neons 资料；支持只读本地图库映射；见[画风资料来源](docs/STYLE_SOURCES.md)。
-- 使用 LM Studio 或可选的 OpenAI-compatible 模型辅助整理；模型结果先作为建议或草稿。
-- 使用 WD14 生成 Anima 标签草稿，人工审核后冻结为带哈希的版本化数据集。
-- 通过 Windows 本机 Worker 运行 ComfyUI、回收图片，并同步 LoRA/底模只读清单；Mac 双机模式使用 SMB 交换任务。
-- 使用 `Soda Compute Worker.exe` 在 Windows 图形界面查看 GPU、bridge、ComfyUI 和当前任务，并从系统托盘启停 Worker。
-- 在工作台管理 Workflow Profile、底模、LoRA、尺寸、Steps、CFG、Sampler 和 Scheduler 的选择。
-
-## 两种方式，数据分别保存在管理端
-
-Windows 单机的项目、审核和结果保存在 Windows；Core 和 Worker 使用本地任务目录交换记录，不需要共享。
-Mac 管理 Windows 时，项目、审核和结果保存在 Mac，通信过程如下：
-
-```text
-Mac Prompt Hub（事实、审核、版本）
-        ↓ 写任务与冻结数据集
-SMB 共享文件夹（运输通道）
-        ↓ Worker 领取
-Windows ComfyUI（出图）
-        ↓ 返回图片与运行记录
-Mac 校验 SHA-256 后导入
-```
-
-Windows 模型权重不会被复制到 Mac；Mac 上选择的是 Worker 回传的只读清单。SMB 密码由 Finder 与
-macOS 钥匙串保存，Prompt Hub 不读取密码。更完整的文件关系见[设备与文件关系](docs/ARCHITECTURE.md)。
+</details>
 
 ## 文档导航
 
-| 我现在要做什么 | 应该看哪里 |
-|---|---|
-| 第一次安装，先把页面打开 | [快速开始](docs/QUICK_START.md) |
-| 下载、安装、升级或卸载商业包 | [商业分发与安装说明](docs/COMMERCIAL_RELEASE.md) |
-| 从灵感到出图、复盘和数据集 | [核心工作流](docs/WORKFLOWS.md) |
-| 设计有故事感的画面、挑选 LoRA 并整理个人画廊 | [创作辅助与画廊](docs/CREATIVE_AI_GUIDE.md) |
-| 按页面顺序完成日常操作 | [用户使用说明书草稿](docs/USER_MANUAL_DRAFT.md) |
-| 启动、停止、备份、恢复和安全更新 | [Mac 使用与维护](docs/MAC_GUIDE.md) |
-| 在 Windows 安装、自检和启动 Worker | [Windows Worker 完整指南](docs/WINDOWS_WORKER.md) |
-| 按需安装 WD14、真人打标和 CLIP | [可选本地模型](docs/OPTIONAL_MODELS.md) |
-| 构建 Windows Worker 图形启动器 | [Windows Shell 构建说明](deploy/windows-shell/README.md) |
-| 了解 Mac、Windows Worker 与 Windows 单机版的产品形态 | [Desktop 产品计划](docs/DESKTOP_PRODUCT_PLAN.md) |
-| 查看三端启动器的视觉与交互规格 | [Desktop UI 规格](docs/DESKTOP_UI_SPEC.md) |
-| 弄清两台设备和文件怎样关联 | [设备与文件关系](docs/ARCHITECTURE.md) |
-| 页面打不开、共享盘断开或任务不动 | [常见问题与排错](docs/TROUBLESHOOTING.md) |
-| 版本号、更新通道和发布检查 | [正式版本体系](docs/RELEASES.md) |
-| 查看长期开发边界和历史路线 | [开发计划](DEVELOPMENT_PLAN.md) |
-| 安装新包后手动验收两种模式 | [1.1.1 pre1 验收清单](docs/acceptance/manual-1.1.1-pre1-20260914.md) |
+| 需要了解的内容 | 文档 |
+| --- | --- |
+| 安装、升级、启动器与排错 | [快速开始](docs/QUICK_START.md) · [安装说明](docs/COMMERCIAL_RELEASE.md) · [故障处理](docs/TROUBLESHOOTING.md) |
+| 出图、素材与数据集操作 | [核心工作流](docs/WORKFLOWS.md) · [创作辅助](docs/CREATIVE_AI_GUIDE.md) · [详细使用手册](docs/USER_MANUAL_DRAFT.md) |
+| 资料来源与可选模型 | [画风来源](docs/STYLE_SOURCES.md) · [模型下载](docs/OPTIONAL_MODELS.md) |
+| 其他平台与多机连接 | [Mac 使用](docs/MAC_GUIDE.md) · [Windows Worker](docs/WINDOWS_WORKER.md) · [Linux 实验性支持](docs/linux/README.md) · [文件与设备关系](docs/ARCHITECTURE.md) |
+| 版本、产品与开发 | [版本体系](docs/RELEASES.md) · [Desktop 计划](docs/DESKTOP_PRODUCT_PLAN.md) · [界面规格](docs/DESKTOP_UI_SPEC.md) · [开发计划](DEVELOPMENT_PLAN.md) |
 
-## 当前边界
-
-- Prompt Hub 交付打好标、经过人工审核的冻结数据集，但不自动开始正式训练。
-- 标签终筛、正则、CUDA/Torch 环境、训练参数和长时间训练由 Windows 工具负责。
-- OC Manager 通过 JSON 导入，Prompt Hub 不回写它的数据库。
-- 外部数据集按只读方式扫描；缩略图、草稿和审核状态保存在 Prompt Hub 自己的资料目录。
-- 公共仓库不包含模型权重、个人图片、数据库、API Key、SMB 密码或真实 `worker-config.json`。
-
-## 开发者启动
+## 从源码运行
 
 ```bash
-git clone https://github.com/cOkieeman/soda-prompt-hub.git
+git clone --branch codex/v1.3-creation-dataset-tagger https://github.com/cOkieeman/soda-prompt-hub.git
 cd soda-prompt-hub
 uv sync
 uv run --no-sync prompt-hub serve --host 127.0.0.1 --port 8765
 ```
 
-自定义个人资料位置时使用 `PROMPT_HUB_LIBRARY_ROOT`；模型目录使用 `PROMPT_HUB_MODELS_ROOT`。
-开发检查与贡献约定见[开发计划](DEVELOPMENT_PLAN.md)和[正式版本体系](docs/RELEASES.md)。
+在浏览器打开 `http://127.0.0.1:8765`。可通过 `PROMPT_HUB_LIBRARY_ROOT` 和 `PROMPT_HUB_MODELS_ROOT` 指定资料与模型目录。源码运行的 PixAI／KohakuGBC 工作器及 MOSS 原生导出需安装对应可选依赖，见[模型与依赖说明](docs/OPTIONAL_MODELS.md)。本轮 Windows 1.3 安装包包含 CPU 依赖，Mac 使用现有发行版，Linux 由社区实验性适配提供。
 
-## 许可证
+## 许可证与示例素材
 
-代码采用 [MIT License](LICENSE)。第三方提示词、图片、模型、工作流和数据集继续遵循各自来源的许可证或使用条款，不因本项目采用 MIT 而被重新授权。
+代码采用 [MIT License](LICENSE)。第三方图片、提示词、模型、工作流和数据集沿用各自来源的许可证与使用条款。
+
+截图中的公共领域画作来自 The Metropolitan Museum of Art 的开放资源，包括[麦田与柏树](https://www.metmuseum.org/art/collection/search/436535)、[柏树](https://www.metmuseum.org/art/collection/search/437980)、[戴草帽的自画像](https://www.metmuseum.org/art/collection/search/436532)与[神奈川冲浪里](https://www.metmuseum.org/art/collection/search/45434)。截图中的示例词条、手工标注与空白连接供操作演示使用。
