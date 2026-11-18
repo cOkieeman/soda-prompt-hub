@@ -8,6 +8,7 @@ from http.client import HTTPException as HTTPClientError
 from io import BytesIO
 from typing import IO, TYPE_CHECKING, Any, override
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from PIL import Image, ImageOps
@@ -831,6 +832,8 @@ def _external_vision_completion(
         "enable_thinking": False,
         "chat_template_kwargs": {"enable_thinking": False},
     }
+    if urlsplit(connection.base_url).hostname == "api.deepseek.com":
+        payload["thinking"] = {"type": "disabled"}
     response = _request_json(
         f"{connection.base_url}/chat/completions",
         method="POST",

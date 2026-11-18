@@ -30,8 +30,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --extra moss
 
       - name: Check formatting
         run: uv run ruff format --check .
@@ -43,7 +48,10 @@ jobs:
         run: uv run ty check src/
 
       - name: Test
-        run: uv run pytest
+        run: uv run --extra moss pytest
+
+      - name: Test frontend behavior
+        run: node --test tests/frontend-studio.test.cjs
 
       - name: Build package
         run: uv build --no-sources

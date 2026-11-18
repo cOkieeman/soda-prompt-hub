@@ -1,0 +1,127 @@
+[
+  {
+    "id": "pixai-tagger-v1.0",
+    "title": "PixAI · 动漫标签",
+    "purpose": "为图片生成 Danbooru 标签，供独立打标或 SAM3 场景图流程使用。",
+    "repository": "pixai-labs/pixai-tagger-v1.0",
+    "revision": "9fe10addf9326e292da8a85a98ea74cd91b41771",
+    "directory": "captioning/pixai",
+    "files": [
+      {
+        "name": "config.json",
+        "size": 693918,
+        "sha256": "f8a19b38661c37dc5fd519f2137be70f6f897972021b4ebc17b7d35a0e27b9dd"
+      },
+      {
+        "name": "model.safetensors",
+        "size": 1945425796,
+        "sha256": "f29e475205cbcbc25b52a075840c7809d6215be15f45375113ba09c49bf90292"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "size": 600,
+        "sha256": "20451575e627950993de7b00641d5b263eceb3e7436e4ad518fea2411b60e49d"
+      },
+      {
+        "name": "tagger_pipeline.py",
+        "size": 43696,
+        "sha256": "3431279fdfff234f62664999fc1fe6bb20f1e8756f7435d0e165ebd4456f7fcd"
+      }
+    ]
+  },
+  {
+    "id": "sam3-litetext-l",
+    "title": "SAM3 LiteText · 对象检测",
+    "purpose": "检测物件框线。搭配关系去重模型和视觉 API 生成场景图。",
+    "repository": "vil-uob/sam3-litetext-l",
+    "revision": "963aaaee6c6a9c2a0bc9f101c57c36635940bad5",
+    "directory": "captioning/sam3-litetext-l",
+    "files": [
+      {
+        "name": "config.json",
+        "size": 3360,
+        "sha256": "84e08c670e427c7887ac36e5a927995cbf5ce8e463b1c479eb2b50bca9cdc96c"
+      },
+      {
+        "name": "model.safetensors",
+        "size": 2442147448,
+        "sha256": "b34eb758173869b3c0298353a6e0bf8a5fea55de1a3ae2b1a8d35135c04f039b"
+      },
+      {
+        "name": "processor_config.json",
+        "size": 576,
+        "sha256": "55ce4ea72cf502f3598f9077865e7f4966a211cc0edb95ff144b47dc08c9d61e"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "size": 380,
+        "sha256": "d7f2df044659180175ea6152d265e8c380f274afa9e9459774994580048ce954"
+      },
+      {
+        "name": "tokenizer.json",
+        "size": 3642073,
+        "sha256": "6d9109cc838977f3ca94a379eec36aecc7c807e1785cd729660ca2fc0171fb35"
+      }
+    ]
+  },
+  {
+    "id": "all-MiniLM-L6-v2",
+    "title": "MiniLM · 关系去重",
+    "purpose": "合并场景图中的相似对象与关系，供 KohakuGBC 使用。",
+    "repository": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "directory": "captioning/embedder",
+    "files": [
+      {
+        "name": "config.json",
+        "size": 612,
+        "sha256": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41"
+      },
+      {
+        "name": "config_sentence_transformers.json",
+        "size": 116,
+        "sha256": "061ca9d39661d6c6d6de5ba27f79a1cd5770ea247f8d46412a68a498dc5ac9f3"
+      },
+      {
+        "name": "modules.json",
+        "size": 349,
+        "sha256": "84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf"
+      },
+      {
+        "name": "sentence_bert_config.json",
+        "size": 53,
+        "sha256": "fc1993fde0a95c24ec6c022539d41cf6e2f7c9721e5415d6fb6897472a9cd4b7"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "size": 112,
+        "sha256": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "size": 350,
+        "sha256": "acb92769e8195aabd29b7b2137a9e6d6e25c476a4f15aa4355c233426c61576b"
+      },
+      {
+        "name": "tokenizer.json",
+        "size": 466247,
+        "sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037"
+      },
+      {
+        "name": "vocab.txt",
+        "size": 231508,
+        "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+      },
+      {
+        "name": "model.safetensors",
+        "size": 90868376,
+        "sha256": "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db"
+      },
+      {
+        "name": "1_Pooling/config.json",
+        "size": 190,
+        "sha256": "4be450dde3b0273bb9787637cfbd28fe04a7ba6ab9d36ac48e92b11e350ffc23"
+      }
+    ]
+  }
+]

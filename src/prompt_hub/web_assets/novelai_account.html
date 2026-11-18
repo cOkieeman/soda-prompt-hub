@@ -1,0 +1,19 @@
+<dialog id="naiAccountDialog" class="workbench-dialog nai-account-dialog" aria-labelledby="naiAccountTitle">
+  <header><h2 id="naiAccountTitle">NovelAI 帳號</h2><button type="button" id="naiAccountClose" aria-label="關閉帳號設定">×</button></header>
+  <label>已保存的帳號<select id="naiAccountSelect"><option value="">加入新帳號</option></select></label>
+  <section id="naiAccountSummary" hidden>
+    <p id="naiAccountCached" hidden>顯示上次驗證資料</p>
+    <dl><div><dt>訂閱</dt><dd id="naiSubscriptionTier" data-i18n-ignore></dd></div><div><dt>Anlas 點數</dt><dd id="naiAnlasBalance" data-i18n-ignore></dd></div><div><dt>訂閱到期</dt><dd id="naiSubscriptionExpiry" data-i18n-ignore></dd></div><div id="naiUsageRow" hidden><dt>Opus 配額</dt><dd id="naiUsage" data-i18n-ignore></dd></div></dl>
+    <div class="workbench-actions"><button type="button" id="naiAccountRefresh">重新整理帳號</button><button type="button" id="naiAccountLogout">登出此帳號</button></div>
+  </section>
+  <form id="naiAccountForm">
+    <div class="nai-login-modes" role="group" aria-label="NovelAI 登入方式"><button type="button" data-nai-login-mode="token" aria-pressed="true">Token 登入</button><button type="button" data-nai-login-mode="credentials" aria-pressed="false">郵件與密碼</button></div>
+    <label>帳號名稱<input name="label" maxlength="160" autocomplete="off" placeholder="方便辨識的名稱"></label>
+    <div id="naiTokenFields"><label>API Token<input name="token" type="password" autocomplete="off" spellcheck="false" placeholder="pst-… 或 Access Token" required></label></div>
+    <div id="naiCredentialsFields" hidden><label>電子郵件<input name="email" type="email" autocomplete="username" disabled></label><label>密碼<input name="password" type="password" autocomplete="current-password" disabled></label></div>
+    <label class="nai-show-secret"><input id="naiShowSecret" type="checkbox">顯示憑證</label>
+    <button type="submit" id="naiAccountSubmit" class="studio-primary">驗證並登入</button>
+  </form>
+  <p id="naiAccountStatus" role="status" aria-live="polite"></p>
+  <footer><a href="https://novelai.net/login" target="_blank" rel="noopener noreferrer">NovelAI 官網</a><button type="button" id="naiThirdPartySettings">第三方 API 連線</button></footer>
+</dialog>

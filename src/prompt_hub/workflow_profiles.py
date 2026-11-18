@@ -164,7 +164,8 @@ class WorkflowProfileStore:
         return sorted(profiles, key=lambda item: (item["model_family"], item["label"]))
 
     def get_profile(self, profile_id: str) -> dict[str, Any]:
-        _rule(profile_id)
+        if not _SAFE_ID.fullmatch(profile_id):
+            raise WorkflowProfileError("Workflow Profile ID 无效")
         path = self.root / profile_id / "profile.json"
         if not path.is_file():
             raise WorkflowProfileError("Workflow Profile 尚未导入")
@@ -250,10 +251,64 @@ class WorkflowProfileStore:
         result["ready"] = True
         result["source_workflow_saved"] = True
         profile_id = str(profile.get("profile_id", ""))
-        rule = _rule(profile_id)
         raw = (self.root / profile_id / "source-workflow.json").read_bytes()
+        if profile.get("generic"):
+            from prompt_hub.studio_workflows import (  # noqa: PLC0415 - load optional runtime dependencies only for the selected operation
+                infer_bindings,
+                postprocess_nodes,
+                scalar_inputs,
+                source_values,
+            )
+
+            graph = _parse_workflow(raw)
+            bindings = profile.get("bindings") or infer_bindings(graph)
+            result["fields"] = scalar_inputs(graph)
+            result["bindings"] = bindings
+            result["source_values"] = source_values(graph, bindings)
+            result["postprocess"] = postprocess_nodes(graph)
+            result["controls"] = {"model_inputs": [], "default_loras": []}
+            return result
+        rule = _rule(profile_id)
         result["controls"] = _control_schema(_parse_workflow(raw), rule)
         return result
+
+    def import_generic(
+        self,
+        raw: bytes,
+        *,
+        label: str,
+        filename: str,
+        model_family: str = "anima",
+    ) -> dict[str, Any]:
+        graph = _parse_workflow(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        profile_id = f"custom-{digest[:20]}"
+        directory = self.root / profile_id
+        directory.mkdir(parents=True, exist_ok=True)
+        _write_bytes(directory / "source-workflow.json", raw)
+        metadata = {
+            "format": PROFILE_FORMAT,
+            "profile_id": profile_id,
+            "generic": True,
+            "label": label.strip()[:160] or Path(filename).stem,
+            "model_family": model_family,
+            "source_filename": Path(filename).name,
+            "source_sha256": digest,
+            "node_count": len(graph),
+            "classes": sorted({node["class_type"] for node in graph.values()}),
+            "models": _model_names(graph),
+            "low_cost_omits": [],
+            "imported_at": _now(),
+        }
+        _write_json(directory / "profile.json", metadata)
+        return self._decorate(metadata)
+
+    def read_graph(self, profile_id: str) -> dict[str, Any]:
+        profile = self.get_profile(profile_id)
+        raw = (self.root / profile_id / "source-workflow.json").read_bytes()
+        if hashlib.sha256(raw).hexdigest() != profile["source_sha256"]:
+            raise WorkflowProfileError("原始工作流已變更，請重新匯入")
+        return _parse_workflow(raw)
 
 
 def _control_schema(

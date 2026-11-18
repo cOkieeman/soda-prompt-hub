@@ -10,9 +10,9 @@ import pytest
 from prompt_hub.workspace_web import WORKSPACE_SCRIPT
 
 ASSETS = Path(__file__).resolve().parents[1] / "src/prompt_hub/web_assets"
-CREATIVE = (ASSETS / "creative.js").read_text()
-BASE = (ASSETS / "base.js").read_text()
-GALLERY = (ASSETS / "gallery.js").read_text()
+CREATIVE = (ASSETS / "creative.js").read_text(encoding="utf-8")
+BASE = (ASSETS / "base.js").read_text(encoding="utf-8")
+GALLERY = (ASSETS / "gallery.js").read_text(encoding="utf-8")
 
 
 def snippet(source: str, start: str, end: str) -> str:
@@ -646,6 +646,7 @@ def test_gallery_delete_requires_one_confirmation_and_preserves_target() -> None
         "close(){this.open=false},focus(){}});"
         "const state={active:{asset_id:'gallery-test',title:'test'},"
         "deleteBusy:false,deleteTarget:null,detailRun:0};"
+        "const window={dispatchEvent(){}},Event=class {};"
         "const message=()=>{},loadAlbums=async()=>{},loadFacets=async()=>{},loadAssets=async()=>{};"
         "let reject=false,release;const api=async(url,opts)=>{calls.push({url,...opts});"
         "if(reject)throw new Error('retry');await new Promise(r=>release=r)};"

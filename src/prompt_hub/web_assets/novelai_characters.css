@@ -1,0 +1,79 @@
+/* NAI Launcher inline character structure with the existing Soda palette. */
+#workbenchCreation #creationCharacters { background: var(--paper-deep); border-radius: 12px; margin: 10px 0; }
+#workbenchCreation #creationCharacters > summary { min-height: 52px; padding: 9px 12px; gap: 6px; }
+#creationCharacters .creation-character-shortcuts { flex-wrap: wrap; margin-left: 1px; gap: 4px; }
+#workbenchCreation .creation-character-shortcuts button { display: inline-flex; align-items: center; gap: 3px; padding: 4px 6px; min-height: 28px; color: var(--ink); border-radius: 6px; }
+#creationCharactersContent { padding: 0 12px 12px; gap: 7px; }
+#naiCharacters { display: grid; gap: 7px; }
+#creationCharactersContent svg, .creation-character-shortcuts svg, #naiPositionDialog svg { width: 17px; height: 17px; flex: 0 0 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+#naiCharacterTools { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; gap: 8px; }
+.nai-character-tools > div, .nai-position-mode { display: flex; align-items: center; }
+#workbenchCreation .nai-character-tools button, .nai-position-mode button { min-height: 36px; padding: 7px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--ink); font: 500 12px/1.5 var(--font-ui); }
+#workbenchCreation .nai-character-tools button[aria-pressed="true"], .nai-position-mode button[aria-pressed="true"] { background: var(--acid); color: var(--on-acid); }
+#workbenchCreation #naiClearCharacters { color: var(--error-text); }
+#naiCharacterStatus { margin: 0; font-size: 12px; color: var(--muted); }
+#naiCharacterStatus:empty { display: none; }
+[data-gender="female"] { --character-accent: #952d54; }
+[data-gender="male"] { --character-accent: #24578f; }
+[data-gender="other"] { --character-accent: #65449a; }
+html[data-theme="dark"] [data-gender="female"] { --character-accent: #f3a4c5; }
+html[data-theme="dark"] [data-gender="male"] { --character-accent: #9ac4ff; }
+html[data-theme="dark"] [data-gender="other"] { --character-accent: #cdb7ff; }
+#workbenchCreation .creation-character-shortcuts [data-gender] { color: var(--character-accent); background: color-mix(in srgb, var(--character-accent) 10%, var(--paper-deep)); }
+#workbenchCreation .nai-character { display: block; margin: 0; padding: 0; border: 0; border-radius: 10px; background: var(--paper); min-width: 0; }
+#workbenchCreation .nai-character[data-editing="true"] { outline: 1px solid var(--acid); outline-offset: -1px; }
+#workbenchCreation .nai-character > header { display: flex; align-items: center; gap: 6px; min-height: 52px; padding: 6px 8px; border-radius: 10px 10px 0 0; background: color-mix(in srgb, var(--character-accent) 10%, var(--paper)); }
+#workbenchCreation .nai-character > header button { min-height: 34px; border: 0; background: transparent; color: var(--ink); padding: 4px 6px; }
+#workbenchCreation .nai-character .nai-character-select { display: flex; flex: 1; align-items: center; text-align: left; gap: 8px; min-width: 0; padding: 0; }
+.nai-character-select strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.nai-character-gender { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; color: var(--character-accent); background: color-mix(in srgb, var(--character-accent) 12%, var(--paper)); padding: 3px 7px; border-radius: 10px; font-size: 11px; }
+#workbenchCreation .nai-character .nai-character-name { width: 0; flex: 1; min-width: 0; min-height: 34px; height: 34px; padding: 4px 5px; border: 0; border-radius: 4px; font: 600 13px/1.5 var(--font-ui); }
+#workbenchCreation .nai-character-enabled[aria-pressed="true"] { color: var(--signal); }
+.nai-character[data-enabled="false"] .nai-character-preview { color: var(--muted); }
+#workbenchCreation .nai-character-menu { position: relative; flex: 0 0 auto; padding: 0; margin: 0; border: 0; }
+.nai-character-menu > summary { display: grid; place-items: center; width: 32px; height: 34px; cursor: pointer; list-style: none; }
+.nai-character-menu > summary::-webkit-details-marker { display: none; }
+.nai-character-menu > div { position: absolute; right: 0; top: 100%; z-index: 12; width: 150px; padding: 5px; background: var(--paper-deep); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+#workbenchCreation .nai-character-menu > div > button { display: block; width: 100%; text-align: left; padding: 8px; }
+#workbenchCreation .nai-character-menu [data-character-action="delete"] { color: var(--error-text); }
+#workbenchCreation .nai-character .nai-character-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; max-height: 70px; width: 100%; min-height: 35px; border: 0; background: transparent; text-align: left; padding: 8px 10px; border-radius: 0 0 10px 10px; font: 400 12px/1.5 var(--font-ui); overflow-wrap: anywhere; white-space: pre-wrap; }
+.nai-character-editor { padding: 6px 8px 8px; }
+.nai-character-thumbnail { width: 34px; height: 34px; border-radius: 6px; object-fit: cover; }
+.nai-character-thumbnail-upload { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
+.nai-character-thumbnail-upload input { min-width: 0; width: 100%; }
+#workbenchCreation .nai-character-editor .creation-highlight-text,
+#workbenchCreation .nai-character-editor .creation-highlight-editor textarea { padding: 12px; font: 400 13px/1.6 var(--font-code); }
+.nai-character-editor-tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+#workbenchCreation .nai-character-editor-tabs button { min-height: 30px; padding: 4px 9px; border: 0; background: transparent; font-size: 12px; }
+#workbenchCreation .nai-character-editor-tabs button[aria-pressed="true"] { background: var(--acid); color: var(--on-acid); }
+#workbenchCreation .nai-character-editor-tabs .nai-character-clear { margin-left: auto; }
+#workbenchCreation .nai-character-editor textarea { display: block; width: 100%; min-height: 112px; height: 112px; max-height: 480px; resize: vertical; margin: 0; font: 400 13px/1.6 var(--font-code); }
+.nai-character-coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+#workbenchCreation .nai-character-coordinates label { font-size: 11px; }
+#workbenchCreation .nai-character-coordinates input { min-height: 34px; padding: 6px; }
+#naiPositionDialog { --position-max-height: min(48dvh, 420px); width: min(780px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 18px; background: var(--paper); color: var(--ink); }
+#naiPositionDialog > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+#naiPositionDialog h2 { margin: 0; font-size: 17px; }
+#naiPositionDialog #naiClosePositions { padding: 5px; min-height: 32px; background: transparent; border: 0; color: var(--ink); }
+.nai-position-mode { margin-top: 12px; }
+#naiPositionHelp { font-size: 13px; color: var(--muted); margin: 10px 0; }
+.nai-position-stage { display: flex; justify-content: center; padding: 24px; min-height: 200px; background: var(--studio-image-bg); }
+#naiPositionBoard { position: relative; width: min(100%, calc(var(--position-max-height) * var(--position-aspect))); height: auto; flex: 0 0 auto; border: 1px solid var(--studio-border); background: var(--field-bg); touch-action: none; }
+#naiPositionBoard > button { position: absolute; transform: translate(-50%, -50%); width: 36px; height: 36px; min-height: 36px; padding: 0; border: 2px solid var(--character-accent); border-radius: 50%; background: var(--paper); color: var(--character-accent); cursor: grab; }
+#naiPositionBoard > button:focus { z-index: 2; outline: 2px solid var(--acid); outline-offset: 3px; }
+#naiPositionChips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+#naiPositionChips button { border: 1px solid var(--line); padding: 6px 9px; color: var(--character-accent); background: var(--field-bg); }
+#naiPositionChips button[aria-pressed="true"] { border-color: var(--acid); }
+@media (max-width: 450px) {
+  #workbenchCreation #creationCharacters > summary { padding-left: 8px; padding-right: 8px; gap: 4px; }
+  #workbenchCreation .creation-character-shortcuts button { padding: 4px; }
+  #creationCharactersContent { padding-left: 8px; padding-right: 8px; }
+  #naiPositionDialog { --position-max-height: min(42dvh, 330px); padding: 12px; }
+}
+
+.nai-composition-guides { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 12px; }
+.nai-composition-guides label { display: grid; gap: 5px; font-size: 12px; }
+.nai-composition-guides input { width: 88px; }
+#naiPositionBoard > button[aria-pressed="true"] { outline: 2px solid var(--acid); outline-offset: 3px; z-index: 2; }
+#naiPositionBoard > button img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+#naiPositionBoard > button span { position: relative; padding: 1px 4px; background: var(--paper); color: var(--character-accent); border-radius: 50%; }

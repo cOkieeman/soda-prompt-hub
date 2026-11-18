@@ -206,7 +206,6 @@ def test_api_health_stats_search_and_page(source_tree, monkeypatch) -> None:
                 'aria-selected="true"',
                 "remoteNodeGrid",
                 "homeProgramVersion",
-                "homeDataVersion",
                 "homeReleaseIdentity",
                 "homeFirstGuide",
                 "/api/system/version",
@@ -433,9 +432,10 @@ def test_page_uses_scoped_headers_and_accessible_contrast(settings) -> None:
     assert "    header {" not in page.text
     assert "--muted: #5b5a53;" in page.text
     assert "--signal: #9a321f;" in page.text
-    assert (
-        ".comfy-head .section-label, .comfy-head label { color: var(--on-ink-muted); }" in page.text
-    )
+    assert ".comfy-head { color: var(--ink); }" in page.text
+    assert ".comfy-head :is(.section-label, label) { color: var(--muted); }" in page.text
+    assert "--inverse-bg: #171815;" in page.text
+    assert "--inverse-text: #ece8dc;" in page.text
 
 
 def test_page_has_mobile_menu_and_workspace_resume_entry(settings) -> None:
@@ -467,9 +467,7 @@ def test_home_offers_batch_setup_for_missing_recommended_sources(settings) -> No
         "sourceSetupSkipKey",
         "renderHomeSourceSetup(sources)",
         "source_ids: sourceIds, clone_missing: true",
-        "loadSourceSyncStatus(), searchPrompts()",
-        "许可证待查",
-        "视觉参照库图片较多",
+        "const updates = [loadStats(),loadSourceSyncStatus()]",
     ):
         assert marker in page
 
@@ -494,7 +492,7 @@ def test_page_paginates_long_lists_and_loads_model_tabs_on_demand(settings) -> N
 
     for marker in (
         'id="archivePagination"',
-        "archivePageSize = 12",
+        "archivePageSize = 48",
         "archiveTotal",
         "offset: String((archivePage - 1) * archivePageSize)",
         "renderPromptPage()",

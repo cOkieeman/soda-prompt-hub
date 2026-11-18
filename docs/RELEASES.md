@@ -86,6 +86,16 @@ ZIP 内文件时间和权限使用固定值；同一提交、同一工具链重�
 
 正式版本使用 `v<版本>` 标签，例如 `v1.1.0`。已发布标签和附件不移动、不覆盖；通常后续修复使用新的修订版本。
 
+### 2026-11-17：Windows 1.3.0
+
+[1.3.0 Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.3.0) 提供 Windows x64 Desktop、Compute Worker Setup、完整源码包、SHA-256、构建来源与运行依赖清单。软件版本为 `1.3.0`，发行包以 **Pre-release** 发布，安装器尚未签名。
+
+安装包沿用已在 Windows 实机完成覆盖升级和运行验证的文件。运行源码对应 `6f37e9629283ea138e7809d1e712ac613d44e43c`，之后的发行提交更新图文说明和下载入口。Release 标签绑定发行提交，`BUILD_PROVENANCE.json` 记录两者与附件校验值。
+
+已验证随包 Python、Desktop／Worker 版本、Core health、私有连接设置及数据库记录保留，安装文件完整性校验通过。完整全新 Windows 系统安装、卸载生命周期、全部外部服务与第三方插件仍需各自验证。本次发布由维护者授权，标签直接对应 PR #34 的已验证提交，PR 保留审核状态。
+
+本次 Windows 范围沿用维护者的发布要求。Mac 使用现有 1.2.0 发行包，Linux 继续由社区实验性适配提供。新版安装与操作见[图文指南](../README.md)。
+
 ### 2026-10-05：1.2.0 验收构建
 
 [1.2.0 Release](https://github.com/cOkieeman/soda-prompt-hub/releases/tag/v1.2.0) 包含 Mac arm64 DMG、Windows x64 Desktop / Compute Worker Setup，以及统一校验清单和依赖库存。产品和 Worker 版本均为 `1.2.0`。

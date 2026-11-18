@@ -55,9 +55,7 @@ def _publish_remote(tmp_path: Path) -> Path:
     author = tmp_path / "author"
     executable = shutil.which("git")
     assert executable is not None
-    subprocess.run(  # noqa: S603 - test controls the temporary repository path
-        [executable, "init", "--bare", str(remote)], check=True, capture_output=True
-    )
+    subprocess.run([executable, "init", "--bare", str(remote)], check=True, capture_output=True)  # noqa: S603 - local configured executable, argument list and no shell
     author.mkdir()
     _git(author, "init", "-b", "main")
     (author / "prompts.txt").write_text("first\n", encoding="utf-8")
@@ -172,16 +170,14 @@ def test_source_sync_fast_forwards_and_skips_dirty_tree(settings, tmp_path) -> N
     source = tmp_path / "source"
     executable = shutil.which("git")
     assert executable is not None
-    subprocess.run(  # noqa: S603 - test controls the temporary repository path
-        [executable, "init", "--bare", str(remote)], check=True, capture_output=True
-    )
+    subprocess.run([executable, "init", "--bare", str(remote)], check=True, capture_output=True)  # noqa: S603 - local configured executable, argument list and no shell
     author.mkdir()
     _git(author, "init", "-b", "main")
     (author / "prompts.txt").write_text("first\n", encoding="utf-8")
     _commit(author, "initial")
     _git(author, "remote", "add", "origin", str(remote))
     _git(author, "push", "-u", "origin", "main")
-    subprocess.run(  # noqa: S603 - test controls the temporary repository paths
+    subprocess.run(  # noqa: S603 - test controls the temporary repository path
         [executable, "clone", "--branch", "main", str(remote), str(source)],
         check=True,
         capture_output=True,

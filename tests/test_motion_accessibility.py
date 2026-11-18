@@ -10,16 +10,10 @@ BASE_CSS = (ROOT / "src/prompt_hub/web_assets/base.css").read_text(encoding="utf
 BASE_JS = (ROOT / "src/prompt_hub/web_assets/base.js").read_text(encoding="utf-8")
 CREATIVE_CSS = (ROOT / "src/prompt_hub/web_assets/creative.css").read_text(encoding="utf-8")
 CREATIVE_JS = (ROOT / "src/prompt_hub/web_assets/creative.js").read_text(encoding="utf-8")
-SOURCE_CENTER = (ROOT / "src/prompt_hub/source_center_web.py").read_text(encoding="utf-8") + (
-    ROOT / "src/prompt_hub/web_assets/source_center.css"
-).read_text(encoding="utf-8")
+SOURCE_CENTER = (ROOT / "src/prompt_hub/source_center_web.py").read_text(encoding="utf-8")
 CREATIVE_LAYOUT = (ROOT / "src/prompt_hub/creative_web_layout.py").read_text(encoding="utf-8")
-COMFY_WEB = (ROOT / "src/prompt_hub/comfy_web.py").read_text(encoding="utf-8") + (
-    ROOT / "src/prompt_hub/web_assets/comfy.css"
-).read_text(encoding="utf-8")
-LORA_WEB = (ROOT / "src/prompt_hub/lora_web.py").read_text(encoding="utf-8") + (
-    ROOT / "src/prompt_hub/web_assets/lora.css"
-).read_text(encoding="utf-8")
+COMFY_WEB = (ROOT / "src/prompt_hub/comfy_web.py").read_text(encoding="utf-8")
+LORA_WEB = (ROOT / "src/prompt_hub/lora_web.py").read_text(encoding="utf-8")
 
 
 def _relative_luminance(hex_color: str) -> float:
@@ -114,28 +108,22 @@ const tick=()=>new Promise(setImmediate);
 
 
 def test_known_dark_surface_text_meets_normal_text_contrast() -> None:
-    disabled = re.search(
-        r"\.wd14-toolbar button:disabled\s*\{[^}]*background:\s*var\((--[a-z-]+)\);"
-        r"[^}]*color:\s*var\((--[a-z-]+)\)",
-        CREATIVE_CSS,
+    theme = (ROOT / "src/prompt_hub/web_assets/theme.css").read_text(encoding="utf-8")
+    muted = re.search(r"--inverse-muted:\s*(#[0-9a-fA-F]{6})", theme)
+    assert muted is not None
+    assert _contrast(muted.group(1), "#383631") >= 4.5
+    assert _contrast(muted.group(1), "#35342f") >= 4.5
+    assert (
+        ".wd14-toolbar button:disabled { background: #383631; color: var(--inverse-muted); }"
+        in CREATIVE_CSS
     )
-    assert disabled is not None
-    assert _contrast(_token(disabled.group(1)), _token(disabled.group(2))) >= 4.5
-
-    no_image = re.search(
-        r"\.workflow-lora-selected \.workflow-lora-no-image\s*\{[^}]*color:\s*var\((--[a-z-]+)\)",
-        CREATIVE_CSS,
+    assert (
+        ".workflow-lora-selected .workflow-lora-no-image { display: grid; "
+        "place-items: center; color: var(--inverse-muted);" in CREATIVE_CSS
     )
-    assert no_image is not None
-    assert _contrast(_token("--ink-line"), _token(no_image.group(1))) >= 4.5
-
     assert "input::placeholder, textarea::placeholder" in BASE_CSS
     assert "opacity: 1" in BASE_CSS
-
-    signal = re.search(r"--signal:\s*(#[0-9a-fA-F]{6})", BASE_CSS)
-    assert signal is not None
-    assert _contrast(signal.group(1), "#d8d1bf") >= 4.5
-    assert "color:var(--signal)" in SOURCE_CENTER
+    assert _contrast(_token("--signal"), "#d8d1bf") >= 4.5
 
 
 def test_navigation_does_not_interpolate_through_low_contrast_colors() -> None:

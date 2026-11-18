@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $manifestPath = Join-Path $PSScriptRoot "MANIFEST.sha256"
 
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {

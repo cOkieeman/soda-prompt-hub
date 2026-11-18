@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import stat
+import time
 import unicodedata
 import zipfile
 from collections import defaultdict
@@ -57,6 +58,9 @@ ARCHIVE_RATIO_MIN_BYTES = 10 * 1024 * 1024
 MAX_ARCHIVE_UPLOAD_BYTES = 1024**3
 _ARCHIVE_NAME_CONTROL_MAX = 31
 _ARCHIVE_NAME_DELETE_CODE = 127
+
+
+MAX_MISSING_IMAGE_RETRIES = 3
 
 
 class DatasetWorkspaceError(ValueError):
@@ -1064,7 +1068,15 @@ def _sha256(path: Path) -> str:
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    loaded = json.loads(path.read_text(encoding="utf-8"))
+    # Windows can briefly deny reads while a scan atomically replaces this file.
+    for attempt in range(4):
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            break
+        except PermissionError:
+            if attempt == MAX_MISSING_IMAGE_RETRIES:
+                raise
+            time.sleep(0.025)
     if not isinstance(loaded, Mapping):
         raise ValueError("JSON object expected")
     return dict(loaded)

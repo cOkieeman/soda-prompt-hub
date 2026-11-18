@@ -1,0 +1,109 @@
+<section id="studioPage" class="studio-page" hidden>
+  <header class="studio-project-heading">
+    <div class="studio-project-title"><button type="button" id="studioBackProjects">我的專案</button><h1 id="studioProjectTitle">資料集</h1><span id="studioTargetLabel"></span></div>
+    <div class="workbench-actions" id="studioProjectTaggerActions" hidden></div>
+    <span class="studio-save-state" id="studioSaveState" role="status"></span>
+  </header>
+  <nav class="studio-steps" aria-label="資料集步驟">
+    <button type="button" data-studio-step="references">參考素材</button>
+    <button type="button" data-studio-step="generate">生圖</button>
+    <button type="button" data-studio-step="review">挑圖</button>
+    <button type="button" data-studio-step="caption">打標</button>
+    <button type="button" data-studio-step="export">匯出</button>
+  </nav>
+  <p id="studioStatus" class="studio-notice" role="status"></p>
+  <div id="studioDraftRecovery" hidden><p>找到另一份未保存的本機草稿，可恢復後繼續編輯。</p><button type="button" id="studioRestoreDraft">恢復草稿</button><button type="button" id="studioDiscardDraft">使用已保存版本</button></div>
+  <section data-studio-panel="references">
+    <header class="studio-section-heading"><div><h2>參考素材</h2><p>為每張圖片指定用途，生圖頁會按所選後端提供輸入。</p></div><label class="studio-upload-button">加入參考圖<input type="file" id="studioReferenceFiles" accept="image/png,image/jpeg,image/webp" multiple></label></header>
+    <div id="studioReferences" class="studio-image-grid"></div>
+  </section>
+  <section data-studio-panel="generate" hidden>
+    <div class="studio-generation-layout">
+      <div class="studio-editor">
+        <div class="studio-control-row">
+          <label>生圖後端<select data-recipe="backend" id="studioBackend"><option value="comfyui">ComfyUI</option><option value="openai">GPT / Niu 類 API</option><option value="novelai">NovelAI</option></select></label>
+          <label id="studioWorkflowField">工作流<select data-recipe="workflow_id" id="studioWorkflow"><option value="">請匯入工作流</option></select></label>
+          <label id="studioProviderField" hidden>圖片連線<select data-recipe="provider_id" id="studioProvider"></select></label>
+          <button type="button" id="studioImportWorkflow">匯入 API 工作流</button>
+          <input type="file" id="studioWorkflowFile" accept=".json,application/json" hidden>
+        </div>
+        <label id="studioComfyUrlField">ComfyUI 地址<input data-recipe="comfy_url" type="url" placeholder="http://127.0.0.1:8190"></label>
+        <div class="studio-material-actions"><button type="button" id="studioChooseMaterial">從素材庫選詞</button><button type="button" id="studioOpenWordlists">管理隨機詞庫</button></div>
+        <div class="studio-prompt-fields">
+          <section class="studio-prompt-field"><header><label for="studioPrefix">主題與風格</label><label class="studio-lock"><input type="checkbox" data-lock="prefix">鎖定</label></header><textarea id="studioPrefix" data-recipe="prefix" rows="3" placeholder="填寫這一批共用的主題、品質詞與畫風"></textarea><button type="button" id="studioToggleRows">分行啟停與排序</button><div id="studioPrefixRows" hidden></div></section>
+          <section class="studio-prompt-field"><header><label for="studioBody">正文</label><label class="studio-lock"><input type="checkbox" data-lock="body">鎖定抽取結果</label></header><textarea id="studioBody" data-recipe="body" rows="7" placeholder="填寫角色、服裝、姿勢與場景。可插入 __詞庫名稱__"></textarea><div class="studio-control-row"><label>抽詞方式<select data-recipe="text_mode"><option value="manual">手寫</option><option value="wildcard">Wildcard</option><option value="raffle">Raffle</option></select></label><label>插入詞庫<select id="studioWordlistInsert"><option value="">選擇詞庫</option></select></label><button type="button" id="studioDrawOnce">抽一次</button><button type="button" id="studioLockDraw">鎖定這組詞</button></div></section>
+          <section class="studio-prompt-field"><header><label for="studioNegative">負面詞</label><label class="studio-lock"><input type="checkbox" data-lock="negative">鎖定</label></header><textarea id="studioNegative" data-recipe="negative" rows="3"></textarea></section>
+          <section class="studio-prompt-field"><header><label for="studioSuffix">後綴與簽名</label><label class="studio-lock"><input type="checkbox" data-lock="suffix">鎖定</label></header><textarea id="studioSuffix" data-recipe="suffix" rows="2"></textarea></section>
+        </div>
+        <details id="studioRaffleSettings" hidden><summary>Raffle 詞池與過濾</summary><div class="studio-details-content"><div class="studio-checks"><label><input type="checkbox" data-raffle="use_general">General</label><label><input type="checkbox" data-raffle="use_sensitive">Sensitive</label><label><input type="checkbox" data-raffle="use_questionable">Questionable</label><label><input type="checkbox" data-raffle="use_explicit">Explicit</label></div><label>候選必含標籤<input data-raffle="taglists_must_include" placeholder="1girl, solo"></label><label>從結果移除標籤<input data-raffle="filter_out_tags"></label><label>排除含以下標籤的詞組<input data-raffle="exclude_taglists_containing"></label><label>排除標籤類別<input data-raffle="exclude_tag_categories"></label></div></details>
+        <details><summary>參考圖輸入對應</summary><div id="studioReferenceBindings" class="studio-details-content"></div></details>
+        <details id="studioNovelaiSettings" hidden><summary>NovelAI 參考與角色設定</summary><div class="studio-details-content">
+          <label>參考方式<select data-recipe="novelai_mode"><option value="vibe">Vibe 畫風參考</option><option value="precise">Precise 角色／服裝參考</option><option value="img2img">圖生圖</option></select></label>
+          <div class="studio-control-row"><label>參考強度<input type="number" min="0" max="1" step="0.05" data-recipe="reference_strength"></label><label>參考資訊量<input type="number" min="0" max="1" step="0.05" data-recipe="reference_information"></label><label>重繪強度<input type="number" min="0" max="1" step="0.05" data-recipe="strength"></label><label>噪聲<input type="number" min="0" max="1" step="0.05" data-recipe="noise"></label></div>
+          <label>角色提示 JSON<textarea id="studioCharacters" rows="5" placeholder='[{"prompt":"1girl, red hair","negative":"","x":0.3,"y":0.5}]'></textarea></label>
+        </div></details>
+        <section id="studioWorkflowControls" class="studio-workflow-controls" hidden>
+          <div class="studio-workflow-toolbar">
+            <button type="button" id="studioWorkflowParametersToggle" aria-controls="studioWorkflowParameters" aria-expanded="false">工作流常用參數</button>
+          </div>
+          <div id="studioWorkflowParameters" hidden></div>
+          <details class="studio-workflow-advanced">
+            <summary>高級工作流設置</summary>
+            <div id="studioWorkflowBindings" class="studio-workflow-bindings"></div>
+            <details>
+              <summary>其他節點參數</summary>
+              <div id="studioWorkflowOverrides" class="studio-details-content"></div>
+            </details>
+            <details>
+              <summary>底層節點狀態 JSON</summary>
+              <div id="studioWorkflowStateOverrides" class="studio-details-content"></div>
+            </details>
+            <p id="studioWorkflowUnconnected" class="studio-workflow-unconnected" hidden></p>
+          </details>
+        </section>
+        <details><summary>後處理</summary><div id="studioPostprocess" class="studio-details-content"></div></details>
+        <div class="studio-generation-controls">
+          <div class="studio-control-row studio-number-row"><label>寬<input type="number" data-recipe="width" min="64" max="4096" step="8"></label><label>高<input type="number" data-recipe="height" min="64" max="4096" step="8"></label><label>步數<input type="number" data-recipe="steps" min="1" max="200"></label><label>CFG<input type="number" data-recipe="cfg" min="0" max="30" step="0.1"></label></div>
+          <div class="studio-control-row"><label>抽詞種子<input type="number" data-recipe="text_seed" min="0"></label><label>變化方式<select data-recipe="text_seed_mode"><option value="fixed">固定</option><option value="increment">遞增</option><option value="random">隨機</option></select></label><label>出圖種子<input type="number" data-recipe="seed" min="0"></label><label>變化方式<select data-recipe="seed_mode"><option value="fixed">固定</option><option value="increment">遞增</option><option value="random">隨機</option></select></label></div>
+          <p id="studioSeedNote"></p>
+          <div class="studio-control-row"><label>批次方式<select data-recipe="batch_mode"><option value="new_text">每張重新抽詞</option><option value="same_text">同一組詞換出圖種子</option></select></label><label>圖片數量<input type="number" data-recipe="count" min="1" max="200"></label></div>
+          <div class="studio-generation-actions"><button type="button" id="studioPreviewBatch">預覽本批提示詞</button><button type="button" id="studioQueueBatch" class="studio-primary">加入生成佇列</button></div>
+        </div>
+      </div>
+      <aside class="studio-results"><h2>本批預覽</h2><div id="studioPromptPreview"><p class="studio-empty">填好提示詞後，先預覽抽取結果。</p></div><h2>生成進度</h2><div id="studioJobs"></div><h2>最近圖片</h2><div id="studioRecentImages" class="studio-image-grid"></div></aside>
+    </div>
+  </section>
+  <section data-studio-panel="review" hidden>
+    <header class="studio-section-heading"><div><h2>挑選訓練圖</h2><p id="studioImageCounts"></p></div><label class="studio-upload-button">匯入已有圖片<input type="file" id="studioCandidateFiles" accept="image/png,image/jpeg,image/webp" multiple></label></header>
+    <div class="studio-control-row"><label>顯示<select id="studioReviewFilter"><option value="all">全部圖片</option><option value="pending">待挑選</option><option value="approved">已採用</option><option value="excluded">已淘汰</option></select></label><button type="button" id="studioApproveVisible">採用目前顯示的圖片</button></div>
+    <button type="button" id="studioFindDuplicates">檢查近似圖片</button><div id="studioDuplicateResults"></div>
+    <div id="studioCandidates" class="studio-image-grid studio-candidate-grid"></div>
+  </section>
+  <section data-studio-panel="caption" hidden>
+    <header class="studio-section-heading tagger-caption-heading"><div><h2>標注與審核</h2><p>選擇圖片編輯標注，確認後加入交付包。</p></div><div class="tagger-run-controls"><details class="tagger-run-settings"><summary>批量打標設置</summary><div class="studio-control-row"><label>標注方式<select id="studioCaptionMethod"><option value="vision">視覺模型 API</option><option value="wd14">WD14 CPU</option><option value="pixai">PixAI 工作器</option><option value="gbc">KohakuGBC 工作器</option><option value="pixai_gbc">PixAI tags + KohakuGBC (SAM3 LiteText + VLM)</option></select></label><label id="studioCaptionModelField">視覺模型<select id="studioCaptionModel"></select></label></div></details><button type="button" id="studioCaptionBatch">為已採用圖片生成草稿</button></div></header>
+    <details class="tagger-import-tools"><summary>匯入同名 TXT／JSON 標注</summary><label class="studio-upload-button">選擇標注檔案<input id="studioAnnotationFiles" type="file" accept=".json,.txt" multiple></label><p>可匯入 PixAI、KohakuGBC 及人工審核後的結果，新增結果會作為待審核草稿。</p></details><div class="studio-caption-layout"><div class="tagger-image-column"><div id="taggerRunSettingsHost"></div><div id="taggerImageFilters" hidden><div class="tagger-filter-tabs" role="group" aria-label="圖片標注狀態"><button type="button" data-graph-filter="all" aria-pressed="true">全部 <span id="taggerAllCount">0</span></button><button type="button" data-graph-filter="captioned" aria-pressed="false">已打標 <span id="taggerCaptionedCount">0</span></button><button type="button" data-graph-filter="uncaptioned" aria-pressed="false">未打標 <span id="taggerUncaptionedCount">0</span></button></div><input type="search" id="taggerImageSearch" placeholder="篩選檔名" aria-label="篩選檔名"><p id="taggerImageCount"></p></div><div id="taggerSelectionHost"><div id="studioTaggerSelection" class="workbench-actions" hidden><button type="button" id="studioTaggerSelectAll">全選待標註圖片</button><button type="button" id="studioTaggerClear">清除選擇</button><span>未選擇時處理全部待標註圖片</span></div></div><div id="studioCaptionImages" class="studio-caption-list"></div></div><div class="studio-caption-editor" id="studioCaptionEditor"><p class="studio-empty">先選擇一張已採用的圖片。</p></div></div>
+    <section id="studioTaggerJobs" hidden><h2>標注任務進度</h2></section>
+  </section>
+  <section data-studio-panel="export" hidden>
+    <div class="studio-export-layout"><div><h2>匯出訓練集</h2><p id="studioExportTarget"></p><label>畫風或角色觸發詞<input data-recipe="trigger" placeholder="依專案需要填寫"></label><label>標注格式<select id="studioExportFormat"><option value="gbc">MOSS 原生 GBC + JSON + TXT</option><option value="both">JSON 與 TXT</option><option value="txt">TXT</option><option value="json">JSON</option></select></label><p id="studioExportCounts"></p><button type="button" id="studioExport" class="studio-primary">建立交付包</button><div id="studioExports"></div></div><div><h2>交付內容</h2><p>交付包包含已採用且標注已確認的圖片、同名標注及版本清單。每張圖片的生成來源與參數保存在清單中。</p><p id="studioNativeExportNote"></p></div></div>
+  </section>
+</section>
+<section id="studioSettingsPage" class="studio-page" hidden>
+  <header class="studio-page-heading"><div><h1>設定</h1><p>圖片 API 與本機工具。</p></div></header>
+  <p id="studioSettingsStatus" class="studio-notice" role="status"></p>
+  <div class="studio-appearance"><label>外觀<select data-theme-select aria-label="設定頁外觀"><option value="dark">深色</option><option value="light">淺色</option><option value="system">跟隨系統</option></select></label></div>
+  <section class="studio-chat-connections"><h2>聊天與視覺模型</h2><p>DeepSeek 等聊天與看圖模型在此接入。</p><button type="button" id="studioManageChatModels">管理聊天／視覺模型</button></section>
+  <div class="studio-settings-layout">
+    <section><h2>圖片服務</h2><div id="studioConnectionList"></div><form id="studioProviderForm" class="studio-settings-form">
+      <input type="hidden" name="id"><label>連線名稱<input name="label" maxlength="160" required></label><label>類型<select name="kind"><option value="openai">GPT / Niu 圖片 API</option><option value="novelai">NovelAI</option></select></label><label>服務地址<input type="url" name="base_url" required placeholder="https://api.openai.com/v1"></label>
+      <div class="studio-provider-model-row"><label>模型名稱<input name="model" required autocomplete="off"></label><button type="button" id="studioDiscoverProviderModels">抓取模型</button><label id="studioProviderModelSelectField" hidden>抓取的模型<select id="studioProviderModelSelect"></select></label></div>
+      <p id="studioProviderModelsStatus" class="studio-notice" role="status"></p>
+      <label>API Key<input type="password" name="api_key" autocomplete="new-password" placeholder="編輯既有連線時，留空可沿用"></label><label class="studio-lock"><input type="checkbox" name="references" checked>服務支援參考圖</label><button type="submit" class="studio-primary">保存連線</button><button type="button" id="studioNewProvider">新增另一個連線</button>
+    </form></section>
+    <section><h2>本機 ComfyUI 工具</h2><form id="studioLocalToolsForm" class="studio-settings-form"><label>ComfyUI 目錄<input name="comfy_root" placeholder="包含 custom_nodes 的 ComfyUI 目錄"></label><p>Raffle 抽詞會讀取這個目錄中的既有詞池，使用 CPU 執行。</p><button type="submit">保存本機目錄</button></form><details><summary>PixAI / KohakuGBC 標注工作器</summary><form id="studioWorkerForm" class="studio-settings-form"><label>工作器 Python<input name="python" placeholder="已安裝所需套件的 python.exe"></label><label>PixAI 模型目錄<input name="pixai_model"></label><label>GBC 偵測模型目錄<input name="detector_model"></label><label>GBC 嵌入模型目錄<input name="embedder_model"></label><label>工作器設備<select name="device"><option value="cpu">CPU</option><option value="cuda">NVIDIA GPU</option></select></label><p>在打標頁提交任務後才會載入模型。KohakuGBC 同時使用所選視覺 API。</p><button type="submit">保存工作器</button></form></details><h2>現有工具</h2><div class="studio-legacy-actions"><button type="button" data-view="management">提示詞資料來源</button><button type="button" data-view="remote">設備與任務</button><button type="button" id="studioOpenModels">視覺模型接入</button></div></section>
+  </div>
+</section>
+<dialog id="studioDeleteProviderDialog" class="studio-dialog" aria-labelledby="studioDeleteProviderTitle"><header><h2 id="studioDeleteProviderTitle">刪除圖片連線？</h2><button type="button" data-studio-close="studioDeleteProviderDialog" aria-label="關閉">關閉</button></header><p id="studioDeleteProviderName" data-i18n-ignore></p><p>使用此連線的專案需要重新選擇圖片服務。</p><div class="workbench-actions"><button type="button" data-studio-close="studioDeleteProviderDialog">取消</button><button type="button" id="studioConfirmDeleteProvider">刪除連線</button></div></dialog>
+<dialog id="studioWordlistDialog" class="studio-dialog"><form id="studioWordlistForm"><header><h2>隨機詞庫</h2><button type="button" data-studio-close="studioWordlistDialog" aria-label="關閉詞庫">關閉</button></header><label>選擇既有詞庫<select id="studioWordlistSelect"><option value="">建立新詞庫</option></select></label><label>詞庫名稱<input name="name" required placeholder="pose/standing"></label><label>每行一個候選條目<textarea name="content" rows="12" required></textarea></label><p id="studioWordlistStatus" role="status"></p><button type="submit" class="studio-primary">保存詞庫</button></form></dialog>
+<dialog id="studioMaterialDialog" class="studio-dialog"><header><h2>從素材庫選詞</h2><button type="button" data-studio-close="studioMaterialDialog">關閉</button></header><form id="studioMaterialSearch"><label>搜尋<input name="query" type="search" placeholder="服裝、姿勢或畫風"></label><button type="submit">搜尋</button></form><label>填入欄位<select id="studioMaterialField"><option value="body">正文</option><option value="prefix">主題與風格</option><option value="negative">負面詞</option><option value="suffix">後綴與簽名</option></select></label><div id="studioMaterialResults"></div></dialog>
+<dialog id="studioImageDialog" class="studio-image-dialog"><button type="button" data-studio-close="studioImageDialog">關閉圖片</button><div id="studioLargeImageMount"></div><pre id="studioImageProvenance"></pre></dialog>

@@ -47,7 +47,7 @@ def test_connection_check_is_scoped_to_selected_device(settings) -> None:
                 "host": "pc",
                 "enabled": True,
                 "label": "primary",
-                "smb_mount": "/missing-pairing-test",
+                "smb_mount": str(settings.library_root / "missing-pairing-test"),
             },
         )
         assert response.status_code == 200

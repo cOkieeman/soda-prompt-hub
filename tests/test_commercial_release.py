@@ -50,6 +50,8 @@ def test_windows_runtime_builder_is_pinned_and_offline_for_end_users() -> None:
     assert "if ($pipExitCode -ne 0)" in runtime
     assert "--no-deps --no-compile --only-binary=:all:" in runtime
     assert "--only-binary=:all:" in runtime
+    assert "--no-binary=kohakugbc" in runtime
+    assert "--extra moss --extra captioning" in runtime
     assert '"..\\..\\core\\src"' in runtime
     assert runtime.index('$pthLines += "..\\..\\core\\src"') < runtime.index(
         '$pthLines += "Lib\\site-packages"'

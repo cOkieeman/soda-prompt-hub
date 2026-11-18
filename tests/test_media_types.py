@@ -44,7 +44,7 @@ def test_project_image_formats_have_fixed_media_types(
 
 def test_unknown_extension_still_falls_back_to_mimetypes() -> None:
     guessed = media_type_for(Path("archive.zip"))
-    assert guessed in {"application/zip", "application/octet-stream"}
+    assert guessed == (mimetypes.guess_type("archive.zip")[0] or "application/octet-stream")
 
 
 @pytest.mark.usefixtures("without_system_mime_database")

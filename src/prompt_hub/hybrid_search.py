@@ -53,7 +53,7 @@ class HybridSearchService:
 
         semantic = {
             "status": "not_requested",
-            "message": "当前按关键词查找本地资料。建立语义索引后，还可以匹配意思相近的内容。",  # noqa: RUF001
+            "message": "当前按关键词查找本地资料。建立语义索引后，还可以匹配意思相近的内容。",
             "index": None,
         }
         if vector is not None:
@@ -72,7 +72,7 @@ class HybridSearchService:
             else:
                 semantic = {
                     "status": "unavailable",
-                    "message": "现有语义索引不适用于本次查询，因此只显示关键词结果。",  # noqa: RUF001
+                    "message": "现有语义索引不适用于本次查询，因此只显示关键词结果。",
                     "index": None,
                 }
         return _response(clean_query, groups, semantic)

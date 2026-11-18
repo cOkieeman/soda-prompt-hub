@@ -106,11 +106,16 @@ class PromptDatabase(DatabaseOCMixin):
             self._upsert_entry(entry, connection)
         return len(entries)
 
-    def upsert_entry(self, entry: EntryInput) -> None:
+    def upsert_entry(
+        self, entry: EntryInput, *, connection: sqlite3.Connection | None = None
+    ) -> None:
         """Insert or refresh one entry without removing sibling entries or user marks."""
-        with self.connect() as connection:
+        if connection is not None:
             self._upsert_entry(entry, connection)
-            connection.commit()
+            return
+        with self.connect() as own_connection:
+            self._upsert_entry(entry, own_connection)
+            own_connection.commit()
 
     def _upsert_entry(self, entry: EntryInput, connection: sqlite3.Connection) -> None:
         now = _now()

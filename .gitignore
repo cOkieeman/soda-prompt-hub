@@ -11,6 +11,7 @@ htmlcov/
 
 # Virtual environments
 .venv/
+node_modules/
 
 # Test, lint, browser, and editor state
 .pytest_cache/

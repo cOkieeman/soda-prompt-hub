@@ -17,6 +17,7 @@ SOURCE_DIRECTORIES = (
     "deploy/windows-shell",
     "deploy/windows-worker",
     "src/prompt_hub",
+    "scripts/agent-client",
     "tests/git-runtime-regression",
     "tests/desktop-host-regression",
     "tests/installer-payload-regression",
@@ -50,7 +51,7 @@ def stage_source(repository_root: Path, output_root: Path) -> dict[str, object]:
             source,
             target,
             ignore=shutil.ignore_patterns(
-                "dist", "bin", "obj", ".venv", "__pycache__", "worker-config.json"
+                "dist", "bin", "obj", ".venv", "__pycache__", "node_modules", "worker-config.json"
             ),
         )
     for relative in SOURCE_FILES:

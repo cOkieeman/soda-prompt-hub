@@ -289,10 +289,10 @@ def test_rendered_desktop_entry_escapes_exec_field_codes(tmp_path: Path) -> None
             "-c",
             'source "$1"; sph_write_desktop_entry "$2" "$3" "$4"',
             "bash",
-            str(DEPLOY_LINUX / "lib.sh"),
-            str(DEPLOY_LINUX / "soda-prompt-hub.desktop"),
-            str(output),
-            str(launcher),
+            (DEPLOY_LINUX / "lib.sh").as_posix(),
+            (DEPLOY_LINUX / "soda-prompt-hub.desktop").as_posix(),
+            output.as_posix(),
+            launcher.as_posix(),
         ],
         capture_output=True,
         text=True,
@@ -300,7 +300,7 @@ def test_rendered_desktop_entry_escapes_exec_field_codes(tmp_path: Path) -> None
     )
     assert render.returncode == 0, render.stderr
     rendered = output.read_text(encoding="utf-8")
-    expected = str(launcher).replace("$", r"\$").replace("%", "%%")
+    expected = launcher.as_posix().replace("$", r"\$").replace("%", "%%")
     assert f'Exec="{expected}" open' in rendered
     assert "__SPH_LAUNCHER_EXEC__" not in rendered
 
@@ -316,7 +316,7 @@ def test_client_urls_normalize_wildcard_and_ipv6_hosts() -> None:
                 "-c",
                 'source "$1"; SPH_HOST="$2"; SPH_PORT=8765; sph_app_url',
                 "bash",
-                str(DEPLOY_LINUX / "lib.sh"),
+                (DEPLOY_LINUX / "lib.sh").as_posix(),
                 host,
             ],
             capture_output=True,
@@ -430,7 +430,7 @@ def test_linux_workflow_runs_existing_checks_and_deployment_smoke() -> None:
         "uv run ruff format --check .",
         "uv run ruff check .",
         "uv run ty check src/",
-        "uv run pytest",
+        "uv run --extra moss pytest",
     ):
         assert command in workflow, f"linux.yml 缺少 {command}"
     assert "ubuntu-22.04" in workflow

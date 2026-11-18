@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from prompt_hub import __version__
+from prompt_hub.agent_workbench import AgentWorkbench, create_agent_router
 from prompt_hub.background_jobs import BackgroundJobRunner, BackgroundJobStore
 from prompt_hub.comfy_results import ComfyResultStore
 from prompt_hub.comfy_routes import create_comfy_router
@@ -33,7 +35,7 @@ from prompt_hub.dataset_routes import create_dataset_router
 from prompt_hub.dataset_workspace import ARCHIVE_JOB_TYPE, DatasetWorkspaceStore
 from prompt_hub.embedding_index import EmbeddingIndexStore
 from prompt_hub.embedding_routes import create_embedding_router
-from prompt_hub.gallery import GalleryStore
+from prompt_hub.gallery import GalleryError, GalleryStore
 from prompt_hub.gallery_routes import create_gallery_router
 from prompt_hub.hybrid_search import HybridSearchService
 from prompt_hub.importers import import_report
@@ -46,6 +48,7 @@ from prompt_hub.local_model import (
     organize_slots,
     revise_caption_with_model,
 )
+from prompt_hub.local_style_library import LocalStyleLibrary, create_local_style_router
 from prompt_hub.local_visual import (
     LocalVisualEncoder,
     LocalVisualIndexService,
@@ -59,6 +62,7 @@ from prompt_hub.media import media_type_for, resolve_media_path
 from prompt_hub.model_connections import MODEL_REF_PATTERN, ModelConnectionStore
 from prompt_hub.model_routes import create_model_router
 from prompt_hub.oc_manager import archive_import, build_oc_creative_seed, parse_oc_manager_json
+from prompt_hub.online_gallery import OnlineGallery, create_online_gallery_router
 from prompt_hub.optional_model_routes import create_optional_model_router
 from prompt_hub.optional_models import OptionalModelInstaller
 from prompt_hub.project_journey import ProjectJourneyServices, create_project_journey_router
@@ -73,6 +77,11 @@ from prompt_hub.search_routes import create_search_router
 from prompt_hub.source_routes import create_source_router
 from prompt_hub.source_sync import SourceSyncService
 from prompt_hub.sourcing import allowed_safety_levels, source_candidates
+from prompt_hub.studio_captions import StudioCaptioner
+from prompt_hub.studio_providers import ImageProviderStore
+from prompt_hub.studio_routes import create_studio_router
+from prompt_hub.studio_service import StudioService
+from prompt_hub.studio_store import StudioError, StudioStore
 from prompt_hub.tag_completion_routes import create_tag_completion_router
 from prompt_hub.tag_completions import TAG_DOWNLOAD_JOB_TYPE, TagCompletionStore
 from prompt_hub.tag_locale import (
@@ -91,7 +100,8 @@ from prompt_hub.visual_model import (
 from prompt_hub.visual_routes import create_visual_router
 from prompt_hub.web import render_index_html
 from prompt_hub.web_capture import WebCaptureService
-from prompt_hub.workflow_profiles import WorkflowProfileStore
+from prompt_hub.workbench_routes import create_workbench_router
+from prompt_hub.workflow_profiles import WorkflowProfileError, WorkflowProfileStore
 from prompt_hub.workflow_routes import create_workflow_router
 from prompt_hub.workspace_routes import create_workspace_router
 
@@ -110,7 +120,7 @@ class CreativeProjectInput(BaseModel):
     title: str = Field(default="未命名绘图项目", max_length=160)
     brief_zh: str = Field(default="", max_length=6000)
     safety_mode: Literal["sfw", "suggestive", "adult", "explicit-adult"] = "sfw"
-    target_profile: Literal["anima", "krea2"] = "anima"
+    target_profile: Literal["anima", "krea2", "moss", "h3"] = "anima"
     character_id: str = Field(default="", max_length=300)
     slots: dict[str, str] = Field(default_factory=dict)
     slot_locks: dict[str, bool] = Field(default_factory=dict)
@@ -125,7 +135,7 @@ class CreativeProjectUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=160)
     brief_zh: str | None = Field(default=None, max_length=6000)
     safety_mode: Literal["sfw", "suggestive", "adult", "explicit-adult"] | None = None
-    target_profile: Literal["anima", "krea2"] | None = None
+    target_profile: Literal["anima", "krea2", "moss", "h3"] | None = None
     character_id: str | None = Field(default=None, max_length=300)
     slots: dict[str, str] | None = None
     slot_locks: dict[str, bool] | None = None
@@ -136,7 +146,7 @@ class CreativeProjectUpdate(BaseModel):
 
 
 class CreativeCompileInput(CreativeProjectInput):
-    profile_id: Literal["anima", "krea2"] | None = None
+    profile_id: Literal["anima", "krea2", "moss", "h3"] | None = None
 
 
 class RecipeInput(BaseModel):
@@ -277,6 +287,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     optional_models = OptionalModelInstaller(active_settings, job_store)
     backup_manager = BackupManager(active_settings)
+    studio_store = StudioStore(active_settings, creative_store, gallery_store)
+    studio_service = StudioService(
+        studio_store, ImageProviderStore(active_settings.library_root), workflow_store
+    )
+    studio_captioner = StudioCaptioner(studio_store, model_connections)
     job_runner = BackgroundJobRunner(
         job_store,
         {
@@ -294,6 +309,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             **optional_models.handlers(),
             TAG_DOWNLOAD_JOB_TYPE: tag_store.download_job,
             "personal_backup": backup_job(backup_manager),
+            "studio_generate": studio_service.generation_job,
+            "studio_caption": studio_captioner.job,
         },
     )
 
@@ -315,6 +332,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         workflow_store.initialize()
         visual_config.initialize()
         tag_store.initialize()
+        studio_store.initialize()
         job_runner.start()
         try:
             yield
@@ -326,6 +344,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=__version__,
         description="Local-first prompt, style, tag, dataset, and workflow hub.",
         lifespan=lifespan,
+    )
+    application.state.studio = studio_service
+
+    @application.exception_handler(StudioError)
+    @application.exception_handler(WorkflowProfileError)
+    @application.exception_handler(GalleryError)
+    async def studio_error(_request: Request, error: StudioError) -> JSONResponse:
+        return JSONResponse(status_code=422, content={"detail": str(error)})
+
+    @application.exception_handler(CreativeProjectConflictError)
+    async def studio_conflict(
+        _request: Request, error: CreativeProjectConflictError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(error)})
+
+    application.include_router(
+        create_studio_router(studio_service, job_store, job_runner, model_connections)
     )
 
     @application.middleware("http")
@@ -414,6 +449,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     )
     application.include_router(create_tag_completion_router(tag_store, job_runner))
+    application.include_router(
+        create_local_style_router(LocalStyleLibrary(active_settings.library_root, database))
+    )
+    application.include_router(
+        create_workbench_router(studio_store, workspace_store, gallery_store)
+    )
+    application.include_router(
+        create_agent_router(
+            AgentWorkbench(active_settings.library_root, model_connections, studio_store),
+            studio_service.providers,
+            studio_service,
+            job_runner,
+        )
+    )
+    application.include_router(
+        create_online_gallery_router(OnlineGallery(active_settings.library_root, gallery_store))
+    )
     application.include_router(create_maintenance_router(backup_manager, job_store, job_runner))
 
     @application.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -948,13 +1000,13 @@ def _check_creative_revision(project: Mapping[str, Any], expected_revision: int 
         raise HTTPException(status_code=409, detail="项目已改变, 请重新读取后再确认操作")
 
 
-def _visual_urls(result: dict[str, Any], safety_filter: str = "") -> list[dict[str, str]]:
+def _visual_urls(result: dict[str, Any], safety_filter: str = "") -> list[dict[str, str | bool]]:
     metadata = result.get("metadata", {})
     refs = metadata.get("image_refs", [])
     if not isinstance(refs, list):
         return []
     source_id = str(result.get("source_id", ""))
-    visuals = []
+    visuals: list[dict[str, str | bool]] = []
     for ref in refs[:3]:
         if not isinstance(ref, dict):
             continue
@@ -964,6 +1016,25 @@ def _visual_urls(result: dict[str, Any], safety_filter: str = "") -> list[dict[s
             continue
         encoded_path = quote(path, safe="/")
         original_variant = "thumbnail" if ref.get("original_variant") == "thumbnail" else "original"
+        if ref.get("origin") == "gallery" and re.fullmatch(r"gallery-[a-f0-9]{32}", path):
+            visuals.append(
+                {
+                    "thumbnail_url": f"/api/gallery/assets/{path}/media/thumbnail",
+                    "original_url": f"/api/gallery/assets/{path}/media/original",
+                    "safety": safety,
+                }
+            )
+            continue
+        if ref.get("origin") == "local-neons":
+            visuals.append(
+                {
+                    "thumbnail_url": f"/api/local-styles/media/{encoded_path}",
+                    "original_url": f"/api/local-styles/media/{encoded_path}",
+                    "safety": safety,
+                    "preview_only": True,
+                }
+            )
+            continue
         visuals.append(
             {
                 "thumbnail_url": f"/media/{source_id}/thumbnail/{encoded_path}",

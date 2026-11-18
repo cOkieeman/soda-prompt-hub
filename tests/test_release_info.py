@@ -29,7 +29,8 @@ def test_system_version_reports_code_schema_and_worker(settings) -> None:
     assert version["data"]["initialized"] is True
     assert version["data"]["components"] == {
         "background_jobs": 1,
-        "creative_store": 2,
+        "creative_store": 3,
+        "dataset_studio": 1,
         "danbooru_tags": 1,
         "gallery": 2,
         "prompt_database": 1,

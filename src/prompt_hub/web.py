@@ -1,5 +1,6 @@
 import html
 import json
+import re
 
 from prompt_hub.comfy_web import COMFY_HTML, COMFY_SCRIPT, COMFY_STYLES
 from prompt_hub.creative_web import CREATIVE_HTML, CREATIVE_SCRIPT, CREATIVE_STYLES
@@ -24,8 +25,40 @@ from prompt_hub.workspace_web import WORKSPACE_HTML, WORKSPACE_SCRIPT, WORKSPACE
 INDEX_HTML = (
     read_web_asset("index.html")
     .replace("__PROMPT_HUB_BASE_STYLES__", read_web_asset("base.css"), 1)
-    .replace("__PROMPT_HUB_I18N_SCRIPT__", read_web_asset("i18n.js"), 1)
-    .replace("__PROMPT_HUB_BASE_SCRIPT__", read_web_asset("base.js"), 1)
+    .replace(
+        "__PROMPT_HUB_I18N_SCRIPT__",
+        read_web_asset("workbench_i18n.js")
+        + "\n"
+        + read_web_asset("studio_i18n.js")
+        + "\n"
+        + read_web_asset("i18n.js"),
+        1,
+    )
+    .replace(
+        "__PROMPT_HUB_BASE_SCRIPT__",
+        read_web_asset("navigation.js") + "\n" + read_web_asset("base.js"),
+        1,
+    )
+)
+
+navigation_start = INDEX_HTML.index('    <nav class="app-nav"')
+navigation_end = INDEX_HTML.index("    </nav>", navigation_start) + len("    </nav>")
+INDEX_HTML = (
+    INDEX_HTML[:navigation_start] + read_web_asset("studio_nav.html") + INDEX_HTML[navigation_end:]
+)
+INDEX_HTML = INDEX_HTML.replace(
+    '    <section class="management-page"',
+    read_web_asset("studio_home.html")
+    + "\n"
+    + read_web_asset("studio.html")
+    + '\n    <section class="management-page"',
+    1,
+)
+INDEX_HTML = INDEX_HTML.replace(
+    '<button class="home-secondary" data-start="lora">',
+    '<button type="button" class="home-secondary" data-start="projects">生成與整理訓練集</button>'
+    '<button class="home-secondary" data-start="lora">',
+    1,
 )
 
 INDEX_HTML = INDEX_HTML.replace(
@@ -46,9 +79,97 @@ INDEX_HTML = INDEX_HTML.replace(
 )
 INDEX_HTML = INDEX_HTML.replace(
     "</body>",
-    f"{OPTIONAL_MODELS_STYLES}{OPTIONAL_MODELS_HTML}{CREATIVE_SCRIPT}{GALLERY_SCRIPT}{SEARCH_SCRIPT}{WORKSPACE_SCRIPT}{LORA_SCRIPT}{COMFY_SCRIPT}{REMOTE_SCRIPT}{SOURCE_CENTER_SCRIPT}{OPTIONAL_MODELS_SCRIPT}</body>",
+    f"{OPTIONAL_MODELS_STYLES}{OPTIONAL_MODELS_HTML}{CREATIVE_SCRIPT}{GALLERY_SCRIPT}{SEARCH_SCRIPT}{WORKSPACE_SCRIPT}{LORA_SCRIPT}{COMFY_SCRIPT}{REMOTE_SCRIPT}{SOURCE_CENTER_SCRIPT}{OPTIONAL_MODELS_SCRIPT}<script>{read_web_asset('studio.js')}</script></body>",
     1,
 )
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('studio.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace("<head>", f"<head><script>{read_web_asset('theme.js')}</script>", 1)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('theme.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('library.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>", f"<script>{read_web_asset('library.js')}</script></body>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('workbench.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>",
+    read_web_asset("workbench.html") + f"<script>{read_web_asset('workbench.js')}</script></body>",
+    1,
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('workbench_extra.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>",
+    "".join(
+        f"<script>{read_web_asset(name)}</script>"
+        for name in (
+            "gallery_workbench.js",
+            "online_gallery.js",
+            "agent_clients.js",
+            "agent.js",
+            "novelai.js",
+            "local_styles_settings.js",
+        )
+    )
+    + "</body>",
+    1,
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('creation_canvas.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('prompt_editor.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>", f"<script>{read_web_asset('prompt_editor.js')}</script></body>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>",
+    read_web_asset("creation_canvas.html")
+    + "".join(
+        f"<script>{read_web_asset(name)}</script>"
+        for name in ("novelai_presets.js", "creation_canvas.js")
+    )
+    + "</body>",
+    1,
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('online_gallery_viewer.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>", f"<script>{read_web_asset('online_gallery_viewer.js')}</script></body>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('approved_layout.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>", f"<script>{read_web_asset('approved_layout.js')}</script></body>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('novelai_characters.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>", f"<script>{read_web_asset('novelai_characters.js')}</script></body>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</head>", f"<style>{read_web_asset('novelai_account.css')}</style></head>", 1
+)
+INDEX_HTML = INDEX_HTML.replace(
+    "</body>",
+    read_web_asset("novelai_account.html")
+    + f"<script>{read_web_asset('novelai_account.js')}</script></body>",
+    1,
+)
+# Legacy action buttons and template strings also receive explicit semantics.
+INDEX_HTML = re.sub(r"<button\b(?![^>]*\btype\s*=)", '<button type="button"', INDEX_HTML)
 
 
 def render_index_html(device_name: str, *, usage_mode: str | None = None) -> str:

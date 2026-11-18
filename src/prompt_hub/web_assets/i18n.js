@@ -28,7 +28,7 @@
         '工作台与 Worker 在这台电脑上运行，无需配对另一台设备。在启动器设置中填写本机 ComfyUI 地址，即可开始出图。':'The workspace and Worker run on this computer. Set the local ComfyUI address in launcher settings to start generating; no pairing is needed.',
         '启动器自动管理 Core 与 Worker。API 模型的 URL 和 Key 在下方“模型服务”填写；打标和检索模型在“管理可选模型”中按需安装。':'The launcher manages Core and Worker. Enter API model URLs and keys under Model services; install tagging and search models under Manage optional models.',
 
-        '主导航':'Main navigation','界面语言':'Interface language','语言 ▾':'Language ▾','语言设置':'Language settings','关闭语言设置':'Close language settings','标签显示':'Tag display','只改变显示，不改写 Prompt。':'Display only; Prompt text is unchanged.','本地绘图与数据集':'Local drawing and datasets','当前：首页':'Current: Home','打开菜单':'Open menu','收起菜单':'Close menu',
+        '主导航':'Main navigation','界面语言':'Interface language','语言 ▾':'Language ▾','语言设置':'Language settings','关闭语言设置':'Close language settings','标签显示':'Tag display','只改变显示，不改写 Prompt。':'Display only; Prompt text is unchanged.','本地绘图与数据集':'Local drawing and datasets','当前：首页':'Current: Home','当前：打标器':'Current: Tagger','打标器':'Tagger','打开菜单':'Open menu','收起菜单':'Close menu',
         '选择 GitHub URL / 本地映射':'Choose GitHub URL / Local mapping','读取方式':'Read from','本地映射':'Local mapping','保存来源设置':'Save source settings','选择来源':'Choose source','个人资料备份':'Personal library backup','设置 ▾':'Settings ▾','资料更新正在进行；请结束后再更换目录':'A library update is running. Wait for it to finish before changing folders.',
         '出图':'Generate','出图结果':'Generated images','查看出图结果':'View generated images',
         '项目与配方 ▾':'Projects and recipes ▾','画面与提示词':'Scene and prompt','出图设置':'Generation settings','结果复盘':'Review results',
@@ -1295,9 +1295,12 @@
       }
 
       function translate(value, {staticText = false} = {}) {
-        if (typeof value !== 'string' || locale === 'zh-CN') return value;
+        if (typeof value !== 'string') return value;
         const trimmed = value.trim();
         if (!trimmed) return value;
+        const studioTranslation = window.promptHubStudioI18n?.translate(trimmed, locale);
+        if (studioTranslation !== undefined) return preserveWhitespace(value, studioTranslation);
+        if (locale === 'zh-CN') return value;
         const translated = locale === 'zh-TW'
           ? translateTraditional(trimmed, staticText)
           : translateEnglish(trimmed, staticText);
@@ -1305,6 +1308,14 @@
       }
 
       const protectedContentSelectors = [
+        '#studioProjectTitle', '.studio-project-row h2', '.studio-image > p',
+        '#studioCaptionEditor h2', '#studioCaptionImages [data-i18n-ignore]',
+        '.studio-material-result > strong', '.studio-material-result > p',
+        '#studioPromptPreview .studio-prompt-preview > p',
+        '#studioWorkflow option:not([value=""])', '#studioProvider option:not([value=""])',
+        '#studioCaptionModel option:not([value=""])',
+        '#studioWorkflowBindings option', '#studioReferenceBindings option:not([value=""])',
+        '.studio-image img', '#studioLargeImageMount img',
         '[data-i18n-ignore]', '#galleryDetailTitle', '#galleryDetailImage',
         '.project-item strong', '.recipe-item strong', '.card h3', '.card .content', '.note-preview', '.character-detail p', '.prompt-record strong',
         '.workflow-lora-selected strong', '.workflow-lora-selected small', '.workflow-lora-result strong', '.workflow-lora-result small',

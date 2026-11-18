@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -43,7 +44,7 @@ KREA2_SLOT_LABELS = {
 }
 
 SAFETY_MODES = ("sfw", "suggestive", "adult", "explicit-adult")
-PROFILE_IDS = ("anima", "krea2")
+PROFILE_IDS = ("anima", "krea2", "moss", "h3")
 
 CREATIVE_SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -55,7 +56,7 @@ CREATE TABLE IF NOT EXISTS creative_projects (
     safety_mode TEXT NOT NULL DEFAULT 'sfw'
         CHECK (safety_mode IN ('sfw', 'suggestive', 'adult', 'explicit-adult')),
     target_profile TEXT NOT NULL DEFAULT 'anima'
-        CHECK (target_profile IN ('anima', 'krea2')),
+        CHECK (target_profile IN ('anima', 'krea2', 'moss', 'h3')),
     character_id TEXT NOT NULL DEFAULT '',
     slots_json TEXT NOT NULL DEFAULT '{}',
     slot_locks_json TEXT NOT NULL DEFAULT '{}',
@@ -128,6 +129,43 @@ class CreativeStore:
                 "creative_store",
                 2,
                 "Creative project lineage",
+            )
+            project_schema = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'creative_projects'"
+            ).fetchone()[0]
+            if "'moss'" not in project_schema:
+                # Rebuild the CHECK constraint inside the same transaction as the data copy.
+                schema = re.sub(
+                    r"target_profile\s+IN\s*\([^)]*\)",
+                    "target_profile IN ('anima', 'krea2', 'moss', 'h3')",
+                    project_schema,
+                    flags=re.IGNORECASE,
+                )
+                schema = re.sub(
+                    r'CREATE TABLE\s+"?creative_projects"?',
+                    "CREATE TABLE creative_projects_v3",
+                    schema,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
+                connection.execute(schema)
+                names = [
+                    row["name"]
+                    for row in connection.execute("PRAGMA table_info(creative_projects)")
+                ]
+                columns_sql = ", ".join('"' + name.replace('"', '""') + '"' for name in names)
+                connection.execute(
+                    f"INSERT INTO creative_projects_v3 ({columns_sql}) "  # noqa: S608 - quoted schema identifiers
+                    f"SELECT {columns_sql} FROM creative_projects"
+                )
+                connection.execute("DROP TABLE creative_projects")
+                connection.execute("ALTER TABLE creative_projects_v3 RENAME TO creative_projects")
+                connection.execute(
+                    "CREATE INDEX idx_creative_projects_updated "
+                    "ON creative_projects(updated_at DESC)"
+                )
+            record_schema_migration(
+                connection, "creative_store", 3, "MOSS and H3 dataset project targets"
             )
             connection.commit()
 
@@ -493,6 +531,8 @@ def compile_prompt(project: Mapping[str, Any], profile_id: str | None = None) ->
     if profile not in PROFILE_IDS:
         raise ValueError(f"Unknown creative profile: {profile}")
     output = _compile_anima(normalized) if profile == "anima" else _compile_krea2(normalized)
+    if profile in {"moss", "h3"}:
+        output["profile_id"] = profile
     scene = normalized["generation"].get("scene_plan")
     if not isinstance(scene, Mapping):
         return output

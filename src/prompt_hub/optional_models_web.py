@@ -3,12 +3,12 @@ from prompt_hub.web_resources import read_web_asset
 OPTIONAL_MODELS_STYLES = "<style>" + read_web_asset("optional_models.css") + "</style>"
 OPTIONAL_MODELS_SCRIPT = "<script>" + read_web_asset("optional_models.js") + "</script>"
 OPTIONAL_MODELS_HTML = """
-<dialog id="optionalModelsDialog" class="model-installer" aria-labelledby="optionalModelsTitle" aria-describedby="optionalModelsIntro">
-  <header class="model-installer-head"><div><p class="section-label">LOCAL TOOLS / 按需添加</p><h2 id="optionalModelsTitle">本地模型，可选安装。</h2><p id="optionalModelsIntro">只安装你用得上的能力。跳过不影响项目管理、外部 API 或 ComfyUI 出图。</p></div><button type="button" id="optionalModelsClose" class="model-close" aria-label="关闭模型安装界面">关闭 ×</button></header>
-  <div class="model-host"><strong id="optionalModelsHost">正在确认安装设备…</strong><span>安装位置由 WebUI 服务所在设备决定，不是浏览器所在设备；不会自动安装到远程 Worker。</span><code id="optionalModelsRoot"></code></div>
-  <div class="model-installer-guide"><span><b>01</b> 选择用途</span><span><b>02</b> 下载 · 可取消续传</span><span><b>03</b> 校验 · 本机自检</span></div>
+<dialog id="optionalModelsDialog" class="model-installer" data-i18n-ignore aria-labelledby="optionalModelsTitle" aria-describedby="optionalModelsIntro">
+  <header class="model-installer-head"><div><h2 id="optionalModelsTitle" data-model-text="选择需要的本地模型">选择需要的本地模型</h2><p id="optionalModelsIntro" data-model-text="勾选需要的功能，再开始下载。以后也可以从设置中的「管理可选模型」安装。">勾选需要的功能，再开始下载。以后也可以从设置中的「管理可选模型」安装。</p></div><button type="button" id="optionalModelsClose" class="model-close" data-model-text="关闭">关闭</button></header>
+  <div class="model-host"><strong id="optionalModelsHost"></strong><code id="optionalModelsRoot"></code></div>
   <p id="optionalModelsNotice" class="model-notice" role="status" aria-live="polite">正在读取模型状态…</p>
+  <p id="optionalModelsRuntime" class="model-notice" hidden></p>
   <div id="optionalModelsList" class="model-install-list"></div>
-  <footer class="model-installer-foot"><div><strong>不上传图片，也不消耗 API 额度。</strong><p>模型文件从 Hugging Face 下载，网络需能访问该站点。下载后会进行 CPU 推理自检，短暂占用内存；不自动生成标签、不替换人工说明、不切换已有自定义 CLIP。</p><p>已有文件不会被静默覆盖。也可按卡片中的目录手动放入相同版本的文件，再校验。关闭此窗口，下载仍会继续。</p></div><button type="button" id="optionalModelsServices">语言／看图模型？前往模型接入 →</button></footer>
+  <footer class="model-installer-foot"><p data-model-text="支持取消与续传。关闭此窗口，下载仍会继续。">支持取消与续传。关闭此窗口，下载仍会继续。</p><p data-model-text="SAM3 场景图需要视觉 API，默认 CPU 推理。">SAM3 场景图需要视觉 API，默认 CPU 推理。</p><div class="model-installer-summary"><span id="optionalModelsSelection" role="status"></span><div><button type="button" id="optionalModelsSkip" class="model-secondary" data-model-text="稍后再说">稍后再说</button><button type="button" id="optionalModelsInstall" disabled data-model-text="下载所选模型">下载所选模型</button></div></div><button type="button" id="optionalModelsServices" class="model-service-link" data-model-text="管理连接">管理连接</button></footer>
 </dialog>
 """

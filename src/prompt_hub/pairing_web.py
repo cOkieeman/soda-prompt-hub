@@ -1,8 +1,5 @@
-"""In-app pairing guide; credentials stay in the operating system."""
-
 # ruff: noqa: RUF001, E501 -- embedded HTML/CSS/JavaScript, like remote_web.py
-
-from prompt_hub.web_resources import read_web_asset
+"""In-app pairing guide; credentials stay in the operating system."""
 
 PAIRING_HTML = r"""
 <section class="pairing-entry" id="pairingEntry" hidden>
@@ -39,9 +36,22 @@ PAIRING_HTML = r"""
 </dialog>
 """
 
-PAIRING_STYLES = f"""
+PAIRING_STYLES = r"""
 <style>
-{read_web_asset("pairing.css")}</style>
+.pairing-entry{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 30px;border-bottom:1px solid var(--line);background: var(--paper-deep)}
+.pairing-entry[hidden],.pairing-dialog [hidden]{display: none !important}
+.pairing-entry h2{margin:8px 0;font-size:24px}.pairing-entry p{margin:0}
+.pairing-dialog{width:min(660px,calc(100vw - 32px));max-height:85vh;box-sizing:border-box;border:1px solid #282822;background: var(--paper-deep);color:#272922;padding:28px;overflow:auto}
+.pairing-dialog::backdrop{background:#20251f75;backdrop-filter:blur(4px)}
+.pairing-dialog header{display:flex;justify-content:space-between;align-items:start;gap:20px}.pairing-dialog h2{margin:8px 0 20px;font-size:30px}.pairing-dialog h3{font-size:22px;margin:24px 0 12px}
+.pairing-dialog p{font-size: 1rem;line-height:1.8}.pairing-dialog label{display:grid;gap:8px;margin:16px 0;font-size: 1rem}.pairing-dialog input{width:100%;box-sizing:border-box;padding:12px;background: var(--field-bg);border:1px solid #a3a493;color:inherit;font:inherit}
+.pairing-dialog button,.pairing-entry button{appearance:none;border:1px solid #272922;background:transparent;color:inherit;font:inherit;padding:11px 16px;cursor:pointer}.pairing-dialog button:disabled{opacity:.5;cursor:wait}.pairing-dialog button:hover:not(:disabled),.pairing-entry button:hover{background:#d8ee87}.pairing-dialog button:focus-visible{outline:3px solid #768d34;outline-offset:3px}
+.pairing-track{display:flex;list-style:none;margin:0;padding:0;border-block:1px solid #b4b6a5;font-size: .875rem}.pairing-track li{flex:1;padding:12px 5px;color: var(--muted)}.pairing-track [aria-current]{color:#20251f;background:#d8ee87}
+.pairing-checks{list-style:none;padding:0}.pairing-checks li{display:flex;gap:16px;justify-content:space-between;padding:13px 0;border-bottom:1px solid #c3c4b5}.pairing-checks [data-ok="true"] strong{color:#466612}.pairing-checks strong{font-size: .9375rem}.pairing-dialog footer{border-top:1px solid #c3c4b5;margin-top:22px;padding-top:16px}.pairing-dialog details{margin:18px 0}.pairing-dialog summary{cursor:pointer;font-size: 1rem}.pairing-dialog section:not([hidden]){animation:pairing-in .22s ease-out}
+@keyframes pairing-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.pairing-dialog section:not([hidden]){animation:none}}
+@media(max-width:620px){.pairing-entry{align-items:start;flex-direction:column;padding:22px}.pairing-dialog{padding:20px}.pairing-track{font-size: .875rem}}
+</style>
 """
 
 PAIRING_SCRIPT = r"""

@@ -1536,7 +1536,7 @@ class TestCaptionLanguageGate:
 
     def test_fullwidth_punctuation_signals_chinese_output(self) -> None:
         with pytest.raises(DatasetWorkspaceError):
-            _normalize_caption("krea2", "A woman，standing.")  # noqa: RUF001 (测试资料本身就必须是这个字符)
+            _normalize_caption("krea2", "A woman，standing.")
 
 
 def test_trigger_word_is_optional_in_every_mode() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 from typing import TYPE_CHECKING
 
@@ -44,7 +45,8 @@ def test_endpoint_store_is_private_and_public_values_are_redacted(settings) -> N
     )
 
     assert store.path == settings.library_root / "private" / "model-connections.json"
-    assert stat.S_IMODE(store.path.stat().st_mode) == 0o600
+    if os.name != "nt":
+        assert stat.S_IMODE(store.path.stat().st_mode) == 0o600
     assert saved["has_api_key"] is True
     assert "api_key" not in saved
     public_json = json.dumps(store.list_public())

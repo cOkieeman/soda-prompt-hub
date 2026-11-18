@@ -18,6 +18,7 @@ from prompt_hub.optional_models import (
     OptionalModelInstaller,
     self_check,
 )
+from prompt_hub.studio_providers import ImageProviderStore
 from prompt_hub.visual_model import VisualModelError
 from prompt_hub.web import INDEX_HTML
 
@@ -77,10 +78,10 @@ def tiny_installer(settings, monkeypatch):
 
 
 def test_model_catalog_is_pinned_and_complete():
-    assert len(OPTIONAL_MODELS) == 3
+    assert len(OPTIONAL_MODELS) == 6
     for model in OPTIONAL_MODELS:
         assert len(model.revision) == 40
-        assert len(model.files) == (1 if model.id.startswith("clip") else 2)
+        assert len(model.files) >= 1
         assert all(len(file.sha256) == 64 and file.size > 0 for file in model.files)
 
 
@@ -91,7 +92,7 @@ def test_status_and_page_do_not_start_downloads(tiny_installer, settings, monkey
         result = client.get("/api/optional-models")
         assert result.status_code == 200
         assert result.json()["models"][0]["state"] == "missing"
-        assert "WebUI" in client.get("/").text
+        assert 'id="optionalModelsDialog"' in client.get("/").text
     assert requests == []
     assert installer.store.list_jobs() == []
     assert not settings.models_root.exists()
@@ -314,3 +315,63 @@ def test_metadata_symlink_is_not_overwritten(tiny_installer, tmp_path):
         installer.install(model, Context())
     assert target.read_text(encoding="utf-8") == "keep"
     assert requests == []
+
+
+def test_first_run_choice_is_saved_per_library_without_downloads(
+    tiny_installer, settings, monkeypatch
+):
+    installer, model, requests, _ = tiny_installer
+    monkeypatch.setattr("prompt_hub.background_jobs.BackgroundJobRunner.start", lambda _self: None)
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/api/optional-models").json()["onboarding"] == {
+            "completed": False,
+            "selected": [],
+        }
+        assert (
+            client.post(
+                "/api/optional-models/onboarding", json={"selected": ["invalid"]}
+            ).status_code
+            == 422
+        )
+        assert client.post(
+            "/api/optional-models/onboarding", json={"selected": [model.id, model.id]}
+        ).json() == {"completed": True, "selected": [model.id]}
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/api/optional-models").json()["onboarding"]["completed"]
+        assert (
+            client.post("/api/optional-models/onboarding", json={"selected": []}).json()["selected"]
+            == []
+        )
+    assert requests == []
+    assert installer.store.list_jobs() == []
+
+
+def test_caption_download_fills_defaults_and_preserves_existing_worker(tiny_installer, monkeypatch):
+    installer, model, _, _ = tiny_installer
+    monkeypatch.setattr("prompt_hub.optional_models.find_spec", lambda _: True)
+    providers = ImageProviderStore(installer.settings.library_root)
+    providers.save(
+        {
+            "caption_worker": {
+                "python": "custom/python.exe",
+                "device": "cuda",
+                "detector_model": "custom/sam3",
+            }
+        }
+    )
+    caption_model = replace(model, caption_key="pixai_model")
+    installer.install(caption_model, Context())
+    worker = providers.public()["caption_worker"]
+    assert worker["pixai_model"] == str(installer.root(model))
+    assert worker["python"] == "custom/python.exe"
+    assert worker["device"] == "cuda"
+    assert worker["detector_model"] == "custom/sam3"
+
+
+def test_caption_model_structure_is_checked_without_inference(tmp_path):
+    model = next(model for model in OPTIONAL_MODELS if model.caption_key)
+    (tmp_path / "config.json").write_text('{"model_type":"cls_vitdet"}', encoding="utf-8")
+    self_check(model, tmp_path)
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(VisualModelError):
+        self_check(model, tmp_path)
