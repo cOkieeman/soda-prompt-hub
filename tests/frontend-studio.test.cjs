@@ -54,6 +54,42 @@ test("standalone tagger route keeps its project across refresh", () => {
   assert.equal(refreshed.nav.read().project, "p2");
 });
 
+test("tagger exit waits for saving before returning to the Hub", async () => {
+  const source = fs.readFileSync(path.join(assets, "workbench.js"), "utf8");
+  const handler = source.slice(source.indexOf("  async function returnToHubHome()"), source.indexOf("  function hideScreens()"));
+  const calls = [];
+  let finishSave;
+  const context = {
+    window: {
+      SodaStudio: {save: () => new Promise(resolve => { finishSave = resolve; })},
+      setPromptHubView: async view => calls.push(view),
+    },
+    message: () => assert.fail("Successful exit must not show an error"),
+  };
+  vm.runInNewContext(handler, context);
+  const exiting = context.returnToHubHome();
+  assert.deepEqual(calls, []);
+  finishSave();
+  await exiting;
+  assert.deepEqual(calls, ["home"]);
+});
+
+test("a failed save keeps the tagger open and reports the error", async () => {
+  const source = fs.readFileSync(path.join(assets, "workbench.js"), "utf8");
+  const handler = source.slice(source.indexOf("  async function returnToHubHome()"), source.indexOf("  function hideScreens()"));
+  const messages = [];
+  const context = {
+    window: {
+      SodaStudio: {save: async () => { throw new Error("Save failed"); }},
+      setPromptHubView: () => assert.fail("Failed save must not navigate"),
+    },
+    message: (text, error) => messages.push({text, error}),
+  };
+  vm.runInNewContext(handler, context);
+  await context.returnToHubHome();
+  assert.deepEqual(messages, [{text: "Save failed", error: true}]);
+});
+
 test("chat model manager retains its subpage on refresh and history navigation", () => {
   const first = navigation("http://localhost/?view=settings");
   first.nav.commit({view: "remote", tab: "endpoints"});
@@ -352,7 +388,7 @@ for (const [locale, title, count, preview] of [
       localStorage: storage({"soda-prompt-hub-ui-language": locale}),
     };
     vm.createContext(context);
-    for (const name of ["studio_i18n.js", "i18n.js"]) {
+    for (const name of ["workbench_i18n.js", "studio_i18n.js", "i18n.js"]) {
       vm.runInContext(fs.readFileSync(path.join(assets, name), "utf8"), context);
     }
     const t = context.window.promptHubI18n.t;
@@ -360,6 +396,7 @@ for (const [locale, title, count, preview] of [
     assert.equal(t("資料集生成"), title);
     assert.equal(t("MOSS · 3 張圖片 · 2 張已採用"), count);
     assert.equal(t("已準備 6 組提示詞。"), preview);
+    assert.equal(t("返回主界面"), {"zh-CN":"返回主界面", "zh-TW":"返回主介面", en:"Back to Hub"}[locale]);
     assert.equal(t(t("資料集生成")), title);
     assert.equal(t("1girl, solo, __pose/standing__"), "1girl, solo, __pose/standing__");
     assert.equal(t("https://example.test/v1"), "https://example.test/v1");

@@ -43,6 +43,13 @@
     return result;
   }
   function message(text,error=false) { $("#workbenchStatus").hidden=false; $("#workbenchStatus").textContent=text; $("#workbenchStatus").dataset.error=String(error); }
+  async function returnToHubHome() {
+    try {
+      await window.SodaStudio.save();
+      await window.setPromptHubView("home");
+    }
+    catch(error) { message(error.message,true); }
+  }
   function hideScreens() {
     ["homePage","creativePage","galleryPage","discoveryPage","workspacePage","loraPage","comfyPage","remotePage","managementPage","archiveWorkspace","studioPage","studioProjectsPage","studioSettingsPage","workbenchTagger"].forEach(id => { $("#" + id).hidden=true; });
     root.hidden=false;
@@ -241,6 +248,7 @@
     catch(error) { message(error.message,true); } finally { button.disabled=false; }
   });
   $("#workbenchTaggerList").addEventListener("click",event=>{const button=event.target.closest("[data-workbench-tagger]");if(button)open("tagger",{route:{view:"tagger",project:button.dataset.workbenchTagger}});});
+  document.querySelectorAll("[data-workbench-tagger-home]").forEach(button=>button.addEventListener("click",returnToHubHome));
   $("#workbenchTaggerBack").addEventListener("click",()=>open("tagger"));
   $("#workbenchTaggerGallery").addEventListener("click",()=>{state.returnToTagger=true;open("gallery",{route:{view:"gallery",project:state.dataset,tab:"local"}});});
   $("#studioCaptionMethod").addEventListener("change",updateTaggerFlow);

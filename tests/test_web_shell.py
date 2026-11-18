@@ -62,6 +62,16 @@ def test_tagger_has_a_standalone_navigation_entry_and_route_host() -> None:
     assert '"tagger"' in INDEX_HTML
 
 
+def test_standalone_tagger_can_return_to_main_navigation() -> None:
+    asset_root = files("prompt_hub").joinpath("web_assets")
+    workbench_html = asset_root.joinpath("workbench.html").read_text(encoding="utf-8")
+    workbench_script = asset_root.joinpath("workbench.js").read_text(encoding="utf-8")
+
+    assert workbench_html.count("data-workbench-tagger-home") == 2
+    assert 'window.setPromptHubView("home")' in workbench_script
+    assert 'querySelectorAll("[data-workbench-tagger-home]")' in workbench_script
+
+
 def test_interface_language_preserves_user_defined_device_name() -> None:
     assert "data-remote-device-name data-i18n-ignore" in INDEX_HTML
     assert "\uff1b <span data-remote-device-name data-i18n-ignore>" in INDEX_HTML

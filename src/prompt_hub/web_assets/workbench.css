@@ -119,16 +119,24 @@ body[data-app-view="tagger"] .studio-caption-list button > span > span:last-chil
 .tagger-box-fields input { width:100%; }
 @media(max-width:1000px) { .tagger-graph-form { grid-template-columns:minmax(0,1fr); } .tagger-inspector { max-height:none; border-left:0; border-top:1px solid var(--line); } .tagger-canvas-scroll { height:65vh; } }
 @media(max-width:650px) { body[data-app-view="tagger"] .studio-caption-layout { grid-template-columns:minmax(0,1fr); } body[data-app-view="tagger"] .tagger-image-column { border-right:0; border-bottom:1px solid var(--line); } body[data-app-view="tagger"] .studio-caption-list { grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); max-height:220px; } .tagger-canvas-scroll { height:55vh; } }
-body[data-app-view="tagger"] { overflow-x:hidden; }
+body[data-app-view="tagger"] { overflow-x:clip; }
 body[data-app-view="tagger"] .app-nav { display:none; }
 body[data-app-view="tagger"] .shell { width:100%; max-width:none; min-height:100dvh; margin:0; padding:0; }
 body[data-app-view="tagger"] .workbench-page { margin:0; }
 body[data-app-view="tagger"] #workbenchTagger { width:100%; max-width:none; min-height:100dvh; margin:0; padding:0 10px 10px; }
 body[data-app-view="tagger"] #workbenchTaggerFlow,
 body[data-app-view="tagger"] .tagger-caption-heading > div:first-child { display:none; }
+#workbenchTaggerProjects > .workbench-heading,
+#workbenchTaggerEditor > .workbench-heading {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--studio-paper);
+}
 body[data-app-view="tagger"] #workbenchTaggerEditor > .workbench-heading { min-height:34px; margin:0; padding:0; gap:4px; }
 body[data-app-view="tagger"] #workbenchTaggerGallery { display:none; }
 body[data-app-view="tagger"] #workbenchTaggerBack { min-height:30px; padding:3px 9px; font-size:.85rem; }
+body[data-app-view="tagger"] [data-workbench-tagger-home] { min-height:34px; padding:5px 10px; }
 body[data-app-view="tagger"] #studioPage { padding:0; }
 body[data-app-view="tagger"] #studioPage .studio-steps { display:none; }
 body[data-app-view="tagger"] #studioPage .studio-project-heading { min-height:42px; margin:0; padding:3px 0; border-bottom:1px solid var(--line); }
