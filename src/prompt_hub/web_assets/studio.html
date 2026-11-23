@@ -31,10 +31,35 @@
         <div class="studio-material-actions"><button type="button" id="studioChooseMaterial">從素材庫選詞</button><button type="button" id="studioOpenWordlists">管理隨機詞庫</button></div>
         <div class="studio-prompt-fields">
           <section class="studio-prompt-field"><header><label for="studioPrefix">主題與風格</label><label class="studio-lock"><input type="checkbox" data-lock="prefix">鎖定</label></header><textarea id="studioPrefix" data-recipe="prefix" rows="3" placeholder="填寫這一批共用的主題、品質詞與畫風"></textarea><button type="button" id="studioToggleRows">分行啟停與排序</button><div id="studioPrefixRows" hidden></div></section>
-          <section class="studio-prompt-field"><header><label for="studioBody">正文</label><label class="studio-lock"><input type="checkbox" data-lock="body">鎖定抽取結果</label></header><textarea id="studioBody" data-recipe="body" rows="7" placeholder="填寫角色、服裝、姿勢與場景。可插入 __詞庫名稱__"></textarea><div class="studio-control-row"><label>抽詞方式<select data-recipe="text_mode"><option value="manual">手寫</option><option value="wildcard">Wildcard</option><option value="raffle">Raffle</option></select></label><label>插入詞庫<select id="studioWordlistInsert"><option value="">選擇詞庫</option></select></label><button type="button" id="studioDrawOnce">抽一次</button><button type="button" id="studioLockDraw">鎖定這組詞</button></div></section>
+          <section class="studio-prompt-field"><header><label for="studioBody">正文</label><label class="studio-lock"><input type="checkbox" data-lock="body">鎖定抽取結果</label></header><textarea id="studioBody" data-recipe="body" rows="7" placeholder="填寫角色、服裝、姿勢與場景。可插入 __詞庫名稱__"></textarea><button type="button" id="studioWildcardV2Edit" hidden>調整 Wildcard V2 槽位</button><div class="studio-control-row"><label>抽詞方式<select data-recipe="text_mode"><option value="manual">手寫</option><option value="wildcard">Wildcard</option><option value="raffle">Raffle</option></select></label><label>插入詞庫<select id="studioWordlistInsert"><option value="">選擇詞庫</option></select></label><button type="button" id="studioDrawOnce">抽一次</button><button type="button" id="studioLockDraw">鎖定這組詞</button></div></section>
           <section class="studio-prompt-field"><header><label for="studioNegative">負面詞</label><label class="studio-lock"><input type="checkbox" data-lock="negative">鎖定</label></header><textarea id="studioNegative" data-recipe="negative" rows="3"></textarea></section>
           <section class="studio-prompt-field"><header><label for="studioSuffix">後綴與簽名</label><label class="studio-lock"><input type="checkbox" data-lock="suffix">鎖定</label></header><textarea id="studioSuffix" data-recipe="suffix" rows="2"></textarea></section>
         </div>
+        <section id="studioWildcardV2" aria-label="Wildcard V2 分槽抽詞" hidden>
+          <label class="studio-wildcard-v2-toggle">
+            <input type="checkbox" data-v2-setting="enabled" aria-controls="studioWildcardV2Fields">
+            <span>Wildcard V2 分槽抽詞</span>
+          </label>
+          <div id="studioWildcardV2Fields" class="studio-wildcard-v2-fields" hidden>
+            <div class="studio-wildcard-v2-options">
+              <label>模型模板
+                <select data-v2-setting="family"><option value="anima">Anima</option><option value="moss">MOSS</option><option value="krea2">Krea2</option></select>
+              </label>
+              <div class="studio-wildcard-v2-modes studio-wildcard-v2-presets" role="group" aria-label="抽詞組合">
+                <button type="button" data-v2-preset="design" aria-pressed="false">雜誌封面 / 壁紙設計模式</button>
+                <button type="button" data-v2-preset="world" aria-pressed="false">實景氛圍大片模式</button>
+                <button type="button" data-v2-preset="bundled" aria-pressed="true">套裝整包模式</button>
+              </div>
+            </div>
+            <div id="studioWildcardV2Slots" class="studio-wildcard-v2-slots"></div>
+            <details id="studioWildcardV2TestLight" hidden><summary>測試光線（暫時取代場景與光影）</summary><div id="studioWildcardV2TestLightSlot"></div></details>
+            <div id="studioWildcardV2TagFilters" class="studio-wildcard-v2-tag-filters" hidden></div>
+            <datalist id="studioWildcardV2Pools"></datalist>
+            <datalist id="studioWildcardV2LayoutPools"></datalist>
+            <datalist id="studioWildcardV2SceneLightPools"></datalist>
+            <p id="studioWildcardV2PoolStatus" role="status" hidden></p>
+          </div>
+        </section>
         <details id="studioRaffleSettings" hidden><summary>Raffle 詞池與過濾</summary><div class="studio-details-content"><div class="studio-checks"><label><input type="checkbox" data-raffle="use_general">General</label><label><input type="checkbox" data-raffle="use_sensitive">Sensitive</label><label><input type="checkbox" data-raffle="use_questionable">Questionable</label><label><input type="checkbox" data-raffle="use_explicit">Explicit</label></div><label>候選必含標籤<input data-raffle="taglists_must_include" placeholder="1girl, solo"></label><label>從結果移除標籤<input data-raffle="filter_out_tags"></label><label>排除含以下標籤的詞組<input data-raffle="exclude_taglists_containing"></label><label>排除標籤類別<input data-raffle="exclude_tag_categories"></label></div></details>
         <details><summary>參考圖輸入對應</summary><div id="studioReferenceBindings" class="studio-details-content"></div></details>
         <details id="studioNovelaiSettings" hidden><summary>NovelAI 參考與角色設定</summary><div class="studio-details-content">

@@ -11,9 +11,22 @@ from fastapi.responses import FileResponse
 
 from prompt_hub.novelai_auth import NovelAIAccounts
 from prompt_hub.studio_annotations import import_annotations
+from prompt_hub.studio_prompts import (
+    V2_GENERIC_CHARACTER_TAGS,
+    list_wildcard_v2_pools,
+    wildcard_v2_default_pools,
+    wildcard_v2_scene_pools,
+)
 from prompt_hub.studio_providers import validate_provider_recipe
-from prompt_hub.studio_store import StudioError, write_json
+from prompt_hub.studio_store import (
+    WILDCARD_V2_SAMPLING_PRESETS,
+    StudioError,
+    wildcard_v2_active,
+    write_json,
+)
+from prompt_hub.studio_wildcard_v2_tags import wildcard_v2_tags_by_pool
 from prompt_hub.studio_workflows import (
+    compile_graph,
     infer_bindings,
     postprocess_nodes,
     scalar_inputs,
@@ -102,8 +115,20 @@ def create_studio_router(  # noqa: C901, PLR0915 - FastAPI route registration ag
             "workflows": workflow_options(),
             "connections": service.providers.public(),
             "wordlists": store.wordlists(),
+            "wildcard_v2_sampling_presets": WILDCARD_V2_SAMPLING_PRESETS,
+            "wildcard_v2_generic_character_tags": sorted(V2_GENERIC_CHARACTER_TAGS),
+            "wildcard_v2_default_pools": wildcard_v2_default_pools(),
             "vision_models": [item for item in models.list_model_options() if item.get("vision")],
         }
+
+    @router.get("/wildcard-v2/pools")
+    def wildcard_v2_pools() -> dict[str, Any]:
+        pools = list_wildcard_v2_pools()
+        scene_pools = wildcard_v2_scene_pools(pools)
+        tags_by_pool = wildcard_v2_tags_by_pool(
+            scene_pools, comfy_root=service.providers.public()["comfy_root"]
+        )
+        return {"pools": pools, "scene_pools": scene_pools, "tags_by_pool": tags_by_pool}
 
     @router.post("/projects", status_code=201)
     def create_project(values: dict[str, Any]) -> dict[str, Any]:
@@ -179,7 +204,7 @@ def create_studio_router(  # noqa: C901, PLR0915 - FastAPI route registration ag
         if count is not None and count != 1:
             msg = "單次抽詞數量有誤"
             raise StudioError(msg)
-        rows = service.prepare(project_id, count=count)
+        rows = service.prepare(project_id, count=count, recipe=project["studio"])
         identifier = f"preview-{uuid4().hex}"
         snapshot = {
             "project_id": project_id,
@@ -223,6 +248,8 @@ def create_studio_router(  # noqa: C901, PLR0915 - FastAPI route registration ag
         graph_digest = ""
         if recipe["backend"] == "comfyui":
             graph = service.workflows.read_graph(recipe["workflow_id"])
+            if wildcard_v2_active(recipe):
+                compile_graph(graph, recipe, snapshot["rows"][0])
             encoded = json.dumps(graph, ensure_ascii=False, sort_keys=True).encode()
             graph_digest = hashlib.sha256(encoded).hexdigest()
             write_json(store.root / "graphs" / f"{graph_digest}.json", graph)

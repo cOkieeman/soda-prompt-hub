@@ -11,6 +11,10 @@
   legacy.append(...editor.childNodes);
   editor.append($("#creationCanvasTemplate").content.cloneNode(true));
   $("#creationLegacyControls").append(legacy);
+  const collapseButton = $("#creationCollapse");
+  const parameters = $("#creationParameters");
+  const parameterShortcut = $("#creationParameterShortcut");
+  const referenceInputs = [...editor.querySelectorAll("[data-canvas-reference]")];
   const paths = {
     brush: "m14 5 5-3 3 3-3 5-5 5-5-5 5-5ZM9 10l5 5M8 14c-5 0-1 7-6 7 7 2 10-2 10-4",
     "chevron-left": "m14 6-6 6 6 6", "chevron-down": "m6 9 6 6 6-6", "chevron-up": "m6 15 6-6 6 6",
@@ -38,7 +42,7 @@
   const current = () => window.SodaStudio.current();
   const recipe = () => current().project?.studio;
   const translate = value => window.promptHubI18n?.t(value) || value;
-  const state = {engine: "", tab: "positive", highlighted: true, cleared: null, reverseSerial: 0};
+  const state = {engine: "", tab: "positive", highlighted: true, cleared: null, reverseSerial: 0, referenceImporting: false};
 
   function move(selector, mount) { $(mount).append($(selector)); }
   function moveLabel(name, mount) { $(mount).append($(`[data-recipe="${name}"]`).closest("label")); }
@@ -82,6 +86,7 @@
   const suffixField = $("#studioSuffix").closest(".studio-prompt-field");
   const bodyLock = originalBody.querySelector(".studio-lock");
   $("#creationRandomContent").append(originalBody.querySelector(".studio-control-row"));
+  move("#studioWildcardV2", "#creationRandomContent");
   $("#creationRandomContent").append(originalBody.querySelector(".studio-lock"));
   move("#studioOpenWordlists", "#creationRandomContent");
   move("#studioLockDraw", "#creationRandomContent");
@@ -194,6 +199,7 @@
     $(".creation-prompts").hidden = isComfy;
     $(".creation-panel-header").hidden = isComfy;
     if (isComfy) {
+      setCanvasCollapsed(false);
       $("#studioBody").style.height = "105px";
       $("#studioNegative").style.height = "52px";
       originalBody.append(bodyEditor);
@@ -306,6 +312,12 @@
     if (Object.keys(changes).length) setFields(changes);
   }
 
+  function syncSizePreset(value) {
+    const size = `${value.width}x${value.height}`;
+    const select = $("#creationSizePreset");
+    select.value = [...select.options].some(option => option.value === size) ? size : "custom";
+  }
+
   function renderRecipe() {
     const value = recipe();
     if (!value) return;
@@ -321,8 +333,7 @@
     $("#creationSeed").value = value.seed_mode === "random" ? "" : String(value.seed);
     $("#creationSeedLock").setAttribute("aria-pressed", String(value.seed_mode === "fixed"));
     $("#creationSeedLock").innerHTML = icon(value.seed_mode === "fixed" ? "lock" : "unlock");
-    const size = `${value.width}x${value.height}`;
-    $("#creationSizePreset").value = [...$("#creationSizePreset").options].some(option => option.value === size) ? size : "custom";
+    syncSizePreset(value);
     $("#creationImageMode").value = ["img2img", "infill", "outpaint"].includes(value.novelai_mode) ? value.novelai_mode : "img2img";
     if (value.model && ![...modelSelect.options].some(option => option.value === value.model)) {
       const option = document.createElement("option");
@@ -336,6 +347,7 @@
     $("#creationModelLabel").textContent = value.backend === "comfyui" ? "ComfyUI" : displayModelName(modelName()) || translate("連線預設模型");
     if (changed) {
       arrangeEngine(value.backend === "comfyui");
+      editor.querySelectorAll(".creation-reference-status").forEach(status => { status.hidden = true; });
       state.cleared = null;
       $("#creationUndoClear").hidden = true;
       const tab = localStorage.getItem("soda-canvas-tab-" + state.engine) || "positive";
@@ -377,12 +389,19 @@
         return `<article class="creation-reference-card"><img src="${escape(image.thumbnail_url || image.image_url)}" alt="${escape(image.title)}"><div><span>${escape(image.title)}</span><button type="button" data-canvas-remove-reference="${escape(image.item_id)}" aria-label="移除參考圖">${icon("x")}</button></div>${kind === "img2img" ? "" : `<label>${kind === "precise" ? "保真度" : "強度"}<input type="range" min="0" max="1" step="0.05" value="${Number(options[kind === "precise" ? "fidelity" : "strength"] ?? .6)}" data-canvas-ref="${escape(image.item_id)}" data-canvas-ref-field="${kind === "precise" ? "fidelity" : "strength"}"></label>`}</article>`;
       }).join("");
     }
-    for (const kind of ["vibe", "precise"]) {
-      const unavailable = modelName().startsWith("nai-diffusion-5");
+    updateReferenceInputs();
+  }
+
+  function updateReferenceInputs() {
+    const unsupported = modelName().startsWith("nai-diffusion-5");
+    for (const input of referenceInputs) {
+      const kind = input.dataset.canvasReference;
       const note = $(`[data-reference-capability="${kind}"]`);
-      note.hidden = !unavailable;
-      note.textContent = translate("目前模型不支援此參考方式，請在參數中選擇 V4.5。");
-      $(`[data-canvas-reference="${kind}"]`).disabled = unavailable;
+      if (note) {
+        note.hidden = !unsupported;
+        note.textContent = translate("目前模型不支援此參考方式，請在參數中選擇 V4.5。");
+      }
+      input.disabled = state.referenceImporting || Boolean(note && unsupported);
     }
   }
 
@@ -398,30 +417,71 @@
     $("#studioStatus").dataset.error = "true";
   }
 
-  async function importReference(input) {
+  async function importReference(input, status) {
     const kind = input.dataset.canvasReference;
     const files = [...input.files];
     input.value = "";
-    input.disabled = true;
+    const project = current().project;
+    if (!files.length || !project || state.referenceImporting) return;
+    const projectId = project.project_id;
+    const role = {vibe: "style", precise: "identity", img2img: "composition", reverse: "identity"}[kind];
+    const mode = kind === "img2img" ? $("#creationImageMode").value : "mixed";
+    const knownImages = new Set(current().images.map(image => image.item_id));
+    const imported = {};
+    let reverseImage = "";
+    let uploadError;
+    state.referenceImporting = true;
+    status.hidden = false;
+    status.dataset.error = "false";
+    status.textContent = translate("正在加入圖片…");
+    updateReferenceInputs();
     try {
       await window.SodaStudio.save();
-      const projectId = current().project.project_id;
-      const options = structuredClone(recipe().reference_modes);
       for (const file of files) {
-        const role = {vibe: "style", precise: "identity", img2img: "composition", reverse: "identity"}[kind];
-        const image = await api(`/api/studio/projects/${projectId}/images?kind=reference&role=${role}&filename=${encodeURIComponent(file.name)}`, {method: "POST", headers: {"Content-Type": file.type}, body: file});
-        if (kind === "reverse") {
-          await api(`/api/studio/projects/${projectId}/images/${image.item_id}`, {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({review: "excluded"})});
-          $("#creationReverseImage").dataset.pendingImage = image.item_id;
-        } else options[image.item_id] = {...options[image.item_id], mode: kind === "precise" ? "precise" : "vibe", strength: .6, information: 1, fidelity: .6};
+        if (current().project !== project) return;
+        try {
+          const image = await api(`/api/studio/projects/${projectId}/images?kind=reference&role=${role}&filename=${encodeURIComponent(file.name)}`, {method: "POST", headers: {"Content-Type": file.type}, body: file});
+          const changes = {};
+          if (kind === "reverse") {
+            if (!knownImages.has(image.item_id)) changes.review = "excluded";
+          } else {
+            if (image.review === "excluded") changes.review = "pending";
+            if (image.role !== role) changes.role = role;
+          }
+          if (Object.keys(changes).length) {
+            await api(`/api/studio/projects/${projectId}/images/${image.item_id}`, {
+              method: "PUT",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({...changes, expected_updated_at: image.updated_at}),
+            });
+          }
+          if (kind === "reverse") reverseImage = image.item_id;
+          else imported[image.item_id] = {mode: kind === "precise" ? "precise" : "vibe", strength: .6, information: 1, fidelity: .6};
+        } catch (error) {
+          uploadError = error;
+          break;
+        }
       }
-      if (current().project.project_id !== projectId) return;
-      if (kind !== "reverse") setFields({reference_modes: options, novelai_mode: kind === "img2img" ? $("#creationImageMode").value : "mixed"});
-      await window.SodaStudio.refresh();
-      const pending = $("#creationReverseImage").dataset.pendingImage;
-      if (pending) { $("#creationReverseImage").value = pending; delete $("#creationReverseImage").dataset.pendingImage; }
-    } catch (error) { showError(error); }
-    finally { input.disabled = false; }
+      if (current().project !== project) return;
+      if (Object.keys(imported).length) {
+        setFields({reference_modes: {...recipe().reference_modes, ...imported}, novelai_mode: mode});
+        await window.SodaStudio.refresh();
+        await window.SodaStudio.save();
+      }
+      if (reverseImage) {
+        await window.SodaStudio.refresh();
+        if (current().project === project) $("#creationReverseImage").value = reverseImage;
+      }
+      if (uploadError) throw uploadError;
+      status.textContent = translate("已加入圖片");
+    } catch (error) {
+      status.dataset.error = "true";
+      status.textContent = translate("加入圖片失敗") + " · " + error.message;
+    } finally {
+      if (current().project !== project) status.hidden = true;
+      state.referenceImporting = false;
+      updateReferenceInputs();
+    }
   }
 
   async function reversePrompt() {
@@ -492,11 +552,15 @@
   $("#creationSeed").addEventListener("input", updateSeed);
   $("#creationSeed").addEventListener("change", updateSeed);
   $("#creationSeedLock").addEventListener("click", () => setFields({seed_mode: recipe().seed_mode === "fixed" ? "random" : "fixed"}));
-  $("#creationCollapse").addEventListener("click", () => {
-    const collapsed = layout.classList.toggle("creation-collapsed");
-    $("#creationCollapse").setAttribute("aria-expanded", String(!collapsed));
-    $("#creationCollapse").setAttribute("aria-label", translate(collapsed ? "展開畫布面板" : "收起畫布面板"));
-  });
+  function setCanvasCollapsed(collapsed) {
+    layout.classList.toggle("creation-collapsed", collapsed);
+    const label = translate(collapsed ? "展開畫布面板" : "收起畫布面板");
+    collapseButton.setAttribute("aria-expanded", String(!collapsed));
+    collapseButton.setAttribute("aria-label", label);
+    collapseButton.title = label;
+    if (collapsed) parameters.open = false;
+  }
+  collapseButton.addEventListener("click", () => setCanvasCollapsed(!layout.classList.contains("creation-collapsed")));
   $("#creationHighlight").addEventListener("click", () => {
     state.highlighted = !state.highlighted;
     $("#creationHighlight").setAttribute("aria-pressed", String(state.highlighted));
@@ -509,6 +573,12 @@
   $("#creationClear").addEventListener("click", () => { state.cleared = {tab: state.tab, prefix: recipe().prefix, body: recipe().body, negative: recipe().negative, suffix: recipe().suffix}; if (state.tab === "fixed") setFields({prefix: "", suffix: ""}); else setPrompt(""); $("#creationUndoClear").hidden = false; });
   $("#creationUndoClear").addEventListener("click", () => { if (!state.cleared) return; const {tab, ...fields} = state.cleared; setFields(fields); selectTab(tab); state.cleared = null; $("#creationUndoClear").hidden = true; });
   $("#creationRandomSettings").addEventListener("click", () => { const section = $("#creationRandom"); section.open = !section.open; $("#creationRandomSettings").setAttribute("aria-expanded", String(section.open)); });
+  $("#studioWildcardV2Edit").addEventListener("click", () => {
+    $("#creationRandom").open = true;
+    $("#creationRandomSettings").setAttribute("aria-expanded", "true");
+    $("#studioWildcardV2").scrollIntoView({block:"nearest"});
+    $("#studioWildcardV2 [data-v2-setting='enabled']").focus({preventScroll:true});
+  });
   $("#creationMaterial").addEventListener("click", () => $("#studioChooseMaterial").click());
   $("#creationQuality").addEventListener("change", event => {
     const value = event.target.value;
@@ -526,12 +596,34 @@
   parameterBackdrop.setAttribute("aria-hidden", "true");
   parameterBackdrop.hidden = true;
   editor.append(parameterBackdrop);
-  parameterBackdrop.addEventListener("click", () => { $("#creationParameters").open = false; });
-  $("#creationParameters").addEventListener("toggle", event => { parameterBackdrop.hidden = !event.target.open; });
-  $("#studioPage").addEventListener("keydown", event => {
-    if (event.key === "Escape" && $("#creationParameters").open) { event.preventDefault(); event.stopPropagation(); $("#creationParameters").open = false; }
+  parameterShortcut.addEventListener("click", () => {
+    setCanvasCollapsed(false);
+    parameters.open = !parameters.open;
+    if (parameters.open) parameters.querySelector("summary").focus({preventScroll: true});
   });
-  document.querySelectorAll("[data-canvas-reference]").forEach(input => input.addEventListener("change", () => importReference(input)));
+  parameterBackdrop.addEventListener("click", () => { parameters.open = false; });
+  parameters.addEventListener("toggle", () => {
+    parameterBackdrop.hidden = !parameters.open;
+    parameterShortcut.setAttribute("aria-expanded", String(parameters.open));
+  });
+  $("#studioPage").addEventListener("keydown", event => {
+    if (event.key === "Escape" && parameters.open) {
+      event.preventDefault();
+      event.stopPropagation();
+      parameters.open = false;
+      if (parameters.contains(document.activeElement)) parameters.querySelector("summary").focus({preventScroll: true});
+    }
+  });
+  for (const input of referenceInputs) {
+    const status = document.createElement("p");
+    status.id = "creationReferenceStatus-" + input.dataset.canvasReference;
+    status.className = "creation-reference-status";
+    status.setAttribute("role", "status");
+    status.hidden = true;
+    input.setAttribute("aria-describedby", status.id);
+    input.closest("label").after(status);
+    input.addEventListener("change", () => importReference(input, status));
+  }
   editor.addEventListener("change", event => {
     const input = event.target;
     if (!input.dataset.canvasRef) return;
@@ -543,14 +635,21 @@
     const button = event.target.closest("[data-canvas-remove-reference]");
     if (!button) return;
     button.disabled = true;
-    try { await api(`/api/studio/projects/${current().project.project_id}/images/${button.dataset.canvasRemoveReference}`, {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({review: "excluded"})}); await window.SodaStudio.refresh(); }
+    try {
+      await api(`/api/studio/projects/${current().project.project_id}/images/${button.dataset.canvasRemoveReference}`, {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({review: "excluded"})});
+      button.closest(".creation-section").querySelector(".creation-reference-status").hidden = true;
+      await window.SodaStudio.refresh();
+    }
     catch (error) { showError(error); button.disabled = false; }
   });
   $("#creationReverseRun").addEventListener("click", reversePrompt);
   $("#creationReverseApply").addEventListener("click", () => { setFields({body: $("#creationReverseResult").value}); selectTab("positive"); });
   document.querySelectorAll(".creation-section, #creationParameters").forEach(details => details.addEventListener("toggle", () => { if (state.engine) localStorage.setItem("soda-canvas-open-" + state.engine + "-" + details.id, String(details.open)); }));
   $("#creationScroll").addEventListener("scroll", () => { if (state.engine) sessionStorage.setItem("soda-canvas-scroll-" + state.engine, $("#creationScroll").scrollTop); });
-  $("#studioPage").addEventListener("input", () => queueMicrotask(updateTextState));
+  $("#studioPage").addEventListener("input", event => queueMicrotask(() => {
+    if (["width", "height"].includes(event.target.dataset.recipe) && recipe()) syncSizePreset(recipe());
+    updateTextState();
+  }));
   $("#studioPage").addEventListener("change", event => { if (event.target.matches("#naiModel,#studioProvider")) { updatePresets(); renderRecipe(); } });
   window.addEventListener("soda-studio-populated", renderRecipe);
   window.addEventListener("soda-studio-populated", () => {

@@ -69,6 +69,47 @@ MAX_NAI_CHARACTERS = 6
 MAX_OUTPAINT_EDGE = 2048
 MAX_WILDCARD_CHARS = 500000
 MAX_WILDCARD_NAME_CHARS = 180
+MAX_WILDCARD_V2_SLOT_CHARS = 4000
+WILDCARD_V2_FAMILIES = ("anima", "moss", "krea2")
+WILDCARD_V2_SAMPLING_PRESETS: dict[str, dict[str, int | float | str]] = {
+    "anima": {
+        "width": 1024,
+        "height": 1536,
+        "steps": 12,
+        "cfg": 1.0,
+        "negative": (
+            "lowres, blurry, bad anatomy, extra fingers, extra limbs, deformed, watermark, "
+            "signature, text, logo, loli, child, kid"
+        ),
+    },
+    "moss": {
+        "width": 832,
+        "height": 1216,
+        "steps": 25,
+        "cfg": 2.5,
+        "negative": (
+            "worst quality, low quality, blurry, jpeg artifacts, overexposed, "
+            "blown-out highlights, blinding glare, harsh white specular patches, "
+            "washed out, bad anatomy, bad hands, "
+            "deformed hands, fused fingers, extra fingers, missing fingers, extra limbs, "
+            "deformed, text, watermark, signature"
+        ),
+    },
+    "krea2": {"width": 832, "height": 1216, "steps": 10, "cfg": 1.0, "negative": ""},
+}
+WILDCARD_V2_SAMPLING_FIELDS = ("width", "height", "steps", "cfg", "negative")
+WILDCARD_V2_SCENE_PRESETS = ("design", "world")
+WILDCARD_V2_TAG_CATEGORIES = ("style", "line", "clothing")
+WILDCARD_V2_SLOT_MODES = {
+    "layout": ("random", "fixed", "none"),
+    "style": ("none", "preset", "fixed", "wildcard"),
+    "character": ("random", "fixed", "none"),
+    "outfit": ("random", "fixed", "none"),
+    "action": ("random", "fixed", "none"),
+    "scene_light": ("random", "fixed", "none"),
+    "test_lighting": ("none", "random", "fixed"),
+    "lighting": ("random", "fixed", "none"),
+}
 REGION_BOX_COORDINATES = 4
 
 
@@ -89,6 +130,96 @@ def write_json(path: Path, value: Any) -> None:  # noqa: ANN401 - external JSON 
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def wildcard_v2_slot_text_field(slot: str) -> str:
+    return "layout_text" if slot == "layout" else slot
+
+
+def wildcard_v2_defaults() -> dict[str, Any]:
+    options: dict[str, Any] = {
+        "enabled": False,
+        "family": "anima",
+        "layout": "bundled",
+        "scene_preset": "design",
+        "tag_filters": {category: [] for category in WILDCARD_V2_TAG_CATEGORIES},
+    }
+    for slot, modes in WILDCARD_V2_SLOT_MODES.items():
+        options[wildcard_v2_slot_text_field(slot)] = ""
+        options[f"{slot}_mode"] = modes[0]
+        options[f"{slot}_pool"] = ""
+    return options
+
+
+def wildcard_v2_active(recipe: dict[str, Any]) -> bool:
+    return (
+        recipe.get("backend") == "comfyui"
+        and recipe.get("text_mode") == "wildcard"
+        and bool(recipe.get("wildcard_v2", {}).get("enabled"))
+    )
+
+
+def _migrate_v2_independent_slots(
+    options: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    if options["layout"] != "independent":
+        return
+    if not {"scene_light", "scene_light_mode", "scene_light_pool"} & source.keys():
+        options["scene_light"] = source.get("scene", "")
+        options["scene_light_mode"] = source.get("scene_mode", "random")
+        options["scene_light_pool"] = source.get("scene_pool", "")
+    if not {"test_lighting", "test_lighting_mode", "test_lighting_pool"} & source.keys() and (
+        options["lighting_mode"] == "fixed"
+        or (options["lighting_mode"] == "random" and options["lighting_pool"])
+    ):
+        options["test_lighting"] = options["lighting"]
+        options["test_lighting_mode"] = options["lighting_mode"]
+        options["test_lighting_pool"] = options["lighting_pool"]
+
+
+def _normalize_v2_tag_filters(value: object) -> dict[str, list[str]]:
+    msg = "Wildcard V2 標籤篩選格式有誤"
+    if not isinstance(value, dict):
+        raise StudioError(msg)
+    filters = {}
+    for category in WILDCARD_V2_TAG_CATEGORIES:
+        tags = value.get(category, [])
+        if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
+            raise StudioError(msg)
+        filters[category] = list(dict.fromkeys(tag.strip() for tag in tags if tag.strip()))
+    return filters
+
+
+def _normalize_wildcard_v2(value: object) -> dict[str, Any]:
+    msg = "Wildcard V2 槽位設定有誤"
+    if not isinstance(value, dict):
+        raise StudioError(msg)
+    normalized = wildcard_v2_defaults()
+    normalized.update({key: value[key] for key in normalized.keys() & value.keys()})
+    _migrate_v2_independent_slots(normalized, value)
+    if "style_pool" not in value and normalized["style_mode"] == "wildcard":
+        normalized["style_pool"] = normalized["style"]
+        normalized["style"] = ""
+    if (
+        not isinstance(normalized["enabled"], bool)
+        or normalized["family"] not in WILDCARD_V2_FAMILIES
+        or normalized["layout"] not in ("bundled", "independent")
+        or normalized["scene_preset"] not in WILDCARD_V2_SCENE_PRESETS
+        or any(
+            normalized[f"{slot}_mode"] not in modes
+            for slot, modes in WILDCARD_V2_SLOT_MODES.items()
+        )
+        or any(
+            not isinstance(normalized[field], str)
+            or len(normalized[field]) > MAX_WILDCARD_V2_SLOT_CHARS
+            for slot in WILDCARD_V2_SLOT_MODES
+            for field in (wildcard_v2_slot_text_field(slot), f"{slot}_pool")
+        )
+    ):
+        raise StudioError(msg)
+    normalized["tag_filters"] = _normalize_v2_tag_filters(normalized["tag_filters"])
+    return normalized
 
 
 def recipe_defaults() -> dict[str, Any]:
@@ -114,6 +245,7 @@ def recipe_defaults() -> dict[str, Any]:
         "seed_mode": "increment",
         "text_seed_mode": "increment",
         "text_mode": "wildcard",
+        "wildcard_v2": wildcard_v2_defaults(),
         "batch_mode": "new_text",
         "count": 1,
         "bindings": {},
@@ -150,11 +282,63 @@ def recipe_defaults() -> dict[str, Any]:
     }
 
 
-def normalize_recipe(values: dict[str, Any]) -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - protocol validation and dispatch stay together
+def _sync_wildcard_v2_sampling(
+    recipe: dict[str, Any],
+    values: dict[str, Any],
+    previous: dict[str, Any] | None,
+    *,
+    migrate_sampling: bool,
+) -> None:
+    if not wildcard_v2_active(recipe):
+        recipe.pop("wildcard_v2_sampling_family", None)
+        return
+
+    family = recipe["wildcard_v2"]["family"]
+    preset = WILDCARD_V2_SAMPLING_PRESETS[family]
+    # The editor marks the preset it applied so edits made before autosave are kept.
+    matched_preset = values.get("wildcard_v2_sampling_family") == family
+    same_family = (
+        previous is not None
+        and wildcard_v2_active(previous)
+        and previous["wildcard_v2"]["family"] == family
+    )
+    inherited = set()
+    if not matched_preset:
+        if previous is not None and not same_family:
+            inherited.update(name for name in preset if values.get(name) == previous[name])
+        legacy_defaults = recipe_defaults()
+        legacy_sampler = (migrate_sampling or not same_family) and (
+            values.get("steps"),
+            values.get("cfg"),
+        ) == (legacy_defaults["steps"], legacy_defaults["cfg"])
+        if legacy_sampler:
+            inherited.update(("steps", "cfg"))
+            if (recipe["width"], recipe["height"]) in (
+                (legacy_defaults["width"], legacy_defaults["height"]),
+                (512, 768),
+            ):
+                inherited.update(("width", "height"))
+        if (migrate_sampling or legacy_sampler) and recipe["negative"] == "":
+            inherited.add("negative")
+
+    for name, default in preset.items():
+        if name in inherited or name not in values:
+            recipe[name] = previous[name] if previous is not None and same_family else default
+    recipe["wildcard_v2_sampling_family"] = family
+
+
+def normalize_recipe(  # noqa: C901, PLR0912, PLR0915 - protocol validation and dispatch stay together
+    values: dict[str, Any],
+    *,
+    previous: dict[str, Any] | None = None,
+    migrate_sampling: bool = False,
+) -> dict[str, Any]:
     if not isinstance(values, dict):
         msg = "生圖設定需要 JSON 物件"
         raise StudioError(msg)
     recipe: dict[str, Any] = {**recipe_defaults(), **values}
+    recipe["wildcard_v2"] = _normalize_wildcard_v2(recipe["wildcard_v2"])
+    _sync_wildcard_v2_sampling(recipe, values, previous, migrate_sampling=migrate_sampling)
     if "character_position_mode" not in values and values.get("characters"):
         recipe["character_position_mode"] = "custom"
     if recipe["character_position_mode"] not in ("ai", "custom"):
@@ -329,7 +513,7 @@ class StudioStore:
                 "negative": compiled.get("negative", ""),
                 "text_mode": "manual",
             }
-        project["studio"] = normalize_recipe(values)
+        project["studio"] = normalize_recipe(values, migrate_sampling=True)
         return project
 
     def list_projects(self) -> list[dict[str, Any]]:
@@ -410,7 +594,9 @@ class StudioStore:
             project = self.require_project(project_id)
             generation = dict(project["generation"])
             if "studio" in values:
-                generation["studio"] = normalize_recipe(values["studio"])
+                generation["studio"] = normalize_recipe(
+                    values["studio"], previous=project["studio"]
+                )
             if "step" in values:
                 if values["step"] not in STEPS:
                     msg = "專案步驟有誤"

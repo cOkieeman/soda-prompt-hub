@@ -24,8 +24,8 @@ from prompt_hub.studio_providers import (
     openai_images,
     read_response,
 )
-from prompt_hub.studio_store import StudioError, StudioStore, now, write_json
-from prompt_hub.studio_workflows import compile_graph, set_input
+from prompt_hub.studio_store import StudioError, StudioStore, now, wildcard_v2_active, write_json
+from prompt_hub.studio_workflows import compile_graph, infer_bindings, set_input, source_values
 from prompt_hub.windows_worker_core import ComfyUIClient, WorkerError
 
 if TYPE_CHECKING:
@@ -63,12 +63,35 @@ class StudioService:
         self.providers = providers
         self.workflows = workflows
 
-    def prepare(self, project_id: str, count: int | None = None) -> list[dict[str, Any]]:
-        project = self.store.require_project(project_id)
-        recipe = dict(project["studio"])
+    def prepare(
+        self,
+        project_id: str,
+        count: int | None = None,
+        *,
+        recipe: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        if recipe is None:
+            recipe = self.store.require_project(project_id)["studio"]
         if count is not None:
-            recipe["count"] = count
-        return prepare_batch(self.store, recipe, self.providers.public())
+            recipe = {**recipe, "count": count}
+        config = self.providers.public()
+        if (
+            wildcard_v2_active(recipe)
+            and recipe["wildcard_v2"]["style_mode"] == "preset"
+            and recipe["workflow_id"]
+        ):
+            graph = self.workflows.read_graph(recipe["workflow_id"])
+            bindings = recipe["bindings"] or infer_bindings(graph)
+            for name in ("style", "prefix"):
+                keys = bindings.get(name)
+                if keys:
+                    explicit = source_values(
+                        graph, {name: [keys] if isinstance(keys, str) else keys}
+                    )
+                    if explicit.get(name):
+                        config["wildcard_v2_workflow_style"] = str(explicit[name])
+                        break
+        return prepare_batch(self.store, recipe, config)
 
     def exports(self, project_id: str) -> list[dict[str, Any]]:
         root = self.store.settings.dataset_exports_root / "studio" / project_id

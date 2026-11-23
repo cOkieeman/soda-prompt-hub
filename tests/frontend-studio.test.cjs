@@ -875,6 +875,185 @@ test("NovelAI gallery reuse replaces prompt fields and resets preset selectors",
   assert.equal(notice.textContent, "已用畫廊提示詞替換目前內容。");
 });
 
+function wildcardV2StudioSource() {
+  return fs.readFileSync(path.join(assets, "studio.js"), "utf8");
+}
+
+test("enabling Wildcard V2 and changing model family updates sampling and negative defaults", () => {
+  const source = wildcardV2StudioSource();
+  const presets = {
+    anima: {width:1024, height:1536, steps:12, cfg:1.0, negative:"lowres, blurry, bad anatomy, extra fingers, extra limbs, deformed, watermark, signature, text, logo, loli, child, kid"},
+    moss: {width:832, height:1216, steps:25, cfg:2.5, negative:"worst quality, low quality, blurry, jpeg artifacts, overexposed, blown-out highlights, blinding glare, harsh white specular patches, washed out, bad anatomy, bad hands, deformed hands, fused fingers, extra fingers, missing fingers, extra limbs, deformed, text, watermark, signature"},
+    krea2: {width:832, height:1216, steps:10, cfg:1.0, negative:""},
+  };
+  const recipe = {backend:"comfyui", text_mode:"wildcard", width:512, height:768, steps:25, cfg:4.0,
+    negative:"old negative", locked_values:{negative:"old locked negative"}, wildcard_v2:{enabled:false, family:"anima"}};
+  const renderedSampling = [];
+  const context = {
+    state:{bootstrap:{wildcard_v2_sampling_presets:presets}, project:{studio:recipe}},
+    populateRecipe:() => renderedSampling.push([recipe.width, recipe.height, recipe.steps, recipe.cfg, recipe.negative]),
+    renderWildcardV2:() => {}, markChanged:() => {}, structuredClone,
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf("  const wildcardV2Active"), source.indexOf("  const v2RandomModes")), context);
+  vm.runInContext(source.slice(source.indexOf("  function applyWildcardV2SamplingPreset"), source.indexOf("  async function loadWildcardV2Pools")), context);
+  vm.runInContext(source.slice(source.indexOf("  function bindStudioWorkflow"), source.indexOf("  function translated")), context);
+
+  context.setWildcardV2Value("enabled", true);
+  assert.equal(recipe.wildcard_v2_sampling_family, "anima");
+  assert.equal(Object.hasOwn(recipe.locked_values, "negative"), false);
+  context.setWildcardV2Value("family", "moss");
+  assert.equal(recipe.wildcard_v2_sampling_family, "moss");
+  context.setWildcardV2Value("family", "krea2");
+  assert.equal(recipe.wildcard_v2_sampling_family, "krea2");
+  for (const [index, preset] of Object.values(presets).entries()) {
+    assert.deepEqual(renderedSampling[index], Object.values(preset));
+  }
+  recipe.steps = 14;
+  context.bindStudioWorkflow(recipe, {profile_id:"legacy", bindings:{},
+    source_values:{width:512, height:768, steps:25, cfg:4.0, negative:"legacy negative"}});
+  assert.deepEqual([recipe.width, recipe.height, recipe.steps, recipe.cfg, recipe.negative], [832, 1216, 14, 1.0, ""]);
+});
+
+test("Wildcard V2 switches to a fixed character only after the user enters a specific trigger", () => {
+  const source = wildcardV2StudioSource();
+  const recipe = {wildcard_v2:{character_mode:"random", character:""}};
+  const context = {
+    state:{bootstrap:{wildcard_v2_generic_character_tags:["1girl", "adult woman", "solo"]}, project:{studio:recipe}},
+    renderWildcardV2:() => {}, markChanged:() => {},
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf("  function hasSpecificWildcardV2Character"), source.indexOf("  async function loadWildcardV2Pools")), context);
+  context.setWildcardV2Value("character_mode", "fixed");
+  assert.equal(context.state.v2CharacterEditing, true);
+  assert.equal(recipe.wildcard_v2.character_mode, "random");
+  context.setWildcardV2Value("character", "1girl，adult_woman\n solo.");
+  assert.equal(recipe.wildcard_v2.character_mode, "random");
+  context.setWildcardV2Value("character", "anima_oc_trigger, 1girl");
+  assert.equal(recipe.wildcard_v2.character_mode, "fixed");
+  context.setWildcardV2Value("character", "solo");
+  assert.equal(recipe.wildcard_v2.character_mode, "random");
+});
+
+test("general Wildcard V2 slot suggestions exclude whole-prompt pools", async () => {
+  const source = wildcardV2StudioSource();
+  const scenePools = ["__moss_lora_v2/girl/scene__", "__moss_lora_v2/anima/slots/lighting__"];
+  const wholePools = ["world/scenery", "world/creature", "world/still_life", "all"]
+    .map(pool => `__moss_lora_v2/${pool}__`);
+  const status = {};
+  const datalist = {options:[], replaceChildren(...options) {this.options = options;}};
+  const slots = {};
+  const context = {
+    state:{v2PoolsRequest:null},
+    v2Slots:[["outfit", "Outfit", [["random", "Random"]]]],
+    v2PairedPoolLists:{},
+    $:selector => selector === "#studioWildcardV2Pools" ? datalist : status,
+    document:{createElement:() => ({})},
+    api:async () => ({pools:[...scenePools, ...wholePools], scene_pools:scenePools}),
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf("  function mountWildcardV2Slots"), source.indexOf("  function renderWildcardV2Slot")), context);
+  vm.runInContext(source.slice(source.indexOf("  function replaceWildcardV2PoolOptions"), source.indexOf("  function populateRecipe")), context);
+  context.mountWildcardV2Slots(slots);
+  await context.loadWildcardV2Pools();
+  assert.match(slots.innerHTML, /data-v2-setting="outfit_pool"[^>]+list="studioWildcardV2Pools"/);
+  assert.deepEqual(datalist.options.map(option => option.value), scenePools);
+  assert.equal(status.hidden, true);
+});
+
+test("editorial Wildcard V2 presents ordered independent slots and applies either pool pair", () => {
+  const source = wildcardV2StudioSource();
+  const html = fs.readFileSync(path.join(assets, "studio.html"), "utf8");
+  const recipe = {wildcard_v2:{layout:"bundled", layout_mode:"fixed", layout_text:"saved layout",
+    outfit_mode:"fixed", layout_pool:"custom layout", scene_light_mode:"none", scene_light_pool:"custom scene"}};
+  const context = {
+    state:{project:{studio:recipe}},
+    renderWildcardV2() {}, markChanged() {},
+    setWildcardV2Value(key, value) {recipe.wildcard_v2[key] = value;},
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf("  const v2NoneMode"), source.indexOf("  const state =")), context);
+  vm.runInContext(source.slice(source.indexOf("  function mountWildcardV2Slots"), source.indexOf("  function renderWildcardV2Slot")), context);
+  vm.runInContext(source.slice(source.indexOf("  function setWildcardV2Preset"), source.indexOf("  function wildcardV2TagChoices")), context);
+  const slots = {};
+  context.mountWildcardV2Slots(slots);
+  const categories = [...slots.innerHTML.matchAll(/data-v2-category="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(categories.slice(0, 6), ["layout", "style", "character", "outfit", "action", "scene_light"]);
+  assert.match(slots.innerHTML, /data-v2-setting="layout_text"[^>]*data-v2-long/);
+  assert.match(slots.innerHTML, /type="text" data-v2-setting="layout_pool"[^>]+list="studioWildcardV2LayoutPools"/);
+  assert.match(slots.innerHTML, /type="text" data-v2-setting="scene_light_pool"[^>]+list="studioWildcardV2SceneLightPools"/);
+  const styleModes = slots.innerHTML.slice(slots.innerHTML.indexOf('data-v2-category="style"'),
+    slots.innerHTML.indexOf('data-v2-category="character"'));
+  assert.deepEqual([...styleModes.matchAll(/data-v2-mode="([^"]+)"/g)].map(match => match[1]), ["preset", "fixed", "wildcard", "none"]);
+  assert.deepEqual([...html.matchAll(/data-v2-preset="([^"]+)"/g)].map(match => match[1]), ["design", "world", "bundled"]);
+  assert.match(html, /<details id="studioWildcardV2TestLight" hidden>/);
+
+  for (const preset of ["design", "world"]) {
+    context.setWildcardV2Preset(preset);
+    assert.equal(recipe.wildcard_v2.scene_preset, preset);
+    assert.equal(recipe.wildcard_v2.layout, "independent");
+    assert.equal(recipe.wildcard_v2.layout_mode, "random");
+    assert.equal(recipe.wildcard_v2.scene_light_mode, "random");
+    assert.equal(recipe.wildcard_v2.layout_pool, "");
+    assert.equal(recipe.wildcard_v2.scene_light_pool, "");
+    assert.equal(recipe.wildcard_v2.outfit_mode, "fixed");
+    assert.equal(recipe.wildcard_v2.layout_text, "saved layout");
+  }
+  context.setWildcardV2Preset("bundled");
+  assert.equal(recipe.wildcard_v2.layout, "bundled");
+});
+
+test("layout and scene-light offer the two official references for the current family", () => {
+  const source = wildcardV2StudioSource();
+  const layoutList = {options:[], replaceChildren(...options) {this.options = options;}};
+  const sceneLightList = {options:[], replaceChildren(...options) {this.options = options;}};
+  const context = {
+    $:selector => selector === "#studioWildcardV2LayoutPools" ? layoutList : sceneLightList,
+    document:{createElement:() => ({})},
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf("  const v2PairedPoolLists"), source.indexOf("  const v2TestLightActive")), context);
+  vm.runInContext(source.slice(source.indexOf("  function renderWildcardV2PairOptions"), source.indexOf("  function renderWildcardV2(recipe")), context);
+  vm.runInContext(source.slice(source.indexOf("  function replaceWildcardV2PoolOptions"), source.indexOf("  async function loadWildcardV2Pools")), context);
+  for (const branch of ["anima", "nl"]) {
+    const ref = name => `__moss_lora_v2/${branch}/slots/${name}__`;
+    const designLayout = ref("layout_design");
+    const worldLayout = ref("layout_camera");
+    const designSceneLight = ref("scene_light_design");
+    const worldSceneLight = ref("scene_light_world");
+    context.renderWildcardV2PairOptions({design:{layout:[designLayout], scene_light:[designSceneLight]},
+      world:{layout:[worldLayout], scene_light:[worldSceneLight]}});
+    assert.deepEqual(layoutList.options.map(option => option.value), [designLayout, worldLayout]);
+    assert.deepEqual(sceneLightList.options.map(option => option.value), [designSceneLight, worldSceneLight]);
+  }
+});
+
+test("Wildcard V2 tag chips use active pool metadata and retain removable saved choices", () => {
+  const source = wildcardV2StudioSource();
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf("  const v2NoneMode"), source.indexOf("  const state =")), context);
+  vm.runInContext(source.slice(source.indexOf("  function wildcardV2TagChoices"), source.indexOf("  function renderWildcardV2TagFilters")), context);
+  const settings = {layout:"independent", style_mode:"wildcard", style_pool:"__style/pool__", action_mode:"fixed",
+    tag_filters:{style:["saved style"]}};
+  const tagsByPool = {
+    "__style/pool__":{style:["ink"], line:["linework"]},
+    "__layout/pool__":{style:["ink"]},
+    "__outfit/pool__":{clothing:["coat"]},
+    "__action/unused__":{style:["unused action"]},
+    "__light/unused__":{style:["unused light"]},
+    "__scene/pool__":{line:["scene"]},
+  };
+  const defaults = {layout:["__layout/pool__"], outfit:["__outfit/pool__"],
+    action:["__action/unused__"], scene_light:["__scene/pool__"], test_lighting:["__light/unused__"]};
+  const choices = context.wildcardV2TagChoices(settings, "design", tagsByPool, defaults);
+  assert.equal(JSON.stringify(choices), JSON.stringify({style:["ink", "saved style"], line:["linework", "scene"], clothing:["coat"]}));
+  const overrideChoices = context.wildcardV2TagChoices({...settings, test_lighting_mode:"random"}, "design", tagsByPool, defaults);
+  assert.equal(JSON.stringify(overrideChoices), JSON.stringify({style:["ink", "saved style", "unused light"], line:["linework"], clothing:["coat"]}));
+  const noHeaders = context.wildcardV2TagChoices({}, "world", {}, defaults);
+  assert.equal(JSON.stringify(noHeaders), JSON.stringify({style:[], line:[], clothing:[]}));
+});
+
 test("workflow controls are compact, named, and exclude unused serialized state", () => {
   const source = fs.readFileSync(path.join(assets, "studio.js"), "utf8");
   const start = source.indexOf("  function selectedWorkflow()");
@@ -895,9 +1074,11 @@ test("workflow controls are compact, named, and exclude unused serialized state"
       control:{kind:"combo",connected:true,targets:[{class_type:"Scheduler Selector (Image Saver)",input:"scheduler",title:"主调度器"}]}},
     {key:"controls::SlidersState#/sliders/5/value", title:"Pixaroma", input:"value_6", type:"number", value:0.4,
       control:{kind:"float",connected:false}},
-    {key:"controls::SlidersState", title:"Pixaroma", input:"SlidersState", type:"text", value:'{"sliders":[]}'}
+    {key:"controls::SlidersState", title:"Pixaroma", input:"SlidersState", type:"text", value:'{"sliders":[]}'},
+    {key:"sampler::steps#", title:"Sampler", input:"steps", type:"number", value:12,
+      source_key:"controls::SlidersState#/sliders/1/value"},
   ];
-  const workflow = {profile_id:"test-workflow",fields,postprocess:[]};
+  const workflow = {profile_id:"test-workflow",fields,bindings:{steps:["sampler::steps#"]},postprocess:[]};
   const recipe = {workflow_id:"test-workflow",bindings:{prefix:["prompt::text"]},overrides:{},branches:{},reference_bindings:{}};
   const selectors = ["#studioWorkflowControls","#studioWorkflowSummary","#studioWorkflowParametersToggle",
     "#studioWorkflowParameters","#studioWorkflowBindings","#studioWorkflowOverrides",
@@ -924,6 +1105,8 @@ test("workflow controls are compact, named, and exclude unused serialized state"
     })[value] || value},
     escape,
     roles:{},
+    wildcardV2Active:recipe => Boolean(recipe.wildcard_v2?.enabled),
+    v2SamplingFields:new Set(["width", "height", "steps", "cfg", "negative"]),
   };
   vm.createContext(context);
   vm.runInContext(source.slice(start,end) + "\nrenderWorkflow();",context);
@@ -943,6 +1126,12 @@ test("workflow controls are compact, named, and exclude unused serialized state"
   assert.match(bindings,/data-binding-choice="prefix"/);
   assert.doesNotMatch(bindings,/multiple size="2"/);
   assert.match(elements.get("#studioWorkflowStateOverrides").innerHTML,/SlidersState/);
+
+  recipe.wildcard_v2 = {enabled:true};
+  vm.runInContext("renderWorkflow();", context);
+  const v2Parameters = elements.get("#studioWorkflowParameters").innerHTML;
+  assert.doesNotMatch(v2Parameters, /Turbo · 步数/);
+  assert.match(v2Parameters, /标准 · CFG/);
 });
 
 test("workflow mode buttons update the saved override and expansion state", () => {

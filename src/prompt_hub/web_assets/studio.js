@@ -6,7 +6,26 @@
   const targets = {moss:"MOSS", anima:"Anima", krea2:"Krea 2", h3:"MiniMax H3 Image"};
   const stepLabels = {references:"參考素材", generate:"生圖", review:"挑圖", caption:"打標", export:"匯出"};
   const roles = {identity:"角色外觀", outfit:"服裝", style:"畫風", pose:"姿勢", depth:"深度", composition:"構圖", mask:"遮罩"};
-  const state = {bootstrap:null, project:null, images:[], jobs:[], generationJobIds:[], preview:null, lastDraw:null, selectedImage:"", captionSelection:new Set(),
+  const wildcardV2Active = recipe => recipe?.backend === "comfyui" && recipe.text_mode === "wildcard" && Boolean(recipe.wildcard_v2?.enabled);
+  const v2SamplingFields = new Set(["width", "height", "steps", "cfg", "negative"]);
+  const v2NoneMode = ["none", "省略"];
+  const v2RandomModes = [["random", "隨機"], ["fixed", "固定"], v2NoneMode];
+  const v2Slots = [
+    ["layout", "構圖版式", v2RandomModes],
+    ["style", "畫風", [["preset", "預設"], ["fixed", "固定"], ["wildcard", "詞庫", "從詞庫隨機抽取"], v2NoneMode]],
+    ["character", "角色", v2RandomModes],
+    ["outfit", "服裝", v2RandomModes],
+    ["action", "動作", v2RandomModes],
+    ["scene_light", "場景與光影", v2RandomModes],
+    ["lighting", "光線", v2RandomModes],
+  ];
+  const v2TestLightingSlot = [["test_lighting", "光線", [v2NoneMode, ...v2RandomModes.slice(0, 2)]]];
+  const v2BundledSlots = new Set(["style", "character", "lighting"]);
+  const v2PairedPoolLists = {layout:"studioWildcardV2LayoutPools", scene_light:"studioWildcardV2SceneLightPools"};
+  const v2TestLightActive = settings => settings.layout === "independent" && ["random", "fixed"].includes(settings.test_lighting_mode);
+  const v2TagGroups = [["style", "畫風"], ["line", "線條"], ["clothing", "服裝"]];
+  const state = {bootstrap:null, project:null, images:[], jobs:[], generationJobIds:[], preview:null, lastDraw:null, lastQueuedV2Preview:"", selectedImage:"", captionSelection:new Set(),
+    v2Editor:"", v2CharacterEditing:false, v2PoolsRequest:null, v2PoolData:null,
     step:"generate", saving:null, dirty:false, saveTimer:null, uploadBusy:false,
     providerFormRun:0, providerDiscoveryRun:0, providerDiscoveryController:null, deletingProviderId:"", graphSelection:"", graphZoom:100,
     graphFilter:"all", graphMinConfidence:0, graphKinds:{entity:true,group:true,relation:true,image:true}, graphDrawMode:false, graphCaptionMode:"detail",
@@ -118,6 +137,248 @@
     renderHome();
   };
 
+  function mountWildcardV2Slots(container, slots = v2Slots) {
+    container.innerHTML = slots.map(([key, label, modes]) => {
+      const nameId = `studioV2-${key}-label`;
+      const editorId = `studioV2-${key}-editor`;
+      const textKey = key === "layout" ? "layout_text" : key;
+      const poolList = v2PairedPoolLists[key] || "studioWildcardV2Pools";
+      const theme = key === "lighting" ?
+        '<div class="studio-wildcard-v2-theme" data-v2-theme><span>主題包 · 服裝、動作、場景</span><span>整組隨機</span></div>' : "";
+      return `${theme}<div class="studio-wildcard-v2-slot" data-v2-category="${key}">
+        <span class="studio-wildcard-v2-name" id="${nameId}">${label}</span>
+        <div class="studio-wildcard-v2-entry">
+          <input type="text" data-v2-setting="${textKey}" data-v2-short maxlength="4000" spellcheck="false" autocomplete="off" aria-labelledby="${nameId}" hidden>
+          <span data-v2-summary hidden></span>
+          <input type="text" data-v2-setting="${key}_pool" data-v2-pool list="${poolList}" maxlength="4000" spellcheck="false" autocomplete="off" aria-labelledby="${nameId}" hidden>
+          <span data-v2-workflow hidden>沿用工作流</span>
+          <button type="button" data-v2-expand="${key}" aria-controls="${editorId}" aria-expanded="false" hidden>展開</button>
+        </div>
+        <div class="studio-wildcard-v2-modes" role="group" aria-labelledby="${nameId}">
+          ${modes.map(([value, text, tip]) => `<button type="button" data-v2-mode="${value}" aria-label="${tip || text}" aria-pressed="false">${text}</button>`).join("")}
+        </div>
+        <div id="${editorId}" class="studio-wildcard-v2-editor" hidden>
+          <textarea rows="5" data-v2-setting="${textKey}" data-v2-long maxlength="4000" spellcheck="false" aria-labelledby="${nameId}"></textarea>
+          <span data-v2-length aria-hidden="true"></span>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderWildcardV2Slot(slot, settings, defaults) {
+    const key = slot.dataset.v2Category;
+    const mode = settings[`${key}_mode`] ?? (key === "style" ? "none" : slot.querySelector("[data-v2-mode]").dataset.v2Mode);
+    const editingCharacter = key === "character" && state.v2CharacterEditing;
+    const fixed = mode === "fixed" || editingCharacter;
+    const text = settings[key === "layout" ? "layout_text" : key] || "";
+    const expanded = fixed && state.v2Editor === key;
+    const short = slot.querySelector("[data-v2-short]");
+    const editor = slot.querySelector("[data-v2-long]");
+    const summary = slot.querySelector("[data-v2-summary]");
+    const expand = slot.querySelector("[data-v2-expand]");
+    const pool = slot.querySelector("[data-v2-pool]");
+    const long = /[\r\n]/.test(text) || text.length > 50;
+    const showSummary = expanded || (long && document.activeElement !== short);
+
+    slot.querySelectorAll("[data-v2-mode]").forEach(button => {
+      button.setAttribute("aria-pressed", String(button.dataset.v2Mode === mode));
+    });
+    short.hidden = !fixed || showSummary;
+    short.placeholder = translated(key === "character" ? "輸入角色名或 OC 觸發詞" : "輸入固定詞");
+    if (!showSummary && short.value !== text) short.value = text;
+    summary.hidden = !fixed || !showSummary;
+    summary.textContent = expanded ? translated("編輯中") : text;
+    pool.hidden = fixed || !["random", "wildcard"].includes(mode);
+    const defaultPools = defaults[key] || [];
+    pool.placeholder = defaultPools.length === 1 ? defaultPools[0].split("/").at(-1).replace(/__$/, "") :
+      translated(key === "style" ? "選擇詞池" : "預設詞池");
+    const poolText = settings[`${key}_pool`] ?? (key === "style" && mode === "wildcard" ? settings.style : "") ?? "";
+    if (pool.value !== poolText) pool.value = poolText;
+    pool.title = poolText || defaultPools.join("\n");
+    const omitted = slot.querySelector("[data-v2-workflow]");
+    omitted.hidden = mode !== "none" && mode !== "preset";
+    omitted.textContent = mode === "preset" ? selectedWorkflow()?.label || translated("沿用工作流") : translated("留空");
+    omitted.title = omitted.textContent;
+    expand.hidden = !fixed || (!long && !expanded);
+    expand.textContent = translated(expanded ? "收起" : "展開");
+    expand.setAttribute("aria-expanded", String(expanded));
+    editor.parentElement.hidden = !expanded;
+    if (editor.value !== text) editor.value = text;
+    slot.querySelector("[data-v2-length]").textContent = `${text.length} ${translated("字元")}`;
+  }
+
+  function renderWildcardV2PairOptions(familyDefaults) {
+    for (const [slot, listId] of Object.entries(v2PairedPoolLists)) {
+      const pools = [...new Set(["design", "world"].flatMap(preset => familyDefaults[preset]?.[slot] || []))];
+      replaceWildcardV2PoolOptions($("#" + listId), pools);
+    }
+  }
+
+  function renderWildcardV2(recipe) {
+    const panel = $("#studioWildcardV2");
+    if (!panel) return;
+    const settings = recipe.wildcard_v2 || {};
+    const active = wildcardV2Active(recipe);
+    panel.hidden = recipe.backend !== "comfyui" || recipe.text_mode !== "wildcard";
+    $("#studioPage").dataset.v2Active = String(active);
+    $("#studioWildcardV2Fields").hidden = !active;
+    $("#studioWildcardV2Edit").hidden = !active;
+    const queueLabel = $("#studioQueueBatch").querySelector("span");
+    if (queueLabel) queueLabel.textContent = translated(active ? "隨機出圖" : "生成");
+    panel.querySelector('[data-v2-setting="enabled"]').checked = Boolean(settings.enabled);
+    panel.querySelector('[data-v2-setting="family"]').value = settings.family || "anima";
+    const slots = $("#studioWildcardV2Slots");
+    if (!slots.childElementCount) mountWildcardV2Slots(slots);
+    const bundled = settings.layout !== "independent";
+    const preset = bundled ? "bundled" : settings.scene_preset || "design";
+    const familyDefaults = state.bootstrap.wildcard_v2_default_pools?.[settings.family || "anima"] || {};
+    const defaults = familyDefaults[preset] || {};
+    if (!bundled) renderWildcardV2PairOptions(familyDefaults);
+    panel.querySelectorAll("[data-v2-preset]").forEach(button => {
+      button.setAttribute("aria-pressed", String(button.dataset.v2Preset === preset));
+    });
+    panel.querySelector("[data-v2-theme]").hidden = !bundled;
+    slots.querySelectorAll("[data-v2-category]").forEach(slot => {
+      const key = slot.dataset.v2Category;
+      slot.hidden = bundled ? !v2BundledSlots.has(key) : key === "lighting";
+      renderWildcardV2Slot(slot, settings, defaults);
+      if (key === "scene_light") {
+        const paused = v2TestLightActive(settings);
+        slot.setAttribute("aria-disabled", String(paused));
+        slot.querySelectorAll("input, textarea, button").forEach(control => { control.disabled = paused; });
+      }
+    });
+    $("#studioWildcardV2TestLight").hidden = bundled;
+    const testLight = $("#studioWildcardV2TestLightSlot");
+    if (!testLight.childElementCount) mountWildcardV2Slots(testLight, v2TestLightingSlot);
+    renderWildcardV2Slot(testLight.firstElementChild, settings, defaults);
+    renderWildcardV2TagFilters(settings, preset, defaults);
+  }
+
+  function applyWildcardV2SamplingPreset(recipe) {
+    const family = recipe.wildcard_v2.family || "anima";
+    const preset = state.bootstrap.wildcard_v2_sampling_presets?.[family];
+    if (!preset) return false;
+    Object.assign(recipe, preset, {wildcard_v2_sampling_family:family});
+    delete recipe.locked_values?.negative;
+    return true;
+  }
+
+  function hasSpecificWildcardV2Character(text) {
+    const genericTags = state.bootstrap.wildcard_v2_generic_character_tags || [];
+    return (text || "").toLowerCase().split(/[,，.。\r\n]+/).some(part => {
+      const tag = part.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+      return tag && !genericTags.includes(tag);
+    });
+  }
+
+  function setWildcardV2Preset(preset) {
+    const recipe = state.project.studio;
+    const settings = recipe.wildcard_v2;
+    if (preset === "bundled") {
+      setWildcardV2Value("layout", "bundled");
+      return;
+    }
+    recipe.wildcard_v2 = {...settings, layout:"independent", scene_preset:preset,
+      layout_mode:"random", layout_pool:"", scene_light_mode:"random", scene_light_pool:""};
+    state.lastDraw = null;
+    state.v2Editor = "";
+    renderWildcardV2(recipe);
+    markChanged();
+  }
+
+  function wildcardV2TagChoices(settings, preset, tagsByPool, defaults) {
+    const pools = [...(defaults.theme || [])];
+    for (const slot of [...v2Slots, ...v2TestLightingSlot]) {
+      const [key] = slot;
+      if (preset === "bundled" ? !v2BundledSlots.has(key) : key === "lighting") continue;
+      if (key === "scene_light" && v2TestLightActive(settings)) continue;
+      const mode = settings[`${key}_mode`] ?? slot[2][0][0];
+      if (mode !== "random" && mode !== "wildcard") continue;
+      const pool = (settings[`${key}_pool`] || "").trim();
+      pools.push(...(pool ? [pool] : defaults[key] || []));
+    }
+    return Object.fromEntries(v2TagGroups.map(([key]) => {
+      const tags = new Set(settings.tag_filters?.[key] || []);
+      for (const pool of pools) {
+        for (const tag of tagsByPool[pool]?.[key] || []) tags.add(tag);
+      }
+      return [key, [...tags].sort()];
+    }));
+  }
+
+  function renderWildcardV2TagFilters(settings, preset, defaults) {
+    const container = $("#studioWildcardV2TagFilters");
+    container.hidden = !state.v2PoolData;
+    if (container.hidden) return;
+    const groups = wildcardV2TagChoices(settings, preset, state.v2PoolData.tags_by_pool || {}, defaults);
+    const catalogue = JSON.stringify(groups);
+    if (container.dataset.v2Catalogue !== catalogue) {
+      container.dataset.v2Catalogue = catalogue;
+      const controls = v2TagGroups.filter(([key]) => groups[key].length).map(([key, label]) =>
+        `<div class="studio-wildcard-v2-tag-group" role="group" aria-label="${escape(translated(label))}">
+          <span>${escape(translated(label))}</span>
+          ${groups[key].map(tag => `<button type="button" data-v2-tag-group="${key}" data-v2-tag="${escape(tag)}" aria-pressed="false">${escape(tag)}</button>`).join("")}
+        </div>`).join("");
+      container.innerHTML = `<h4>${escape(translated("詞庫標籤"))}</h4>${controls || `<p>${escape(translated("目前詞池沒有可用標籤。"))}</p>`}`;
+    }
+    container.querySelectorAll("[data-v2-tag]").forEach(button => {
+      const selected = settings.tag_filters?.[button.dataset.v2TagGroup] || [];
+      button.setAttribute("aria-pressed", String(selected.includes(button.dataset.v2Tag)));
+    });
+  }
+
+  function setWildcardV2Value(key, value) {
+    const recipe = state.project.studio;
+    const settings = recipe.wildcard_v2 || {};
+    const next = {...settings, [key]:value};
+    if (key === "character_mode") state.v2CharacterEditing = value === "fixed";
+    if (key === "character" || (key === "character_mode" && state.v2CharacterEditing)) {
+      state.v2CharacterEditing = true;
+      next.character_mode = hasSpecificWildcardV2Character(next.character) ? "fixed" : "random";
+    }
+    if (next[key] === settings[key] && next.character_mode === settings.character_mode) {
+      if (key === "character_mode") renderWildcardV2(recipe);
+      return;
+    }
+    recipe.wildcard_v2 = next;
+    if (["enabled", "family", "layout"].includes(key)) {
+      state.lastDraw = null;
+      state.v2Editor = "";
+    }
+    if (key === "enabled" && !value) state.v2CharacterEditing = false;
+    if (["enabled", "family"].includes(key) && wildcardV2Active(recipe) && applyWildcardV2SamplingPreset(recipe)) {
+      populateRecipe();
+    } else renderWildcardV2(recipe);
+    markChanged();
+  }
+
+  function replaceWildcardV2PoolOptions(list, pools) {
+    if (list.options.length === pools.length && pools.every((value, index) => list.options[index].value === value)) return;
+    list.replaceChildren(...pools.map(value => {
+      const option = document.createElement("option");
+      option.value = value;
+      return option;
+    }));
+  }
+
+  async function loadWildcardV2Pools() {
+    if (state.v2PoolsRequest) return state.v2PoolsRequest;
+    const status = $("#studioWildcardV2PoolStatus");
+    status.hidden = true;
+    state.v2PoolsRequest = api("/wildcard-v2/pools").then(data => {
+      const {scene_pools} = data;
+      replaceWildcardV2PoolOptions($("#studioWildcardV2Pools"), scene_pools);
+      state.v2PoolData = data;
+      if (state.project && wildcardV2Active(state.project.studio)) renderWildcardV2(state.project.studio);
+    }).catch(() => {
+      state.v2PoolsRequest = null;
+      status.textContent = translated("詞池清單暫時無法載入，可直接輸入已知的 Wildcard 引用。");
+      status.hidden = false;
+    });
+    return state.v2PoolsRequest;
+  }
+
   function populateRecipe() {
     const recipe = state.project.studio;
     document.querySelectorAll("#studioPage [data-recipe]").forEach(element => {
@@ -140,6 +401,8 @@
     renderWorkflow();
     renderPrefixRows();
     $("#studioRaffleSettings").hidden = recipe.text_mode !== "raffle";
+    renderWildcardV2(recipe);
+    if (wildcardV2Active(recipe)) void loadWildcardV2Pools();
     window.dispatchEvent(new Event("soda-studio-populated"));
   }
 
@@ -176,6 +439,18 @@
 
   function selectedWorkflow() {
     return state.bootstrap.workflows.find(item => item.profile_id === state.project.studio.workflow_id);
+  }
+
+  function bindStudioWorkflow(recipe, workflow) {
+    recipe.workflow_id = workflow.profile_id;
+    recipe.bindings = structuredClone(workflow.bindings);
+    recipe.overrides = {};
+    recipe.branches = {};
+    const v2 = wildcardV2Active(recipe);
+    for (const [name, value] of Object.entries(workflow.source_values || {})) {
+      if (v2 && v2SamplingFields.has(name)) continue;
+      if (recipe[name] === "" || (name !== "negative" && v2SamplingFields.has(name))) recipe[name] = value;
+    }
   }
 
   function translated(message) {
@@ -261,6 +536,15 @@
     const bindingValues = Object.values(recipe.bindings || {}).flatMap(value =>
       Array.isArray(value) ? value : value ? [value] : []);
     const boundKeys = new Set(bindingValues);
+    if (wildcardV2Active(recipe)) {
+      const samplingKeys = new Set([...v2SamplingFields].flatMap(name =>
+        recipe.bindings?.[name] ?? workflow?.bindings?.[name] ?? []));
+      for (const field of fields) {
+        if (!samplingKeys.has(field.key)) continue;
+        boundKeys.add(field.key);
+        if (field.source_key) boundKeys.add(field.source_key);
+      }
+    }
     const connectedControls = fields.filter(field => field.control?.connected && !boundKeys.has(field.key));
     const primaryControls = connectedControls.filter(field =>
       field.control.kind === "toggle");
@@ -480,6 +764,8 @@
       } catch { state.generationJobIds = []; }
       state.preview = null;
       state.lastDraw = null;
+      state.v2Editor = "";
+      state.v2CharacterEditing = false;
       state.dirty = false;
       state.pendingDraft = null;
       $("#studioDraftRecovery").hidden = true;
@@ -549,16 +835,22 @@
   }
 
   async function previewBatch(count) {
-    if (count === 1 && state.lastDraw && state.project.studio.text_seed_mode === "increment") {
+    const v2 = wildcardV2Active(state.project.studio);
+    if (count === 1 && state.lastDraw && (v2 || state.project.studio.text_seed_mode === "increment")) {
       state.project.studio.text_seed = (state.lastDraw.text_seed + 1) % (2 ** 53);
       const input = document.querySelector('[data-recipe="text_seed"]');
       input.value = state.project.studio.text_seed;
       markChanged();
     }
     await saveCurrent();
-    const result = await api(`/projects/${state.project.project_id}/preview`, {
+    const project = state.project;
+    const snapshot = JSON.stringify(project.studio);
+    const result = await api(`/projects/${project.project_id}/preview`, {
       method:"POST", body:count === 1 ? {count:1} : {},
     });
+    if (v2 && (project !== state.project || snapshot !== JSON.stringify(project.studio))) {
+      throw new Error(translated("抽詞設定已變更，請重新抽詞。"));
+    }
     state.preview = result;
     state.lastDraw = result.rows[0];
     try { localStorage.setItem(previewKey(state.project.project_id), JSON.stringify({recipe:JSON.stringify(state.project.studio),value:result})); } catch { }
@@ -974,10 +1266,26 @@
         persistCaptionDraft();
       }
       if (element.matches("[data-recipe]")) {
-        state.project.studio[element.dataset.recipe] = element.type === "number" ? Number(element.value) : element.value;
-        if (element.dataset.recipe === "prefix") state.project.studio.prefix_rows = [];
-        if (Object.hasOwn(state.project.studio.locked_values, element.dataset.recipe)) delete state.project.studio.locked_values[element.dataset.recipe];
+        const recipe = state.project.studio;
+        const field = element.dataset.recipe;
+        const wasV2 = wildcardV2Active(recipe);
+        recipe[field] = element.type === "number" ? Number(element.value) : element.value;
+        if (field === "prefix") recipe.prefix_rows = [];
+        if (Object.hasOwn(recipe.locked_values, field)) delete recipe.locked_values[field];
+        if (["backend", "text_mode"].includes(field)) {
+          const active = wildcardV2Active(recipe);
+          if (wasV2 !== active) {
+            state.lastDraw = null;
+            if (active && recipe.wildcard_v2_sampling_family !== recipe.wildcard_v2.family) applyWildcardV2SamplingPreset(recipe);
+            populateRecipe();
+          } else renderWildcardV2(recipe);
+        }
+        if (field === "text_seed" && wasV2) state.lastDraw = null;
         markChanged();
+      }
+      if (element.matches("[data-v2-setting]")) {
+        const key = element.dataset.v2Setting;
+        setWildcardV2Value(key, element.type === "checkbox" ? element.checked : element.value);
       }
       if (element.matches("[data-row-text]")) {
         state.project.studio.prefix_rows[Number(element.dataset.rowText)].text = element.value;
@@ -1147,12 +1455,7 @@
       if (element.id === "studioWorkflow") {
         const workflow = selectedWorkflow();
         if (workflow) {
-          recipe.bindings = structuredClone(workflow.bindings);
-          recipe.overrides = {};
-          recipe.branches = {};
-          Object.entries(workflow.source_values || {}).forEach(([name,value]) => {
-            if (recipe[name] === "" || ["width","height","steps","cfg"].includes(name)) recipe[name] = value;
-          });
+          bindStudioWorkflow(recipe, workflow);
           populateRecipe();
           markChanged();
         }
@@ -1186,9 +1489,64 @@
         localStorage.setItem("studio-caption-options-" + state.project.project_id, JSON.stringify({method:$("#studioCaptionMethod").value,model:$("#studioCaptionModel").value}));
       }
     });
+    $("#studioWildcardV2").addEventListener("focusin", event => {
+      if (event.target.matches("[data-v2-pool]")) void loadWildcardV2Pools();
+    });
+    $("#studioWildcardV2").addEventListener("focusout", event => {
+      if (event.target.matches("[data-v2-short]")) {
+        queueMicrotask(() => { if (state.project) renderWildcardV2(state.project.studio); });
+      }
+    });
+    $("#studioWildcardV2").addEventListener("paste", event => {
+      const short = event.target;
+      if (!short.matches("[data-v2-short]")) return;
+      const text = event.clipboardData?.getData("text/plain").replace(/\r\n?/g, "\n") || "";
+      if (!text.includes("\n")) return;
+      event.preventDefault();
+      const [start, end] = [short.selectionStart, short.selectionEnd];
+      const slot = short.closest("[data-v2-category]");
+      const editor = slot.querySelector("[data-v2-long]");
+      state.v2Editor = slot.dataset.v2Category;
+      renderWildcardV2(state.project.studio);
+      editor.setRangeText(text.slice(0, editor.maxLength - editor.value.length + end - start), start, end, "end");
+      setWildcardV2Value(short.dataset.v2Setting, editor.value);
+      editor.focus();
+    });
     $("#studioPage").addEventListener("click", event => {
       const button = event.target.closest("button");
       if (!button) return;
+      if (button.dataset.v2Preset) {
+        setWildcardV2Preset(button.dataset.v2Preset);
+        return;
+      }
+      if (button.dataset.v2Tag) {
+        const {v2TagGroup:key, v2Tag:tag} = button.dataset;
+        const filters = state.project.studio.wildcard_v2.tag_filters || {};
+        const selected = filters[key] || [];
+        setWildcardV2Value("tag_filters", {...filters,
+          [key]:selected.includes(tag) ? selected.filter(value => value !== tag) : [...selected, tag]});
+        return;
+      }
+      if (button.dataset.v2Mode) {
+        const slot = button.closest("[data-v2-category]");
+        const key = slot.dataset.v2Category;
+        if (button.dataset.v2Mode !== "fixed" && state.v2Editor === key) state.v2Editor = "";
+        setWildcardV2Value(`${key}_mode`, button.dataset.v2Mode);
+        if (button.dataset.v2Mode === "fixed") {
+          const input = slot.querySelector("[data-v2-short]");
+          if (!input.hidden && (key === "character" || !input.value)) input.focus();
+        } else if (button.dataset.v2Mode === "wildcard") {
+          slot.querySelector("[data-v2-pool]").focus();
+        }
+        return;
+      }
+      if (button.dataset.v2Expand) {
+        const key = button.dataset.v2Expand;
+        state.v2Editor = state.v2Editor === key ? "" : key;
+        renderWildcardV2(state.project.studio);
+        if (state.v2Editor) button.closest("[data-v2-category]").querySelector("[data-v2-long]").focus();
+        return;
+      }
       if (button.dataset.graphFilter) {
         state.graphFilter = button.dataset.graphFilter;
         renderTaggerImageList(state.images.filter(image => image.kind === "candidate" && image.review !== "excluded"), true);
@@ -1258,10 +1616,21 @@
       if (button.id === "studioPreviewBatch" || button.id === "studioDrawOnce") action(button, () => previewBatch(button.id === "studioDrawOnce" ? 1 : undefined));
       if (button.id === "studioQueueBatch") action(button, async () => {
         await saveCurrent();
-        if (!state.preview || state.preview.rows.length !== state.project.studio.count) await previewBatch();
-        const result = await api(`/projects/${state.project.project_id}/generate`, {method:"POST",body:{preview_id:state.preview.preview_id}});
+        const v2 = wildcardV2Active(state.project.studio);
+        if (!state.preview || state.preview.rows.length !== state.project.studio.count ||
+            (v2 && state.preview.preview_id === state.lastQueuedV2Preview)) await previewBatch();
+        const previewId = state.preview.preview_id;
+        const projectId = state.project.project_id;
+        const result = await api(`/projects/${projectId}/generate`, {method:"POST",body:{preview_id:previewId}});
+        if (v2) {
+          state.lastQueuedV2Preview = previewId;
+          const cacheKey = previewKey(projectId);
+          try {
+            if (JSON.parse(localStorage.getItem(cacheKey))?.value?.preview_id === previewId) localStorage.removeItem(cacheKey);
+          } catch { }
+        }
         state.generationJobIds = result.job_ids;
-        sessionStorage.setItem("studio-generation-jobs-" + state.project.project_id, JSON.stringify(result.job_ids));
+        sessionStorage.setItem("studio-generation-jobs-" + projectId, JSON.stringify(result.job_ids));
         notice(`已加入 ${result.job_ids.length} 個任務。`);
         await refreshImages();
       });
@@ -1363,13 +1732,7 @@
         const parameters = new URLSearchParams({filename:file.name,label:file.name.replace(/\.json$/i,""),target:state.project.target_profile});
         const workflow = await api(`/workflows?${parameters}`, {method:"POST",body:file});
         await bootstrap();
-        state.project.studio.workflow_id = workflow.profile_id;
-        state.project.studio.bindings = workflow.bindings;
-        state.project.studio.overrides = {};
-        state.project.studio.branches = {};
-        Object.entries(workflow.source_values || {}).forEach(([name,value]) => {
-          if (state.project.studio[name] === "" || ["width","height","steps","cfg"].includes(name)) state.project.studio[name] = value;
-        });
+        bindStudioWorkflow(state.project.studio, workflow);
         populateRecipe();
         markChanged();
         await saveCurrent();
@@ -1599,7 +1962,12 @@
     },
     setFields: fields => {
       if (!state.project) return;
-      Object.assign(state.project.studio, fields);
+      const recipe = state.project.studio;
+      const wasV2 = wildcardV2Active(recipe);
+      Object.assign(recipe, fields);
+      if (!wasV2 && wildcardV2Active(recipe) && recipe.wildcard_v2_sampling_family !== recipe.wildcard_v2.family) {
+        applyWildcardV2SamplingPreset(recipe);
+      }
       populateRecipe();
       markChanged();
     },
