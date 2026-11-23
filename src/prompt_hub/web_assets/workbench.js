@@ -128,6 +128,7 @@
         document.querySelectorAll("[data-generation-engine]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.generationEngine===state.engine)));
         $("#workbenchGenerationHost").hidden=true;
         $("#workbenchAgentHost").hidden=true;
+        $("#creationParameterShortcut").hidden=true;
         message("正在載入創作台…");
         if (state.engine==="agent") {
           window.PromptHubNavigation.commit(route,options.historyMode || "push");
@@ -150,6 +151,7 @@
           if (window.SodaStudio.current().project.studio.backend!==state.engine) window.SodaStudio.setFields({backend:state.engine});
           updateCanvas();
           $("#workbenchGenerationHost").hidden=false;
+          $("#creationParameterShortcut").hidden=state.engine!=="novelai";
           window.dispatchEvent(new Event("soda-studio-populated"));
         }
         $("#workbenchStatus").hidden=true;

@@ -1,0 +1,801 @@
+{
+  "format": "soda-windows-desktop-source-v1",
+  "version": "1.2.0",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "7e32e488caea9c84f7358bc0529e3d28acc427123041b342f61b1e2cf178c26e",
+      "bytes": 1066
+    },
+    {
+      "path": "README.md",
+      "sha256": "04467fa4fe25a053cc920369e57a66cd946e16c539498142662135a37ac49238",
+      "bytes": 9260
+    },
+    {
+      "path": "RELEASE.json",
+      "sha256": "d607dc4fd55afc658986522ea4f28fe5ed93ee01e07532ea28d881245ec285f4",
+      "bytes": 202
+    },
+    {
+      "path": "deploy/desktop-ui/BRIDGE_CONTRACT.md",
+      "sha256": "b86a1d28dc3423935064a15932dd6f3c47857e08ce297a586ef56ebfb43fa6e8",
+      "bytes": 6145
+    },
+    {
+      "path": "deploy/desktop-ui/app-icon-source.png",
+      "sha256": "99812ffa7650e4f68b4fa86ad46770892fd12fffe663a17d9b242a9f177d490f",
+      "bytes": 807733
+    },
+    {
+      "path": "deploy/desktop-ui/app-icon.icns",
+      "sha256": "f46ea10169e4c152389e3ba78ccc37f4e5dd92e575216fb90e11012a5257a3fc",
+      "bytes": 1033719
+    },
+    {
+      "path": "deploy/desktop-ui/app-icon.ico",
+      "sha256": "1ab043236aa96bddda72bcd058f71b7459f2d51c548a2fa48c4231493206e13d",
+      "bytes": 81003
+    },
+    {
+      "path": "deploy/desktop-ui/app-icon.png",
+      "sha256": "feba3d6573fcf59d935624626d9f78e37daccc91549a0618a372eb196ecca4f4",
+      "bytes": 590328
+    },
+    {
+      "path": "deploy/desktop-ui/desktop.css",
+      "sha256": "0035fb921d7fb1ace9528fe534c582212fd2ff638d3375ec7c5c327bdfe13e1c",
+      "bytes": 21122
+    },
+    {
+      "path": "deploy/desktop-ui/desktop.js",
+      "sha256": "1afc5d8ca1f8ac98c882e3dd9d64491abb6246fd2df202d2071438278babd1f7",
+      "bytes": 33021
+    },
+    {
+      "path": "deploy/desktop-ui/index.html",
+      "sha256": "2c5f7ca66fb0b786f1b62ea46e75fc1f0bfc2998bf01d452276ab8a567f91588",
+      "bytes": 13405
+    },
+    {
+      "path": "deploy/windows-desktop/README.md",
+      "sha256": "a340d541a493e982e03b2c1b49bd2c73d4a4cefbb9bcfd7f8ad0530ed596904b",
+      "bytes": 2300
+    },
+    {
+      "path": "deploy/windows-desktop/SodaPromptHub/DesktopHost.cs",
+      "sha256": "239a25fd7d0dfbcd9eb627e2fc8d0f802bbc937a5b134b17b1e1f3c733d78a92",
+      "bytes": 30461
+    },
+    {
+      "path": "deploy/windows-desktop/SodaPromptHub/GitRuntime.cs",
+      "sha256": "fbd7e397a5bef7227fe9a0aed5079bf5337a7059bf824104873cda8de5204290",
+      "bytes": 1858
+    },
+    {
+      "path": "deploy/windows-desktop/SodaPromptHub/Program.cs",
+      "sha256": "77c309e3efc95f8022970bb9013ed9fe710a1bc7da86ba098c9f80b130c70f45",
+      "bytes": 1158
+    },
+    {
+      "path": "deploy/windows-desktop/SodaPromptHub/ShellForm.cs",
+      "sha256": "70c0b1506bccc9849dc09399757239d4db474f23097c34cd124e00074efdb918",
+      "bytes": 18351
+    },
+    {
+      "path": "deploy/windows-desktop/SodaPromptHub/SodaPromptHub.csproj",
+      "sha256": "efb8646a6e1ebe70892c13e46fa70242add49ffba40aab776a1525dc8e41d4e0",
+      "bytes": 3231
+    },
+    {
+      "path": "deploy/windows-desktop/SodaPromptHub/app.manifest",
+      "sha256": "39c27b022609efe4e02abbb23b134e3644f334122fdf7d0265f530d86e3885af",
+      "bytes": 615
+    },
+    {
+      "path": "deploy/windows-desktop/build.ps1",
+      "sha256": "861e08f7a25f8d659e5e84ff5d963a2e1687eb1798976846e3aa4ab62b44d9b1",
+      "bytes": 2737
+    },
+    {
+      "path": "deploy/windows-desktop/校验桌面包.ps1",
+      "sha256": "23da6e0cb92b6eb458827ebdab4dcfaef81500f143f0e6db835817c75f2c6dde",
+      "bytes": 1366
+    },
+    {
+      "path": "deploy/windows-installer/README.md",
+      "sha256": "3e4ae1420f9bb858e5d6226c9fde51c66e902302d5595187ab9a3f32a7e6b070",
+      "bytes": 4430
+    },
+    {
+      "path": "deploy/windows-installer/build.ps1",
+      "sha256": "f1a9ad2c31828ee23cbdb39115211a65cc342b910f5ea4215175df279b8c26f9",
+      "bytes": 8330
+    },
+    {
+      "path": "deploy/windows-installer/desktop.iss",
+      "sha256": "70211c008e45ae1c4adaf7ab0f78156fe60836b672313d3c0f1cf01e71abc394",
+      "bytes": 2384
+    },
+    {
+      "path": "deploy/windows-installer/prepare-git.ps1",
+      "sha256": "5ad58fca325cead057e1c6604695fae7c2af5712ad162e16f7b5de8d3ecf5fb1",
+      "bytes": 2935
+    },
+    {
+      "path": "deploy/windows-installer/prepare-runtime.ps1",
+      "sha256": "174d0119436ec210226e7477472a4347910d49158fed69e114d9351e8014b629",
+      "bytes": 9192
+    },
+    {
+      "path": "deploy/windows-installer/test-lifecycle.ps1",
+      "sha256": "27e947c351988385e55850b26b22453a0881d3d40a9ea0d528ff75170b6932ad",
+      "bytes": 10186
+    },
+    {
+      "path": "deploy/windows-installer/worker.iss",
+      "sha256": "020339eda447cee9141919a0e30da8d649016ca5a1c7149e7ae735ce26c08cb5",
+      "bytes": 2110
+    },
+    {
+      "path": "deploy/windows-shell/README.md",
+      "sha256": "2739b3445f7175035eff7f28431f424bf2f07859a90ffa0f1f3674b04bd4e958",
+      "bytes": 2221
+    },
+    {
+      "path": "deploy/windows-shell/SodaComputeWorker/BrandIcon.cs",
+      "sha256": "6d0559567bc88bfab1e65028b89b10edd8b8da2cea93a72c0b81b362f5410ae0",
+      "bytes": 402
+    },
+    {
+      "path": "deploy/windows-shell/SodaComputeWorker/DiagnosticBundle.cs",
+      "sha256": "85dd0acc46c5bdba760a5c20112dd413e00caefff461b4b6b324cf0f6f1205b9",
+      "bytes": 7379
+    },
+    {
+      "path": "deploy/windows-shell/SodaComputeWorker/Program.cs",
+      "sha256": "c1b296a246595d6553a476443df6e62e0f1a865f0a20fad240d9ea6a6289ca26",
+      "bytes": 1170
+    },
+    {
+      "path": "deploy/windows-shell/SodaComputeWorker/ShellForm.cs",
+      "sha256": "b89e800be83ca1091d2e677597f48481041f92900ab9970513d2c04164b4041f",
+      "bytes": 18155
+    },
+    {
+      "path": "deploy/windows-shell/SodaComputeWorker/SodaComputeWorker.csproj",
+      "sha256": "c4338152f890390bc819bce2ae8414dfcfd1e3df40e99742a45a3cd76e14dd7b",
+      "bytes": 2173
+    },
+    {
+      "path": "deploy/windows-shell/SodaComputeWorker/WorkerHost.cs",
+      "sha256": "7d68ed4af74acc446b4a25c94834a9ff7f99e3ec3445246fd0bc428d6cf493db",
+      "bytes": 40882
+    },
+    {
+      "path": "deploy/windows-shell/SodaComputeWorker/app.manifest",
+      "sha256": "a82a1dda8bbaf51d03f91a4d941d8b16b49f99533e893bafd913635877116fe4",
+      "bytes": 621
+    },
+    {
+      "path": "deploy/windows-shell/build.ps1",
+      "sha256": "ca74984b36847c67d17b9706bdb98169fad0e44c2a84d80716bdabc30c1e1d20",
+      "bytes": 2594
+    },
+    {
+      "path": "deploy/windows-shell/install-to-worker.ps1",
+      "sha256": "57beba1a57636f1f6b743d878dd4ffc0dc579366fa6749d2de649c9d66d8988b",
+      "bytes": 1862
+    },
+    {
+      "path": "deploy/windows-shell/校验桌面包.ps1",
+      "sha256": "6c81b570298a772d6b176773dff7181652527dc51f87e1a3e24a284fee383939",
+      "bytes": 1359
+    },
+    {
+      "path": "deploy/windows-worker/0-首次配置.bat",
+      "sha256": "3ab0f042790b7b5e9535e87d0b172bd6ac55c1beba37e509249985131b16cf72",
+      "bytes": 787
+    },
+    {
+      "path": "deploy/windows-worker/1-先自检.bat",
+      "sha256": "84e46bc863eff44bf0cffbf61baf10b854ddec71eb7f1a4f46e4688ae13f1eb4",
+      "bytes": 1107
+    },
+    {
+      "path": "deploy/windows-worker/2-启动Worker.bat",
+      "sha256": "9ef3965b1a9f3ac6a51acbd42c727b5552f3fa019acffb186486bf96fa1c4d4f",
+      "bytes": 686
+    },
+    {
+      "path": "deploy/windows-worker/3-检查LoRAManager.ps1",
+      "sha256": "dfc066ed2cb11f55cb345d6695297e94a199a55f1f1c4b535aeb97f219b8d133",
+      "bytes": 5024
+    },
+    {
+      "path": "deploy/windows-worker/README-WINDOWS.md",
+      "sha256": "c462bf938bbc594e76deac73508d8d6d0f16fc7d21af00e295cc633e75d7cbc3",
+      "bytes": 9741
+    },
+    {
+      "path": "deploy/windows-worker/RELEASE.json",
+      "sha256": "9e57b51d808545622eeebf462175f5c59b5e4d5fda85706024d045bca5c4a749",
+      "bytes": 157
+    },
+    {
+      "path": "deploy/windows-worker/examples/comfyui-smoke-empty-image-v1.json",
+      "sha256": "d6f17e49d31e2e4de887123c9cbfab9ba648f99f5366f0c04b94033d262d4155",
+      "bytes": 619
+    },
+    {
+      "path": "deploy/windows-worker/prompt_hub_worker.py",
+      "sha256": "1ce8c3511861ddd1f94e121f05e638ed21c0836099e547e208f5512d01938e42",
+      "bytes": 64610
+    },
+    {
+      "path": "deploy/windows-worker/worker-config.example.json",
+      "sha256": "6059fae60501d44d63ca5d0e2f92764bf2ebb977ea98aae6b9a9cffbda216e9b",
+      "bytes": 1232
+    },
+    {
+      "path": "deploy/windows-worker/校验发行包.ps1",
+      "sha256": "ba6a8abce511f753d3bf96d5079a9aaf46522b5a0900c076ad1d42ed1ffff61d",
+      "bytes": 1348
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "c0674e1446dd8216feeaaf09a1d6a1b92bd164656a9030f8deb021f1238ef862",
+      "bytes": 8158
+    },
+    {
+      "path": "scripts/package_windows_desktop_release.py",
+      "sha256": "f3a648faf646d2396a9c337abd7b51eb48379a595de9b538faadd1cd3a88cd48",
+      "bytes": 6810
+    },
+    {
+      "path": "scripts/stage_windows_desktop_source.py",
+      "sha256": "2856fdc9afc13fe854eb0a390bedc4896d8d877b01f1f1b1d158d5cbd32020f7",
+      "bytes": 4294
+    },
+    {
+      "path": "src/prompt_hub/__init__.py",
+      "sha256": "3bc7ea39750c280106fd170e5930a7856a234f982820de8339229924c1bfd61f",
+      "bytes": 274
+    },
+    {
+      "path": "src/prompt_hub/__main__.py",
+      "sha256": "61c0ca70392fa2426072ddf59058151f1105aab0540e252857d2f462b3901d63",
+      "bytes": 71
+    },
+    {
+      "path": "src/prompt_hub/api.py",
+      "sha256": "72bab268f3923086651ce27ba1b1501b4714b9662639cff8936832e27b1a578c",
+      "bytes": 41689
+    },
+    {
+      "path": "src/prompt_hub/background_jobs.py",
+      "sha256": "91c1507d5bd6cf6639807d0b0cd250cd61e08883d2b0cab00d45b4617da7396a",
+      "bytes": 16231
+    },
+    {
+      "path": "src/prompt_hub/cli.py",
+      "sha256": "42d8fe8228979f520da48d2a50931a6a676a6ec5723e451ece9b22e247ba0e7b",
+      "bytes": 5606
+    },
+    {
+      "path": "src/prompt_hub/comfy_results.py",
+      "sha256": "d23127c20be3bb06944f93086ee4169b8b2ce5efbb2b22305081f3b7afb4167b",
+      "bytes": 30255
+    },
+    {
+      "path": "src/prompt_hub/comfy_routes.py",
+      "sha256": "6b39ff7ff1090c7d78749835b644e48085f840d69d723fd5d0af2ca8baf3840b",
+      "bytes": 10733
+    },
+    {
+      "path": "src/prompt_hub/comfy_web.py",
+      "sha256": "053e273620a19d5e77372f3bc68755d9a32d0f198288ece5015685aa9c9d2989",
+      "bytes": 23552
+    },
+    {
+      "path": "src/prompt_hub/compute_bridge.py",
+      "sha256": "70e7c54b20d82faadfc743e2f7d0bcba7e595768901c3c75e1c95793e67bcb43",
+      "bytes": 7187
+    },
+    {
+      "path": "src/prompt_hub/config.py",
+      "sha256": "30b0f1de1a2a4039d52ce38b65e3d05ce5b1e7887b7eddda29966781fbf84db2",
+      "bytes": 6519
+    },
+    {
+      "path": "src/prompt_hub/creative.py",
+      "sha256": "e3be7804451f8e5d890a4b972c2183c927991670f60bcd73eb0f57d13c962c75",
+      "bytes": 30279
+    },
+    {
+      "path": "src/prompt_hub/creative_web.py",
+      "sha256": "bdbbd3c505da697f1b5aa6a7197af3162aa9f10226429b7461a7f52dac0119cb",
+      "bytes": 367
+    },
+    {
+      "path": "src/prompt_hub/creative_web_layout.py",
+      "sha256": "bfd2bf5c39d2bd6064f38eee7ca394ffc91fb22f04a9225b3389f2002bda10bd",
+      "bytes": 24097
+    },
+    {
+      "path": "src/prompt_hub/database.py",
+      "sha256": "45e0ae895907b35207cef2d222abe10a5747b23865437540c78e6569169c34e5",
+      "bytes": 24332
+    },
+    {
+      "path": "src/prompt_hub/database_oc.py",
+      "sha256": "f318fadd7f477b0b2277391d55dd9fdd24d25c7b894fcb497aa9fe3c7cceec0d",
+      "bytes": 16773
+    },
+    {
+      "path": "src/prompt_hub/database_support.py",
+      "sha256": "6bd6dad40256b6d474f86a0fb807415b6331988e4588e6f1e4bbc29c5c2ad6d5",
+      "bytes": 10665
+    },
+    {
+      "path": "src/prompt_hub/dataset_curation.py",
+      "sha256": "0c5c4b7c09472540988a86a9e04c9ebda00e9ee0735b7ed20df25d0a2b104cf4",
+      "bytes": 25340
+    },
+    {
+      "path": "src/prompt_hub/dataset_curation_export.py",
+      "sha256": "a3c7d622151d4fdde8d3a7de9112c0b6b6862b2b552fc6f879118d6087c31afc",
+      "bytes": 22500
+    },
+    {
+      "path": "src/prompt_hub/dataset_curation_jobs.py",
+      "sha256": "81e49c4c7e2fd44de54a253dd2407e61e62b95250b1333f6be50bbd34387a172",
+      "bytes": 35877
+    },
+    {
+      "path": "src/prompt_hub/dataset_curation_records.py",
+      "sha256": "9e50b8aacf5b1145db0811a4ec717dd5a26cf8443c612bb78ad0c5a92a933366",
+      "bytes": 4238
+    },
+    {
+      "path": "src/prompt_hub/dataset_curation_support.py",
+      "sha256": "57d4037a77d9bfab249bb919cba310d4159f1a2d5e3738865a9cea8f60ba34ea",
+      "bytes": 18458
+    },
+    {
+      "path": "src/prompt_hub/dataset_export.py",
+      "sha256": "219810327b0790fb981a5dd3c15e0231b0363e9cfbe7670a4e29f32939023963",
+      "bytes": 8847
+    },
+    {
+      "path": "src/prompt_hub/dataset_routes.py",
+      "sha256": "e4531ae7a3afb93d3e3633def8e9feb3f6c2444077ee1c3ac12ef9fe957deda2",
+      "bytes": 10369
+    },
+    {
+      "path": "src/prompt_hub/dataset_tagging.py",
+      "sha256": "72a77f43d08483d43278979f8db1b6e5a8f01ab1e80e4a5e25d8c44ea6cbee0b",
+      "bytes": 4977
+    },
+    {
+      "path": "src/prompt_hub/dataset_workspace.py",
+      "sha256": "7b1e4b02641f4dd47be3534565328ef54c6d10f1bb8a6e9ae411f5bbf75dd339",
+      "bytes": 43345
+    },
+    {
+      "path": "src/prompt_hub/desktop_connection.py",
+      "sha256": "67d9d16d756336b1022040ef52dd27dc2ee90849d8561a81940d0310c900eef6",
+      "bytes": 7283
+    },
+    {
+      "path": "src/prompt_hub/embedding_index.py",
+      "sha256": "0afaf1c0ec67928a49fb8437f71b48f3691d7f487893d07f14e57f3fde655018",
+      "bytes": 18208
+    },
+    {
+      "path": "src/prompt_hub/embedding_routes.py",
+      "sha256": "b654fefdb6e041067a83c7f8c97151f91acb07976547c16bb8fa1735e2a06447",
+      "bytes": 4112
+    },
+    {
+      "path": "src/prompt_hub/gallery.py",
+      "sha256": "2ad9bbdcfa697c10e2d776adb2b02521862b6356d353b1bd806e69eea8a420eb",
+      "bytes": 39091
+    },
+    {
+      "path": "src/prompt_hub/gallery_routes.py",
+      "sha256": "4e80881f2d71f4ef3381216c3fd951697d8088c800e0100d210a2d3e03469d0c",
+      "bytes": 10612
+    },
+    {
+      "path": "src/prompt_hub/gallery_web.py",
+      "sha256": "666cd65c3620bce68b7f294e9c84813e2c636ee345451340ab386ada9f534498",
+      "bytes": 8566
+    },
+    {
+      "path": "src/prompt_hub/generation_evidence.py",
+      "sha256": "91b380f8c53c7f3c7624cca4edd81ac2cfb8b3d11d22aec88e95dda1cc4743a4",
+      "bytes": 65620
+    },
+    {
+      "path": "src/prompt_hub/hybrid_search.py",
+      "sha256": "13fabebb2317215a22d02901ae49e64262b85347bb0a3b5bcc953e82dfbec686",
+      "bytes": 8128
+    },
+    {
+      "path": "src/prompt_hub/importers.py",
+      "sha256": "dc469f732d5fd12f26f46b67141218b0ab5113211318acd8b898ebb578c91042",
+      "bytes": 31904
+    },
+    {
+      "path": "src/prompt_hub/local_model.py",
+      "sha256": "84d9313191cd2d07d4e57dacb18b6e943cbb1c1f20cef9be770ae126dbcb4bb1",
+      "bytes": 40453
+    },
+    {
+      "path": "src/prompt_hub/local_sources.py",
+      "sha256": "bb9aa504712f4c3812f94971728c4d1d22879925ba7dc1bfbc6523073d5d05c7",
+      "bytes": 3781
+    },
+    {
+      "path": "src/prompt_hub/local_visual.py",
+      "sha256": "c7cecd1dc81e28a67cdf2f9f897c9da2f55c2fc3bc15814948e6f0d4353e7935",
+      "bytes": 21786
+    },
+    {
+      "path": "src/prompt_hub/lora_freeze.py",
+      "sha256": "2183acffa0bab2832037769b8dc2009ffac4fe359c76332c89e3f636eac0eb45",
+      "bytes": 7602
+    },
+    {
+      "path": "src/prompt_hub/lora_projects.py",
+      "sha256": "1d8a369e07f40acdeb36bf0dbd6ae8369d197822fc77b1474aa076b5c6701323",
+      "bytes": 32767
+    },
+    {
+      "path": "src/prompt_hub/lora_routes.py",
+      "sha256": "0159a40678814becb4206cd7715da6b7bae819a53128782e25563319abf99568",
+      "bytes": 14073
+    },
+    {
+      "path": "src/prompt_hub/lora_web.py",
+      "sha256": "f517f687beae47fe862bd07f6b4442baabeb0a0440dd68d152ad70a1ff186d76",
+      "bytes": 41957
+    },
+    {
+      "path": "src/prompt_hub/maintenance.py",
+      "sha256": "db941ee73a8adcaca5d62620a6580cc9588a965e89f803d49371222e604903c3",
+      "bytes": 17857
+    },
+    {
+      "path": "src/prompt_hub/maintenance_routes.py",
+      "sha256": "14be9388c0035c4333b6eccafd41a338c24dd4dd08bd67af2e4b8945d8bea321",
+      "bytes": 2145
+    },
+    {
+      "path": "src/prompt_hub/mcp_server.py",
+      "sha256": "93f3ed6fc1a90d7dbf2b11b19e3863493f754cdce0119dfe89d9aae71fdc7cbf",
+      "bytes": 4471
+    },
+    {
+      "path": "src/prompt_hub/media.py",
+      "sha256": "da0c3a6386dab621c33d4c3063531513ee01cbf2a6010ea8fb8b492d5f888b1c",
+      "bytes": 6059
+    },
+    {
+      "path": "src/prompt_hub/model_connections.py",
+      "sha256": "c7d657e7aa811396941e4120ba65f9052b93bbd1eada552f4dd8fb1ce0186151",
+      "bytes": 26422
+    },
+    {
+      "path": "src/prompt_hub/model_routes.py",
+      "sha256": "1105329d9dfc9af3a8528e5da56f17a49fc666b67da36bc933b8972e6aff3538",
+      "bytes": 6091
+    },
+    {
+      "path": "src/prompt_hub/oc_manager.py",
+      "sha256": "57910d5db8121a734765695802e2180ec72dcb82be3c94faa42119dea87984c4",
+      "bytes": 14646
+    },
+    {
+      "path": "src/prompt_hub/optional_model_download.py",
+      "sha256": "bb45fbd0e657285b4bd0d6b809008dbb753e51649e972d0753bae3f4fde406a8",
+      "bytes": 4423
+    },
+    {
+      "path": "src/prompt_hub/optional_model_routes.py",
+      "sha256": "a552048d14f251d17a360a08fd162d2ae5b9c38cd5fdff972bf88150b864b5b8",
+      "bytes": 1144
+    },
+    {
+      "path": "src/prompt_hub/optional_models.py",
+      "sha256": "25be961ed36134e5c4f1188d5954fde0e2e4780f0dfe316b53a109bd102707f8",
+      "bytes": 11475
+    },
+    {
+      "path": "src/prompt_hub/optional_models_web.py",
+      "sha256": "daa419418ede8973a340b6649606f61ca977f7a4e787f885be69affb3afe746f",
+      "bytes": 2054
+    },
+    {
+      "path": "src/prompt_hub/pairing_web.py",
+      "sha256": "59e5ac6910912ef0d7147756f087937c83c65fc826e13c305a26c11b3c60ef1f",
+      "bytes": 13400
+    },
+    {
+      "path": "src/prompt_hub/project_journey.py",
+      "sha256": "deaaaae893ec2997fb1ff5ee6a9c9fda4394300fc4486e9b4fdbb9ec1accad10",
+      "bytes": 22428
+    },
+    {
+      "path": "src/prompt_hub/release_info.py",
+      "sha256": "5770c7c69cf0b521541c2da0df40d356f405c23e2eae417d2ab51512c3907a75",
+      "bytes": 5547
+    },
+    {
+      "path": "src/prompt_hub/remote_catalogs.py",
+      "sha256": "0d11be1f4b79b67a9593e0bcfbca37bc662d657710d86769126ddb8923f3416c",
+      "bytes": 31652
+    },
+    {
+      "path": "src/prompt_hub/remote_nodes.py",
+      "sha256": "2596527debd6d717b03834a3b301d0df4dd7a93a92972982577893b13b5d2b3e",
+      "bytes": 21789
+    },
+    {
+      "path": "src/prompt_hub/remote_nodes_support.py",
+      "sha256": "32cd84d914896e9b699845be420952b129d671480d43e33c927a440c3261a86c",
+      "bytes": 18775
+    },
+    {
+      "path": "src/prompt_hub/remote_routes.py",
+      "sha256": "32314ddabcca2977f7bb3421925310da31b1908c324c5d14c2921f004ecab592",
+      "bytes": 14160
+    },
+    {
+      "path": "src/prompt_hub/remote_web.py",
+      "sha256": "040ef4670299a362dcf7a0a0de5d68e94e49e2bf834689c9531d4dd02cceba47",
+      "bytes": 116137
+    },
+    {
+      "path": "src/prompt_hub/result_assets.py",
+      "sha256": "6d4cec8ccdbb2543b06701f3601bcbf0a41aa051e5c97757c30b1f104e305fc5",
+      "bytes": 1511
+    },
+    {
+      "path": "src/prompt_hub/result_media.py",
+      "sha256": "72c8c753e269e6f79e403077dce2684fb10fdf87ad02caba42b7f4f883353c32",
+      "bytes": 3720
+    },
+    {
+      "path": "src/prompt_hub/saved_lora_metadata.py",
+      "sha256": "7cb73f0f7f98d6e2d6a2d010813c504bb9f4cea5c195788eef73a19b53ff225c",
+      "bytes": 11528
+    },
+    {
+      "path": "src/prompt_hub/scene_planning.py",
+      "sha256": "3283061f929ce42eb695bd751abe60591d85113b1e9b49d77eac5fcb3d76c1e9",
+      "bytes": 38580
+    },
+    {
+      "path": "src/prompt_hub/scene_routes.py",
+      "sha256": "7782b30ecf7ed2dca985b8fba8757f32def13b0a4f40f99b64acc7b1fc12c598",
+      "bytes": 16322
+    },
+    {
+      "path": "src/prompt_hub/schema_migrations.py",
+      "sha256": "baba09f46c54dcd24a964e45b7e3673cb8e25de99acafbd0c68908a72782fb0e",
+      "bytes": 2034
+    },
+    {
+      "path": "src/prompt_hub/search_routes.py",
+      "sha256": "716cfd79118ccbeea5cfe5ad098390102a9f7746702801f2c8f398ad0540d78e",
+      "bytes": 2468
+    },
+    {
+      "path": "src/prompt_hub/search_web.py",
+      "sha256": "7e248504acb6f5b3e217275d3fe6a3ad0e94247714565f9521c5b65b9993c982",
+      "bytes": 36991
+    },
+    {
+      "path": "src/prompt_hub/source_center_web.py",
+      "sha256": "2ef879d1e12a93d04a8151a76e5f1de94f6f045d67007cba0e63b2a305af6e2a",
+      "bytes": 22991
+    },
+    {
+      "path": "src/prompt_hub/source_routes.py",
+      "sha256": "fd06dc3cff85830f43b600871bc3c8172763990a73c384e56f9576a9abf4b2e3",
+      "bytes": 6323
+    },
+    {
+      "path": "src/prompt_hub/source_sync.py",
+      "sha256": "dfee2de62acdd145a224a26963c50d454149d14d7acdee74727f68f94310ee72",
+      "bytes": 14168
+    },
+    {
+      "path": "src/prompt_hub/sourcing.py",
+      "sha256": "a669bc1450e4b5628d5b21ed7de8975660ab8e4c9f834419706fc6bd01ed92e7",
+      "bytes": 12586
+    },
+    {
+      "path": "src/prompt_hub/style_explorers.py",
+      "sha256": "8d0a23847906990322b90231e4e6b5018b547b711de4b7d126a019beb9caeca6",
+      "bytes": 9212
+    },
+    {
+      "path": "src/prompt_hub/tag_completion_routes.py",
+      "sha256": "57130a57ce153d2a1b6b736b1a57694de63fa9b7e85fd3a7e23582a2f08c4233",
+      "bytes": 1085
+    },
+    {
+      "path": "src/prompt_hub/tag_completions.py",
+      "sha256": "11b7e389bce5a5e3cf363552c4fa3bb5743b0bb5e7d7eb7f8b6bc69bd12a20fa",
+      "bytes": 19591
+    },
+    {
+      "path": "src/prompt_hub/tag_locale.py",
+      "sha256": "414c7458ec874cd289c924ff10e70e24037e06fdc595de3798123332b8bbac90",
+      "bytes": 15730
+    },
+    {
+      "path": "src/prompt_hub/usage_modes.py",
+      "sha256": "eca587eafe2978d16407458b55d380ed695110b4e0af3b475d74dafa672e2307",
+      "bytes": 1537
+    },
+    {
+      "path": "src/prompt_hub/visual_assets.py",
+      "sha256": "77f97e9e01e85f1576e2e258b6c21a3d1240aa10d19d4b7ecc3586957dbf1b05",
+      "bytes": 19539
+    },
+    {
+      "path": "src/prompt_hub/visual_model.py",
+      "sha256": "a32ffeb490faee31bb6768fba108ee90aa954a2794e2c1433cc2de2b4e7d8358",
+      "bytes": 11977
+    },
+    {
+      "path": "src/prompt_hub/visual_routes.py",
+      "sha256": "7e256de31d5d22e1016a9ac4978cac815e9cd34d08d4804534fc846f25c41965",
+      "bytes": 11121
+    },
+    {
+      "path": "src/prompt_hub/wd14.py",
+      "sha256": "e5c0904d2e4e89b8e36d66a680807f3baeff5fc57144a77b35fe197c45ce0af5",
+      "bytes": 6276
+    },
+    {
+      "path": "src/prompt_hub/web.py",
+      "sha256": "372574dff8d3a4442575b5290d5df5e0359813f1121b8839e0d1a5e455a212f1",
+      "bytes": 3683
+    },
+    {
+      "path": "src/prompt_hub/web_assets/base.css",
+      "sha256": "3beed138d1af17be4fd1c57d22c463c4e14004af5692b0b0eb5bf249c1e44512",
+      "bytes": 40635
+    },
+    {
+      "path": "src/prompt_hub/web_assets/base.js",
+      "sha256": "ab90f9bcc6d2e47f28d9d6d3fa9570db73a8dd20b411c9dc2aa720f3938ce4f6",
+      "bytes": 63358
+    },
+    {
+      "path": "src/prompt_hub/web_assets/creative.css",
+      "sha256": "dd2a3899dcb8385331f3fbee55c3c5ca196c650a2062c4d12da511e82591a12a",
+      "bytes": 54416
+    },
+    {
+      "path": "src/prompt_hub/web_assets/creative.js",
+      "sha256": "fd839b36764e50e89e4484ecdec860779db49c26bdfabfa567bdeb43f8cb10ff",
+      "bytes": 132374
+    },
+    {
+      "path": "src/prompt_hub/web_assets/gallery.css",
+      "sha256": "6d33349f582a8b554e9e49a9a5fc3c7727db278352de10f6b3d8b930ffb9e73a",
+      "bytes": 12686
+    },
+    {
+      "path": "src/prompt_hub/web_assets/gallery.js",
+      "sha256": "fd6e95af3148aba6327e675e3f4baae5943dc1a5a8d129fa713fa821bfada7eb",
+      "bytes": 34460
+    },
+    {
+      "path": "src/prompt_hub/web_assets/i18n.js",
+      "sha256": "89b249351a71bd1c857adea80389d1ff1b6230f41a40bc06aaf76e8cad05aeb4",
+      "bytes": 147650
+    },
+    {
+      "path": "src/prompt_hub/web_assets/index.html",
+      "sha256": "a44f984e6abefc417659b67a86306a89911c970d0a0730ab8ba77a6eeb440ae1",
+      "bytes": 17643
+    },
+    {
+      "path": "src/prompt_hub/web_assets/optional_models.css",
+      "sha256": "458ddb2d9fd2482dc3d4bb98bb528f88f2a592505e4ebe590062b3b4f41a4d6d",
+      "bytes": 6259
+    },
+    {
+      "path": "src/prompt_hub/web_assets/optional_models.js",
+      "sha256": "8a15a03c1be74646c8f8b94befad1764610c31bcd1426eb49a34276976ede157",
+      "bytes": 8444
+    },
+    {
+      "path": "src/prompt_hub/web_capture.py",
+      "sha256": "c81efdec47ec093a5d4592d6b46b824d18aa19f332667a9446c17247c222e70c",
+      "bytes": 20942
+    },
+    {
+      "path": "src/prompt_hub/web_resources.py",
+      "sha256": "97d8cd16dc6775f37a25f5ae0d9fa4a4ae78ebd35e0667f8833a9f8a0a37930d",
+      "bytes": 202
+    },
+    {
+      "path": "src/prompt_hub/windows_worker.py",
+      "sha256": "f3a688619fae86edc7125c621bef6c051f58ed93cc842421269f0442058f00b9",
+      "bytes": 3330
+    },
+    {
+      "path": "src/prompt_hub/windows_worker_core.py",
+      "sha256": "348e4b6ebd3a61f19302c3079c860944146e9447725b92e8ca632232b94849ad",
+      "bytes": 29842
+    },
+    {
+      "path": "src/prompt_hub/windows_worker_support.py",
+      "sha256": "9ee329efb75763db0d7e045f34a8112e1d2af936b144298d0ccf4b5654a88418",
+      "bytes": 33052
+    },
+    {
+      "path": "src/prompt_hub/workflow_profiles.py",
+      "sha256": "8219b53b1657f22d3bf79bb4581080879a9488bed0ca04b3d1bb9158a20d0ccc",
+      "bytes": 23446
+    },
+    {
+      "path": "src/prompt_hub/workflow_routes.py",
+      "sha256": "8774b3fa77cb1339263c2f3a1c16069e1e49012b5eff203c06c97d18f77bc588",
+      "bytes": 15813
+    },
+    {
+      "path": "src/prompt_hub/workspace_routes.py",
+      "sha256": "b0858c90eda6b9cfe739d5d5299d194bf64805cb42417c7915d933c47b2455d0",
+      "bytes": 31996
+    },
+    {
+      "path": "src/prompt_hub/workspace_web.py",
+      "sha256": "4c0b75359f7e43c90c6952167822da1c5da7bba3be5df156d9c14e56f40cbfe6",
+      "bytes": 142540
+    },
+    {
+      "path": "tests/desktop-host-regression/DesktopHostRegression.csproj",
+      "sha256": "423071130dc3843943f0c4fcd5ac4bb3e7864cdd523971dd7a647e120ad26605",
+      "bytes": 728
+    },
+    {
+      "path": "tests/desktop-host-regression/Program.cs",
+      "sha256": "322befa0ed135ea6d0841f0d7e1b0436aadc8070fc41f97aec9dbaa4ca3c7771",
+      "bytes": 2941
+    },
+    {
+      "path": "tests/desktop-host-regression/README.md",
+      "sha256": "5370d95d31dd1545a2267846456083cf548e49ca307507a1f5be486e80784eac",
+      "bytes": 796
+    },
+    {
+      "path": "tests/git-runtime-regression/GitRuntimeRegression.csproj",
+      "sha256": "3a62d19e0d8f4202c08dd1282c375500645d13ff264ac8cc174af82e3e1dc6b4",
+      "bytes": 360
+    },
+    {
+      "path": "tests/git-runtime-regression/Program.cs",
+      "sha256": "5cccf7f07727d1ee8b8c2ed7992fbcabae96a52f6440904eac3a7cb44dd01d05",
+      "bytes": 2497
+    },
+    {
+      "path": "tests/installer-payload-regression/run.ps1",
+      "sha256": "8cf3df987b986478abf865303ee3b39f1b263cf1fab5036a503f351334333101",
+      "bytes": 5038
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "43e6567a97458993fa55e871993874963f37672d19178154854c98bacd687816",
+      "bytes": 213085
+    }
+  ]
+}

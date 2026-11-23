@@ -1,5 +1,10 @@
 <template id="creationCanvasTemplate">
-  <header class="creation-panel-header"><h2><span data-canvas-icon="brush"></span>畫布</h2><button type="button" id="creationCollapse" aria-label="收起畫布面板" aria-expanded="true"><span data-canvas-icon="chevron-left"></span></button></header>
+  <header class="creation-panel-header">
+    <h2><span data-canvas-icon="brush"></span>畫布</h2>
+    <button type="button" id="creationCollapse" aria-label="收起畫布面板" title="收起畫布面板" aria-controls="creationScroll creationFooter" aria-expanded="true">
+      <span data-canvas-icon="chevron-left"></span><span class="creation-collapse-label">畫布</span>
+    </button>
+  </header>
   <div class="creation-scroll" id="creationScroll">
     <section class="creation-size-section">
       <h3>圖像尺寸</h3>
@@ -23,7 +28,7 @@
     <details class="creation-section" id="creationComfy" data-comfy-only><summary><span data-canvas-icon="workflow"></span><span>工作流與參考</span><span class="creation-chevron" data-canvas-icon="chevron-down"></span></summary><div class="creation-section-content" id="creationComfyContent"></div></details>
     <div id="creationLegacyControls" hidden></div>
   </div>
-  <footer class="creation-footer">
+  <footer class="creation-footer" id="creationFooter">
     <details class="creation-parameters" id="creationParameters"><summary><span>參數</span><span id="creationModelLabel"></span><span data-canvas-icon="chevron-up"></span></summary><div class="creation-parameter-content"><div id="creationConnection"></div><div id="creationModel"></div><div id="creationSampler"></div><div class="creation-sampling-values" id="creationSamplingValues"></div><div id="creationAdvanced"></div></div></details>
       <div class="creation-generate-bar"><div id="creationPreview"></div><div id="creationGenerate"></div><div id="creationCount"></div><span class="creation-autosave"><span data-canvas-icon="check"></span><span id="creationSaveState">自動保存</span></span></div>
       <div id="creationGenerationProgress" class="creation-generation-progress" role="status" aria-live="polite" hidden>

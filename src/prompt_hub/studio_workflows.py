@@ -5,7 +5,8 @@ import re
 from copy import deepcopy
 from typing import Any
 
-from prompt_hub.studio_store import StudioError
+from prompt_hub.studio_store import WILDCARD_V2_SAMPLING_FIELDS, StudioError, wildcard_v2_active
+from prompt_hub.studio_wildcard_v2_tags import strip_tag_headers
 from prompt_hub.studio_workflow_values import (
     input_value,
     output_source,
@@ -19,6 +20,7 @@ NUMBER_INPUTS = {"width", "height", "steps", "cfg", "seed", "noise_seed"}
 GENERATION_INPUT_NODES = {
     "KSampler",
     "KSamplerAdvanced",
+    "SamplerCustom",
     "ImpactKSamplerBasicPipe",
     "ImpactKSamplerAdvancedBasicPipe",
     "EmptyLatentImage",
@@ -43,6 +45,10 @@ MAX_GENERATION_CFG = 30
 MAX_GENERATION_EDGE = 4096
 MAX_GENERATION_STEPS = 200
 MIN_GENERATION_EDGE = 64
+V2_DIRECT_SAMPLERS = {"KSampler", "KSamplerAdvanced", "SamplerCustom"}
+V2_PIPE_SAMPLERS = {"ImpactKSamplerBasicPipe", "ImpactKSamplerAdvancedBasicPipe"}
+V2_TEXT_ENCODERS = {"CLIPTextEncode", "PCLazyTextEncode", "PCLazyTextEncodeAdvanced"}
+V2_POSITIVE_FIELDS = {"prefix", "body", "suffix", "positive"}
 
 
 def field_key(node_id: str, name: str) -> str:
@@ -147,6 +153,8 @@ def _scalar_field(
             else "text"
         ),
     }
+    if key_name.endswith("#"):
+        field["source_key"] = output_source(graph, node["inputs"][name])
     if control is not None:
         slot = int(name.removeprefix("value_")) - 1
         control["connected"] = (node_id, slot) in outputs
@@ -339,25 +347,101 @@ def bypass_image_node(graph: dict[str, Any], node_id: str) -> None:
     del graph[node_id]
 
 
-def compile_graph(  # noqa: C901, PLR0912 - protocol validation and dispatch stay together
-    original: dict[str, Any],
+def _upstream_node(
+    graph: dict[str, Any],
+    link: object,
+) -> tuple[str, dict[str, Any]] | None:
+    if not isinstance(link, list) or len(link) != COMFY_LINK_LENGTH or link[1] != 0:
+        return None
+    node_id = str(link[0])
+    return (node_id, graph[node_id]) if node_id in graph else None
+
+
+def _v2_text_encoders(
+    graph: dict[str, Any],
+    link: object,
+    visited: frozenset[str] = frozenset(),
+    *,
+    required: bool = True,
+) -> set[str]:
+    upstream = _upstream_node(graph, link)
+    if upstream is None or upstream[0] in visited:
+        if not required:
+            return set()
+        msg = "Wildcard V2 無法識別工作流的正向文字編碼節點"
+        raise StudioError(msg)
+    node_id, node = upstream
+    inputs = node["inputs"]
+    if node["class_type"] in V2_TEXT_ENCODERS and "text" in inputs:
+        return {node_id}
+    if node["class_type"] == "Any Switch (rgthree)":
+        candidates = [value for name, value in inputs.items() if name.startswith("any_")]
+        if candidates:
+            return set().union(
+                *(
+                    _v2_text_encoders(graph, candidate, visited | {node_id}, required=required)
+                    for candidate in candidates
+                )
+            )
+    if not required:
+        return set()
+    msg = "Wildcard V2 需要工作流的正向輸入連接到 CLIPTextEncode 或 PCLazyTextEncode"
+    raise StudioError(msg)
+
+
+def _apply_v2_conditioning(
+    graph: dict[str, Any],
     recipe: dict[str, Any],
-    expanded: dict[str, Any],
-) -> dict[str, Any]:
-    graph = deepcopy(original)
-    routing_graph = deepcopy(original)
-    for key, value in recipe.get("overrides", {}).items():
-        set_input(routing_graph, key, value)
-    bindings = recipe.get("bindings") or infer_bindings(graph)
-    values = {**recipe, **expanded}
-    body_parts = []
-    if not bindings.get("prefix"):
-        body_parts.append(expanded["prefix"])
-    body_parts.append(expanded["body"])
-    if not bindings.get("suffix"):
-        body_parts.append(expanded["suffix"])
-    values["body"] = "\n\n".join(part for part in body_parts if part.strip())
-    values["positive"] = expanded["positive"]
+    positive: str,
+    negative: str | None,
+) -> None:
+    positive_targets = set()
+    negative_targets = set()
+    for node in graph.values():
+        inputs = node["inputs"]
+        if node["class_type"] in V2_PIPE_SAMPLERS:
+            upstream = _upstream_node(graph, inputs.get("basic_pipe"))
+            if upstream is None or upstream[1]["class_type"] != "ToBasicPipe":
+                msg = "Wildcard V2 需要可追蹤的 ToBasicPipe 工作流正向管線"
+                raise StudioError(msg)
+            inputs = upstream[1]["inputs"]
+        elif node["class_type"] not in V2_DIRECT_SAMPLERS:
+            continue
+        positive_targets.update(_v2_text_encoders(graph, inputs.get("positive")))
+        if negative is not None:
+            negative_targets.update(
+                _v2_text_encoders(graph, inputs.get("negative"), required=False)
+            )
+    if not positive_targets:
+        msg = "Wildcard V2 需要帶正向文字編碼節點的 ComfyUI 採樣工作流"
+        raise StudioError(msg)
+    reference_keys = recipe.get("reference_bindings", {}).values()
+    if any(
+        field_key(node_id, "text") in reference_keys
+        for node_id in positive_targets | negative_targets
+    ):
+        msg = "參考圖不能綁定到 Wildcard V2 的提示詞文字欄位"
+        raise StudioError(msg)
+    for node_id in negative_targets - positive_targets:
+        graph[node_id]["inputs"]["text"] = negative
+    for node_id in positive_targets:
+        graph[node_id]["inputs"]["text"] = positive
+
+
+def _v2_text_binding_keys(bindings: dict[str, Any]) -> set[str]:
+    return {
+        key
+        for field in V2_POSITIVE_FIELDS & bindings.keys()
+        for key in ([bindings[field]] if isinstance(bindings[field], str) else bindings[field])
+    }
+
+
+def _apply_bound_inputs(
+    graph: dict[str, Any],
+    routing_graph: dict[str, Any],
+    bindings: dict[str, Any],
+    values: dict[str, Any],
+) -> None:
     for field, binding_keys in bindings.items():
         if field not in values:
             continue
@@ -371,8 +455,56 @@ def compile_graph(  # noqa: C901, PLR0912 - protocol validation and dispatch sta
             set_input(graph, key, value, routing_graph=routing_graph)
             if graph[node_id]["class_type"] in {"ImpactWildcardEncode", "ImpactWildcardProcessor"}:
                 graph[node_id]["inputs"]["mode"] = "fixed"
-    for key, value in recipe.get("overrides", {}).items():
+
+
+def compile_graph(  # noqa: C901, PLR0912 - protocol validation and dispatch stay together
+    original: dict[str, Any],
+    recipe: dict[str, Any],
+    expanded: dict[str, Any],
+) -> dict[str, Any]:
+    graph = deepcopy(original)
+    routing_graph = deepcopy(original)
+    v2 = wildcard_v2_active(recipe)
+    bindings = recipe.get("bindings")
+    inferred = infer_bindings(graph) if v2 or not bindings else {}
+    bindings = bindings or inferred
+    ignored_overrides = _v2_text_binding_keys(bindings) if v2 else set()
+    overrides = {
+        key: value
+        for key, value in recipe.get("overrides", {}).items()
+        if key not in ignored_overrides
+    }
+    for key, value in overrides.items():
+        set_input(routing_graph, key, value)
+    values = {**recipe, **expanded}
+    sampling_bindings = {}
+    if v2:
+        # The workflow's legacy prompt stack is independent of the Impact result.
+        values["body"] = ""
+        values.pop("positive", None)
+        sampling_bindings = {
+            field: bindings[field] if field in bindings else inferred[field]
+            for field in WILDCARD_V2_SAMPLING_FIELDS
+            if field in bindings or field in inferred
+        }
+        bindings = {
+            field: keys for field, keys in bindings.items() if field not in sampling_bindings
+        }
+    else:
+        body_parts = []
+        if not bindings.get("prefix"):
+            body_parts.append(expanded["prefix"])
+        body_parts.append(expanded["body"])
+        if not bindings.get("suffix"):
+            body_parts.append(expanded["suffix"])
+        values["body"] = "\n\n".join(part for part in body_parts if part.strip())
+    _apply_bound_inputs(graph, routing_graph, bindings, values)
+    for key, value in overrides.items():
         set_input(graph, key, value)
+    if v2:
+        # Studio's sampling fields use the active routing and take priority over
+        # node overrides saved before the preset was applied.
+        _apply_bound_inputs(graph, graph, sampling_bindings, values)
     available = {item["node_id"] for item in postprocess_nodes(original)}
     for node_id, enabled in recipe.get("branches", {}).items():
         if node_id not in available:
@@ -384,4 +516,9 @@ def compile_graph(  # noqa: C901, PLR0912 - protocol validation and dispatch sta
         if node["class_type"] == "WidgetToString":
             text = widget_text(graph, node)
             node.update(class_type="PrimitiveString", inputs={"value": text})
+    if v2:
+        fallback_negative = values["negative"] if "negative" not in sampling_bindings else None
+        _apply_v2_conditioning(
+            graph, recipe, strip_tag_headers(expanded["positive"]), fallback_negative
+        )
     return graph

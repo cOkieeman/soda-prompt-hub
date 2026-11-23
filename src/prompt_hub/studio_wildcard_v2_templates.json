@@ -1,0 +1,92 @@
+{
+  "anima": {
+    "random": "masterpiece, best quality, very aesthetic, absurdres, score_9, score_8, year 2025, newest, highres, safe${style}, __moss_lora_v2/anima/random_girl__",
+    "bundled": "masterpiece, best quality, very aesthetic, absurdres, score_9, score_8, year 2025, newest, highres, safe${style}${character}, __moss_lora_v2/anima/slots/theme_sfw__${lighting}",
+    "independent": "${layout}${style}masterpiece, best quality, very aesthetic, absurdres, score_9, score_8, year 2025, newest, highres, safe${character}${outfit}${action}${scene_light}",
+    "segment": ", ${value}",
+    "bundled_style_segment": ", ${value}",
+    "bundled_character_segment": ", ${value}",
+    "independent_segments": {
+      "default": ", ${value}",
+      "layout": "${value}, ",
+      "style": "${value}, "
+    },
+    "scene_presets": {
+      "design": {
+        "layout": "__moss_lora_v2/anima/slots/layout_design__",
+        "scene_light": "__moss_lora_v2/anima/slots/scene_light_design__"
+      },
+      "world": {
+        "layout": "__moss_lora_v2/anima/slots/layout_camera__",
+        "scene_light": "__moss_lora_v2/anima/slots/scene_light_world__"
+      }
+    },
+    "generic_character": "${value}, __moss_lora_v2/anima/slots/hair__, __moss_lora_v2/anima/slots/eyes_expr__",
+    "defaults": {
+      "character": "1girl, adult woman, solo, __moss_lora_v2/anima/slots/hair__, __moss_lora_v2/anima/slots/eyes_expr__",
+      "outfit": "__moss_lora_v2/anima/slots/outfit__",
+      "action": "__moss_lora_v2/anima/slots/action__",
+      "lighting": "__moss_lora_v2/anima/slots/lighting__"
+    }
+  },
+  "moss": {
+    "random": "${style}best quality, highres, masterpiece. __moss_lora_v2/nl/random_girl__",
+    "bundled": "${style}best quality, highres, masterpiece.${character} __moss_lora_v2/nl/slots/theme_sfw__.${lighting}",
+    "independent": "${layout}${style}best quality, highres, masterpiece${character}${outfit}${action}${scene_light}.",
+    "segment": " ${value}",
+    "bundled_style_segment": "${value} illustration. ",
+    "bundled_character_segment": " ${value}.",
+    "independent_segments": {
+      "default": ". ${value}",
+      "layout": "${value}. ",
+      "style": "${value}. "
+    },
+    "scene_presets": {
+      "design": {
+        "layout": "__moss_lora_v2/nl/slots/layout_design__",
+        "scene_light": "__moss_lora_v2/nl/slots/scene_light_design__"
+      },
+      "world": {
+        "layout": "__moss_lora_v2/nl/slots/layout_camera__",
+        "scene_light": "__moss_lora_v2/nl/slots/scene_light_world__"
+      }
+    },
+    "generic_character": "${value}. The character has __moss_lora_v2/nl/slots/hair__ and __moss_lora_v2/nl/slots/eyes_expr__",
+    "defaults": {
+      "character": "1girl, solo. A captivating young woman with __moss_lora_v2/nl/slots/hair__ and __moss_lora_v2/nl/slots/eyes_expr__",
+      "outfit": "__moss_lora_v2/nl/slots/outfit__",
+      "action": "__moss_lora_v2/nl/slots/action__",
+      "lighting": "__moss_lora_v2/nl/slots/lighting__"
+    }
+  },
+  "krea2": {
+    "random": "A refined, high-detail anime illustration.${style} __moss_lora_v2/nl/random_girl__",
+    "bundled": "A refined, high-detail anime illustration.${style}${character} __moss_lora_v2/nl/slots/theme_sfw__.${lighting}",
+    "independent": "${layout}${style}A refined, high-detail anime illustration${character}${outfit}${action}${scene_light}.",
+    "segment": " ${value}",
+    "bundled_style_segment": " ${value}",
+    "bundled_character_segment": " ${value}.",
+    "independent_segments": {
+      "default": ". ${value}",
+      "layout": "${value}. ",
+      "style": "${value}. "
+    },
+    "scene_presets": {
+      "design": {
+        "layout": "__moss_lora_v2/nl/slots/layout_design__",
+        "scene_light": "__moss_lora_v2/nl/slots/scene_light_design__"
+      },
+      "world": {
+        "layout": "__moss_lora_v2/nl/slots/layout_camera__",
+        "scene_light": "__moss_lora_v2/nl/slots/scene_light_world__"
+      }
+    },
+    "generic_character": "${value}. The character has __moss_lora_v2/nl/slots/hair__ and __moss_lora_v2/nl/slots/eyes_expr__",
+    "defaults": {
+      "character": "1girl, solo. A captivating young woman with __moss_lora_v2/nl/slots/hair__ and __moss_lora_v2/nl/slots/eyes_expr__",
+      "outfit": "__moss_lora_v2/nl/slots/outfit__",
+      "action": "__moss_lora_v2/nl/slots/action__",
+      "lighting": "__moss_lora_v2/nl/slots/lighting__"
+    }
+  }
+}

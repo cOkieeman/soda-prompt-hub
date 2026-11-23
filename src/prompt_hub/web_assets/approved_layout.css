@@ -19,7 +19,7 @@ body[data-app-view="creative"] .shell { padding-bottom: 0; }
 [data-engine="comfyui"] .creation-scroll > :not(.creation-size-section, .creation-seed-section) { grid-column: 1 / -1; }
 #workbenchCreation [data-engine="comfyui"] .creation-scroll > .creation-size-section { margin: 0; }
 #workbenchCreation [data-engine="comfyui"] .creation-size-section h3 { font-size: 14px; }
-#workbenchCreation [data-engine="comfyui"] .creation-dimensions { display: none; }
+#workbenchCreation #studioPage:not([data-v2-active="true"]) [data-engine="comfyui"] .creation-dimensions { display: none; }
 #creationWorkflowTop { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 8px; align-items: end; }
 #creationWorkflowTop > label { min-width: 0; }
 #creationWorkflowTop > #studioWorkflowControls { grid-column: 1 / -1; width: 100%; min-width: 0; }

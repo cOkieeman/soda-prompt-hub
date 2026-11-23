@@ -131,7 +131,12 @@
       binding.timer = setTimeout(save, 900);
       if (!event.isComposing) complete(textarea);
     });
-    textarea.addEventListener("blur", () => { save(); setTimeout(() => {if (active?.textarea === textarea) closeSuggestions();}, 0); });
+    textarea.addEventListener("blur", () => {
+      save();
+      setTimeout(() => {
+        if (active?.textarea === textarea || installTarget === textarea) closeSuggestions();
+      }, 0);
+    });
     textarea.addEventListener("scroll", () => { highlight(textarea); closeSuggestions(); });
     textarea.addEventListener("keydown", event => {
       if (event.isComposing || active?.textarea !== textarea) return;
