@@ -42,7 +42,7 @@
   const current = () => window.SodaStudio.current();
   const recipe = () => current().project?.studio;
   const translate = value => window.promptHubI18n?.t(value) || value;
-  const state = {engine: "", tab: "positive", highlighted: true, cleared: null, reverseSerial: 0, referenceImporting: false};
+  const state = {engine: "", tab: "positive", highlighted: true, cleared: null, reverseRequest: null, referenceImporting: false};
 
   function move(selector, mount) { $(mount).append($(selector)); }
   function moveLabel(name, mount) { $(mount).append($(`[data-recipe="${name}"]`).closest("label")); }
@@ -372,6 +372,7 @@
   function renderReferences() {
     const value = recipe();
     if (!value) return;
+    if (state.reverseRequest && state.reverseRequest.project !== current().project) resetReversePrompt();
     const images = current().images.filter(image => image.kind === "reference");
     const selectedReverse = $("#creationReverseImage").value;
     $("#creationReverseImage").innerHTML = '<option value="">選擇圖片</option>' + images.map(image => `<option value="${escape(image.item_id)}">${escape(image.title)}</option>`).join("");
@@ -380,7 +381,7 @@
     const selectedModel = $("#creationReverseModel").value;
     $("#creationReverseModel").innerHTML = '<option value="">選擇視覺模型</option>' + models.map(model => `<option value="${escape(model.id || model.value)}">${escape(model.label || model.name || model.model)}</option>`).join("");
     if (selectedModel) $("#creationReverseModel").value = selectedModel;
-    $("#creationReverseRun").disabled = !images.length || !models.length;
+    $("#creationReverseRun").disabled = Boolean(state.reverseRequest?.pending) || !images.length || !models.length;
     for (const kind of ["img2img", "vibe", "precise"]) {
       const rows = images.filter(image => image.review !== "excluded" && referenceKind(image) === kind);
       $(`[data-reference-count="${kind}"]`).textContent = rows.length || "";
@@ -393,15 +394,25 @@
   }
 
   function updateReferenceInputs() {
-    const unsupported = modelName().startsWith("nai-diffusion-5");
+    const model = modelName();
+    const kinds = new Set();
+    if (recipe()?.novelai_mode === "mixed") {
+      for (const image of current().images) {
+        if (image.kind === "reference" && image.review !== "excluded") kinds.add(referenceKind(image));
+      }
+    }
+    const mixed = kinds.has("precise") && kinds.has("vibe");
     for (const input of referenceInputs) {
       const kind = input.dataset.canvasReference;
       const note = $(`[data-reference-capability="${kind}"]`);
+      const unsupported = kind === "precise" ? Boolean(model && !model.startsWith("nai-diffusion-4-5")) :
+        kind === "vibe" && model.startsWith("nai-diffusion-5");
       if (note) {
-        note.hidden = !unsupported;
-        note.textContent = translate("目前模型不支援此參考方式，請在參數中選擇 V4.5。");
+        note.hidden = !unsupported && !mixed;
+        note.textContent = translate(unsupported ? "目前模型不支援此參考方式，請在參數中選擇 V4.5。" :
+          "NovelAI 無法同時使用 Vibe 與 Precise，請選用一種參考方式後再生成。");
       }
-      input.disabled = state.referenceImporting || Boolean(note && unsupported);
+      input.disabled = state.referenceImporting || unsupported;
     }
   }
 
@@ -484,34 +495,53 @@
     }
   }
 
+  function resetReversePrompt() {
+    state.reverseRequest = null;
+    $("#creationReverseStatus").textContent = "";
+    $("#creationReverseResult").value = "";
+    $("#creationReverseResult").hidden = true;
+    $("#creationReverseApply").hidden = true;
+  }
+
   async function reversePrompt() {
     const button = $("#creationReverseRun");
     const model = $("#creationReverseModel").value;
     const item = $("#creationReverseImage").value;
     if (!model || !item) { $("#creationReverseStatus").textContent = translate("請選擇圖片與視覺模型"); return; }
-    const projectId = current().project.project_id;
-    const serial = ++state.reverseSerial;
+    resetReversePrompt();
+    const request = {project: current().project, pending: true};
+    state.reverseRequest = request;
+    const projectId = request.project.project_id;
+    const isCurrent = () => state.reverseRequest === request && current().project === request.project;
     button.disabled = true;
     $("#creationReverseStatus").textContent = translate("正在反推提示詞…");
     try {
       const job = await api(`/api/studio/projects/${projectId}/caption`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({item_ids: [item], model, method: "vision"})});
-      const poll = async () => {
-        if (serial !== state.reverseSerial || current().project?.project_id !== projectId) return;
-        try {
-          const result = await api("/api/jobs/" + job.job_id);
-          if (["queued", "running"].includes(result.status)) { setTimeout(poll, 1200); return; }
-          if (result.status !== "completed") throw Error(result.error || translate("反推失敗"));
-          const project = await api(`/api/studio/projects/${projectId}`);
-          const caption = project.images.find(image => image.item_id === item)?.caption;
-          $("#creationReverseResult").value = caption?.tags?.length ? caption.tags.join(", ") : caption?.long || "";
-          $("#creationReverseResult").hidden = false;
-          $("#creationReverseApply").hidden = false;
-          $("#creationReverseStatus").textContent = translate("反推完成");
-          button.disabled = false;
-        } catch (error) { $("#creationReverseStatus").textContent = error.message; button.disabled = false; }
-      };
-      await poll();
-    } catch (error) { $("#creationReverseStatus").textContent = error.message; button.disabled = false; }
+      while (isCurrent()) {
+        const result = await api("/api/jobs/" + job.job_id);
+        if (!isCurrent()) return;
+        if (result.status === "completed") break;
+        if (!["queued", "running"].includes(result.status)) throw Error(result.error || translate("反推失敗"));
+        await new Promise(resolve => setTimeout(resolve, 1200));
+      }
+      if (!isCurrent()) return;
+      const project = await api(`/api/studio/projects/${projectId}`);
+      if (!isCurrent()) return;
+      const caption = project.images.find(image => image.item_id === item)?.caption;
+      const text = caption?.tags?.length ? caption.tags.join(", ") : caption?.long;
+      if (!text) throw Error(translate("反推失敗"));
+      $("#creationReverseResult").value = text;
+      $("#creationReverseResult").hidden = false;
+      $("#creationReverseApply").hidden = false;
+      $("#creationReverseStatus").textContent = translate("反推完成");
+    } catch (error) {
+      if (isCurrent()) $("#creationReverseStatus").textContent = error.message;
+    } finally {
+      if (isCurrent()) {
+        request.pending = false;
+        button.disabled = $("#creationReverseImage").options.length <= 1 || $("#creationReverseModel").options.length <= 1;
+      }
+    }
   }
 
   document.querySelectorAll("[data-canvas-tab]").forEach(button => {
@@ -643,7 +673,11 @@
     catch (error) { showError(error); button.disabled = false; }
   });
   $("#creationReverseRun").addEventListener("click", reversePrompt);
-  $("#creationReverseApply").addEventListener("click", () => { setFields({body: $("#creationReverseResult").value}); selectTab("positive"); });
+  $("#creationReverseApply").addEventListener("click", () => {
+    if (state.reverseRequest?.project !== current().project || $("#creationReverseResult").hidden) return;
+    setFields({body: $("#creationReverseResult").value});
+    selectTab("positive");
+  });
   document.querySelectorAll(".creation-section, #creationParameters").forEach(details => details.addEventListener("toggle", () => { if (state.engine) localStorage.setItem("soda-canvas-open-" + state.engine + "-" + details.id, String(details.open)); }));
   $("#creationScroll").addEventListener("scroll", () => { if (state.engine) sessionStorage.setItem("soda-canvas-scroll-" + state.engine, $("#creationScroll").scrollTop); });
   $("#studioPage").addEventListener("input", event => queueMicrotask(() => {

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import time
+from contextlib import contextmanager
 from threading import Event
+from types import SimpleNamespace
 
 from prompt_hub.background_jobs import BackgroundJobRunner, BackgroundJobStore
 
@@ -48,6 +50,32 @@ def test_background_job_store_recovers_interrupted_and_retries(settings) -> None
     canceled = store.request_cancel(canceled["job_id"])
     assert canceled is not None
     assert canceled["status"] == "canceled"
+
+
+def test_late_retry_cannot_requeue_another_clients_running_job(settings, monkeypatch) -> None:
+    store = BackgroundJobStore(settings.database_path)
+    other = BackgroundJobStore(settings.database_path)
+    store.initialize()
+    job_id = store.enqueue("scan", {})["job_id"]
+    store.claim_next({"scan"})
+    store.fail(job_id, "original failure")
+    connect = store.connect
+
+    @contextmanager
+    def interleaved_connect():
+        with connect() as connection:
+
+            def execute(sql, parameters):
+                if "UPDATE background_jobs" in sql:
+                    other.retry(job_id)
+                    assert other.claim_next({"scan"})["job_id"] == job_id
+                return connection.execute(sql, parameters)
+
+            yield SimpleNamespace(execute=execute, commit=connection.commit)
+
+    monkeypatch.setattr(store, "connect", interleaved_connect)
+    assert store.retry(job_id)["status"] == "running"
+    assert other.claim_next({"scan"}) is None
 
 
 def test_recover_interrupted_cancel_has_clear_final_message(settings) -> None:

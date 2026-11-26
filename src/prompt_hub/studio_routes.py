@@ -17,7 +17,7 @@ from prompt_hub.studio_prompts import (
     wildcard_v2_default_pools,
     wildcard_v2_scene_pools,
 )
-from prompt_hub.studio_providers import validate_provider_recipe
+from prompt_hub.studio_providers import reference_options, validate_provider_recipe
 from prompt_hub.studio_store import (
     WILDCARD_V2_SAMPLING_PRESETS,
     StudioError,
@@ -257,7 +257,7 @@ def create_studio_router(  # noqa: C901, PLR0915 - FastAPI route registration ag
             provider = service.providers.require(recipe["provider_id"], recipe["backend"])
             validate_provider_recipe(
                 provider,
-                recipe,
+                {**recipe, "_reference_options": reference_options(recipe, current_references)},
                 [
                     (item["role"], store.image_path(project_id, item["item_id"]))
                     for item in current_references

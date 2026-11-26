@@ -540,6 +540,56 @@ const api=()=>new Promise(r=>resolve=r);
     )
 
 
+def test_dataset_job_feedback_exposes_failed_images_and_model_errors() -> None:
+    render = snippet(WORKSPACE_SCRIPT, "  function renderJob(", "  async function refreshJobs(")
+    run_js(
+        render
+        + r"""
+const assert = require('node:assert/strict'), state = {mode:'simple'};
+const panel = {dataset:{}}, $ = () => panel, escapeHtml = String;
+const job = {job_type:'dataset_wd14', progress_total:10, progress_current:10};
+renderJob({...job, status:'failed', progress_message:'失败', error:'model unavailable'});
+assert.equal(panel.hidden, false);
+assert.match(panel.innerHTML, /model unavailable/);
+renderJob({...job, status:'completed', result:{completed:7, failed:2, skipped:1}});
+assert.equal(panel.hidden, false);
+assert.equal(panel.dataset.jobState, 'partial');
+assert.match(panel.innerHTML, /成功 7 张，失败 2 张，跳过 1 张/);
+renderJob({...job, status:'completed', result:{completed:10, failed:0}});
+assert.equal(panel.hidden, true);
+"""
+    )
+
+
+def test_workspace_preflight_ignores_stale_selection_workspace_and_request() -> None:
+    key = snippet(WORKSPACE_SCRIPT, "  let preflightRun =", "  function renderPreflight(")
+    check = snippet(
+        WORKSPACE_SCRIPT, "  async function runPreflight(", "  async function exportVersion("
+    )
+    run_js(
+        key
+        + check
+        + r"""
+const assert = require('node:assert/strict'), field = {value:'anima'}, $ = () => field;
+const state = {active:{workspace_id:'a'}, selected:new Set(['first.png']), preflight:null};
+const selectedPaths = () => [...state.selected], renderPreflight = () => {};
+const requests = [], api = () => new Promise((resolve,reject) => requests.push({resolve,reject}));
+(async () => {
+  let pending = runPreflight(); state.selected = new Set(['other.png']);
+  requests[0].resolve({ready:true}); assert.equal(await pending, null);
+  assert.equal(state.preflight, null);
+  pending = runPreflight(); state.active = {workspace_id:'b'};
+  requests[1].reject(Error('old workspace')); assert.equal(await pending, null);
+  const older = runPreflight(), latest = runPreflight();
+  requests[3].resolve({ready:false}); assert.equal((await latest).ready, false);
+  requests[2].resolve({ready:true}); assert.equal(await older, null);
+  assert.equal(state.preflight.ready, false);
+  assert.equal(state.preflight._selectionKey, deliverySelectionKey());
+})().catch(error => { console.error(error); process.exitCode=1; });
+"""
+    )
+
+
 def test_dataset_rewrite_keeps_edited_draft_and_ignores_another_image() -> None:
     handler = snippet(
         WORKSPACE_SCRIPT,
@@ -667,6 +717,30 @@ assert.equal(q('#galleryDeleteConfirm').disabled,true);release();await pending;
 assert.equal(state.active,null);assert.equal(q('#galleryDeleteDialog').open,false);
 assert.equal(q('#galleryDeleteConfirm').disabled,false);
 })().catch(error=>{console.error(error);process.exitCode=1});
+"""
+    )
+
+
+def test_gallery_editor_sends_only_edited_fields_and_refreshes_the_saved_values() -> None:
+    run_js(
+        "const assert=require('node:assert/strict'),controls={};"
+        "const q=id=>controls[id]||=( {value:'',checked:false,dataset:{}} );"
+        + snippet(GALLERY, "  function safeLink", "  function records")
+        + snippet(GALLERY, "  const assetFormControls", "  async function openAsset")
+        + r"""
+const asset={title:'from disk',kind:'work',favorite:false,tags:['tag'],note:'old'};
+fillAssetForm(asset);
+q('#galleryAssetNote').value='new note';
+const submitted=readAssetForm();
+assert.deepEqual(changedAssetFields(submitted),{note:'new note'});
+q('#galleryAssetNote').value='still typing';
+fillAssetForm({...asset,note:'new note',favorite:true},submitted);
+assert.equal(q('#galleryAssetFavorite').checked,true);
+assert.deepEqual(changedAssetFields(readAssetForm()),{note:'still typing'});
+q('#galleryAssetFavorite').checked=false;
+q('#galleryAssetTags').value='';
+q('#galleryAssetNote').value='';
+assert.deepEqual(changedAssetFields(readAssetForm()),{favorite:false,tags:[],note:''});
 """
     )
 

@@ -307,11 +307,6 @@ class BackgroundJobStore:
             connection.commit()
 
     def retry(self, job_id: str) -> dict[str, Any] | None:
-        job = self.get(job_id)
-        if job is None:
-            return None
-        if job["status"] not in {"failed", "canceled"}:
-            return job
         with self.connect() as connection:
             connection.execute(
                 """
@@ -321,7 +316,7 @@ class BackgroundJobStore:
                     progress_current = 0, progress_total = 0,
                     progress_message = '等待重试', started_at = '', finished_at = '',
                     updated_at = ?
-                WHERE job_id = ?
+                WHERE job_id = ? AND status IN ('failed', 'canceled')
                 """,
                 (_now(), job_id),
             )

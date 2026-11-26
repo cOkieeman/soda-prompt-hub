@@ -312,6 +312,23 @@ class ImageProviderStore:
         return {**provider, "_cache_root": str(self.path.parent.parent / "studio" / "vibe-cache")}
 
 
+def reference_options(
+    recipe: dict[str, Any], references: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    options = recipe.get("reference_modes", {})
+    return [options.get(item["item_id"], {}) for item in references]
+
+
+def _novelai_reference_mode(recipe: dict[str, Any]) -> str:
+    if recipe["novelai_mode"] != "mixed":
+        return recipe["novelai_mode"]
+    modes = {option.get("mode", "vibe") for option in recipe.get("_reference_options", [])}
+    if len(modes) > 1:
+        msg = "NovelAI 無法同時使用 Vibe 與 Precise，請選用一種參考方式後再生成。"
+        raise StudioError(msg)
+    return next(iter(modes), "vibe")
+
+
 def validate_provider_recipe(  # noqa: C901, PLR0912 - protocol validation and dispatch stay together
     provider: dict[str, Any], recipe: dict[str, Any], references: list[tuple[str, Path]]
 ) -> None:
@@ -337,7 +354,7 @@ def validate_provider_recipe(  # noqa: C901, PLR0912 - protocol validation and d
         if recipe["width"] % 64 or recipe["height"] % 64:
             msg = "NovelAI 尺寸需要為 64 的倍數"
             raise StudioError(msg)
-        mode = recipe["novelai_mode"]
+        mode = _novelai_reference_mode(recipe) if references else recipe["novelai_mode"]
         caps = novelai_capabilities(model)
         if mode in {"infill", "outpaint"}:
             sources = [path for role, path in references if role != "mask"]
@@ -351,7 +368,7 @@ def validate_provider_recipe(  # noqa: C901, PLR0912 - protocol validation and d
         if references and mode == "img2img" and len(references) != 1:
             msg = "NovelAI 圖生圖需要一張來源圖"
             raise StudioError(msg)
-        if references and mode in {"vibe", "precise", "mixed"} and not caps["vibe"]:
+        if references and mode in {"vibe", "precise"} and not caps["vibe"]:
             msg = "目前的 NovelAI V5 未提供 Vibe／Precise，請選 V4.5 或圖生圖"
             raise StudioError(msg)
         if references and mode == "precise" and not caps["precise"]:
@@ -542,7 +559,7 @@ def novelai_images(  # noqa: C901, PLR0912, PLR0915 - protocol validation and di
         parameters.pop("cfg_rescale", None)
     action = "generate"
     if references:
-        mode = recipe["novelai_mode"]
+        mode = _novelai_reference_mode(recipe)
         if mode in {"infill", "outpaint"}:
             source = next(path for role, path in references if role != "mask")
             with Image.open(source) as opened:
@@ -607,12 +624,7 @@ def novelai_images(  # noqa: C901, PLR0912, PLR0915 - protocol validation and di
                 }
             )
             action = "img2img"
-        elif mode in {"vibe", "mixed"} and not (
-            mode == "mixed"
-            and any(
-                option.get("mode") == "precise" for option in recipe.get("_reference_options", [])
-            )
-        ):
+        elif mode == "vibe":
             parameters["reference_image_multiple"] = [
                 encode_vibe(
                     provider,
@@ -636,18 +648,7 @@ def novelai_images(  # noqa: C901, PLR0912, PLR0915 - protocol validation and di
                     recipe["reference_information"]
                 ] * len(references)
         else:
-            if not caps["precise"]:
-                msg = "Precise 參考需要 NovelAI V4.5 模型"
-                raise StudioError(msg)
             options = recipe.get("_reference_options", [{}] * len(references))
-            if mode == "mixed":
-                selected = [
-                    (reference, option)
-                    for reference, option in zip(references, options, strict=False)
-                    if option.get("mode") == "precise"
-                ]
-                references = [reference for reference, _ in selected]
-                options = [option for _, option in selected]
             parameters["director_reference_images"] = [
                 base64.b64encode(png_bytes(path)).decode() for _, path in references
             ]

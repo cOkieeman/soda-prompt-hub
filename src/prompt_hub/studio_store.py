@@ -482,6 +482,13 @@ class StudioStore:
         self.root.mkdir(parents=True, exist_ok=True)
         with self.projects.connect() as connection:
             connection.executescript(STUDIO_SCHEMA)
+            # Older releases left confirmed ComfyUI execution errors in the accepted state.
+            connection.execute(
+                "UPDATE studio_executions SET state='failed' WHERE state='accepted' "
+                "AND job_id IN (SELECT job_id FROM background_jobs "
+                "WHERE job_type='studio_generate' AND status='failed' AND error=?)",
+                ("ComfyUI 執行失敗，請查看對應任務的節點錯誤",),
+            )
             connection.execute(
                 "UPDATE gallery_assets SET image_json=json_set(image_json, '$.hub_"
                 "generation', json((SELECT provenance_json FROM studio_images WHER"
