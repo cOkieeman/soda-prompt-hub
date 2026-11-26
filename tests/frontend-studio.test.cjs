@@ -44,7 +44,7 @@ test("query route wins over a previously saved homepage", () => {
   assert.equal(app.nav.read().step, "caption");
 });
 
-test("standalone tagger route keeps its project across refresh", () => {
+test("tagger route keeps its project across refresh", () => {
   const app = navigation("http://localhost/?view=tagger&project=p1");
   assert.equal(app.nav.read().view, "tagger");
   assert.equal(app.nav.read().project, "p1");
@@ -54,31 +54,39 @@ test("standalone tagger route keeps its project across refresh", () => {
   assert.equal(refreshed.nav.read().project, "p2");
 });
 
-test("tagger exit waits for saving before returning to the Hub", async () => {
+test("tagger global navigation waits for saving before leaving the project", async () => {
   const source = fs.readFileSync(path.join(assets, "workbench.js"), "utf8");
-  const handler = source.slice(source.indexOf("  async function returnToHubHome()"), source.indexOf("  function hideScreens()"));
+  const handler = source.slice(source.indexOf("  async function saveBeforeNavigation("), source.indexOf("  function hideScreens()"));
+  const base = fs.readFileSync(path.join(assets, "base.js"), "utf8");
+  const setView = base.slice(base.indexOf("    async function setView(view"), base.indexOf("      window.SodaWorkbench?.hide();"));
   const calls = [];
-  let finishSave;
+  const pendingSaves = [];
   const context = {
+    document: {body:{dataset:{appView:"tagger"}}},
     window: {
-      SodaStudio: {save: () => new Promise(resolve => { finishSave = resolve; })},
-      setPromptHubView: async view => calls.push(view),
+      SodaStudio: {save: () => new Promise(resolve => { pendingSaves.push(resolve); })},
+      SodaWorkbench: {handles: () => false},
     },
+    calls, navigationRun:0, state:{serial:0},
     message: () => assert.fail("Successful exit must not show an error"),
   };
-  vm.runInNewContext(handler, context);
-  const exiting = context.returnToHubHome();
+  vm.runInNewContext(handler + "window.SodaWorkbench.saveBeforeNavigation = saveBeforeNavigation;\n" + setView + "calls.push(view);}", context);
+  const exiting = context.setView("home");
   assert.deepEqual(calls, []);
-  finishSave();
+  const latest = context.setView("prompts");
+  pendingSaves[1]();
+  await latest;
+  pendingSaves[0]();
   await exiting;
-  assert.deepEqual(calls, ["home"]);
+  assert.deepEqual(calls, ["prompts"]);
 });
 
 test("a failed save keeps the tagger open and reports the error", async () => {
   const source = fs.readFileSync(path.join(assets, "workbench.js"), "utf8");
-  const handler = source.slice(source.indexOf("  async function returnToHubHome()"), source.indexOf("  function hideScreens()"));
+  const handler = source.slice(source.indexOf("  async function saveBeforeNavigation("), source.indexOf("  function hideScreens()"));
   const messages = [];
   const context = {
+    root:{hidden:true}, state:{serial:0},
     window: {
       SodaStudio: {save: async () => { throw new Error("Save failed"); }},
       setPromptHubView: () => assert.fail("Failed save must not navigate"),
@@ -86,7 +94,8 @@ test("a failed save keeps the tagger open and reports the error", async () => {
     message: (text, error) => messages.push({text, error}),
   };
   vm.runInNewContext(handler, context);
-  await context.returnToHubHome();
+  assert.equal(await context.saveBeforeNavigation(), false);
+  assert.equal(context.root.hidden, false);
   assert.deepEqual(messages, [{text: "Save failed", error: true}]);
 });
 
@@ -432,7 +441,6 @@ for (const [locale, title, count, preview] of [
     assert.equal(t("資料集生成"), title);
     assert.equal(t("MOSS · 3 張圖片 · 2 張已採用"), count);
     assert.equal(t("已準備 6 組提示詞。"), preview);
-    assert.equal(t("返回主界面"), {"zh-CN":"返回主界面", "zh-TW":"返回主介面", en:"Back to Hub"}[locale]);
     assert.equal(t(t("資料集生成")), title);
     assert.equal(t("1girl, solo, __pose/standing__"), "1girl, solo, __pose/standing__");
     assert.equal(t("https://example.test/v1"), "https://example.test/v1");

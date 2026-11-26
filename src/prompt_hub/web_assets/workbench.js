@@ -43,12 +43,15 @@
     return result;
   }
   function message(text,error=false) { $("#workbenchStatus").hidden=false; $("#workbenchStatus").textContent=text; $("#workbenchStatus").dataset.error=String(error); }
-  async function returnToHubHome() {
+  async function saveBeforeNavigation(run = ++state.serial) {
     try {
       await window.SodaStudio.save();
-      await window.setPromptHubView("home");
+      return run === state.serial;
     }
-    catch(error) { message(error.message,true); }
+    catch(error) {
+      if (run === state.serial) { root.hidden=false; message(error.message,true); }
+      return false;
+    }
   }
   function hideScreens() {
     ["homePage","creativePage","galleryPage","discoveryPage","workspacePage","loraPage","comfyPage","remotePage","managementPage","archiveWorkspace","studioPage","studioProjectsPage","studioSettingsPage","workbenchTagger"].forEach(id => { $("#" + id).hidden=true; });
@@ -102,9 +105,7 @@
   }
   async function open(view,options={}) {
     const run=++state.serial;
-    try { await window.SodaStudio.save(); }
-    catch(error) { root.hidden=false; message(error.message,true); return; }
-    if (run!==state.serial) return;
+    if (!await saveBeforeNavigation(run) || run!==state.serial) return;
     const incoming=options.route || {view};
     const route={...incoming,view:["projects","studio"].includes(view)?"datasets":view==="comfy"?"gallery":view};
     if (view==="studio") route.step=incoming.step || "review";
@@ -250,7 +251,6 @@
     catch(error) { message(error.message,true); } finally { button.disabled=false; }
   });
   $("#workbenchTaggerList").addEventListener("click",event=>{const button=event.target.closest("[data-workbench-tagger]");if(button)open("tagger",{route:{view:"tagger",project:button.dataset.workbenchTagger}});});
-  document.querySelectorAll("[data-workbench-tagger-home]").forEach(button=>button.addEventListener("click",returnToHubHome));
   $("#workbenchTaggerBack").addEventListener("click",()=>open("tagger"));
   $("#workbenchTaggerGallery").addEventListener("click",()=>{state.returnToTagger=true;open("gallery",{route:{view:"gallery",project:state.dataset,tab:"local"}});});
   $("#studioCaptionMethod").addEventListener("change",updateTaggerFlow);
@@ -302,5 +302,5 @@
   });
   $("#workbenchOpenAdded").addEventListener("click",async()=>{$("#workbenchDatasetDialog").close();const view=state.returnToTagger?"tagger":"datasets";state.returnToTagger=false;await open(view,{route:view==="tagger"?{view,project:state.dataset}:{view,project:state.dataset,step:"review"}});});
   new MutationObserver(updateCanvas).observe($("#studioRecentImages"),{childList:true});
-  window.SodaWorkbench={handles:view=>["creative","gallery","datasets","tagger","projects","studio","comfy"].includes(view),open,hide:()=>{state.serial++;root.hidden=true;},applySlots,addToDataset,repair};
+  window.SodaWorkbench={handles:view=>["creative","gallery","datasets","tagger","projects","studio","comfy"].includes(view),open,hide:()=>{state.serial++;root.hidden=true;},saveBeforeNavigation,applySlots,addToDataset,repair};
 })();

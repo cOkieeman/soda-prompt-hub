@@ -610,10 +610,13 @@
     window.playPromptHubStatusPulse = playPromptHubStatusPulse;
 
     async function setView(view, options = {}) {
-      if (window.SodaWorkbench?.handles(view)) { navigationRun++; currentMode=view; return window.SodaWorkbench.open(view, options); }
+      const run = ++navigationRun;
+      if (window.SodaWorkbench?.handles(view)) { currentMode=view; return window.SodaWorkbench.open(view, options); }
+      if (document.body.dataset.appView === 'tagger') {
+        if (!await window.SodaWorkbench.saveBeforeNavigation() || run !== navigationRun) return;
+      }
       window.SodaWorkbench?.hide();
       if (!Object.hasOwn(viewLabels, view)) throw new Error('这个页面暂不可用');
-      const run = ++navigationRun;
       const route = window.PromptHubNavigation.commit(
         options.route || {view}, options.historyMode || 'push'
       );
