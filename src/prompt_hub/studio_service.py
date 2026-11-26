@@ -23,6 +23,7 @@ from prompt_hub.studio_providers import (
     novelai_images,
     openai_images,
     read_response,
+    reference_options,
 )
 from prompt_hub.studio_store import StudioError, StudioStore, now, wildcard_v2_active, write_json
 from prompt_hub.studio_workflows import compile_graph, infer_bindings, set_input, source_values
@@ -50,6 +51,25 @@ def request_evidence(value: Any) -> Any:  # noqa: ANN401 - external JSON and plu
     if isinstance(value, list):
         return [request_evidence(item) for item in value]
     return value
+
+
+def _comfy_failure(status: dict[str, Any]) -> str:
+    for event in reversed(status.get("messages") or []):
+        match event:
+            case ["execution_error" | "execution_interrupted" as name, dict() as detail]:
+                pass
+            case _:
+                continue
+        node = " ".join(
+            str(detail[key])[:120] for key in ("node_id", "node_type") if detail.get(key)
+        )
+        reason = " · ".join(
+            str(detail[key]).strip()[:1200]
+            for key in ("exception_type", "exception_message")
+            if detail.get(key)
+        )
+        return " · ".join(filter(None, ("ComfyUI 執行失敗", node, reason or name)))
+    return "ComfyUI 執行失敗，歷史記錄未提供節點詳情"
 
 
 class StudioService:
@@ -130,10 +150,7 @@ class StudioService:
             (item["role"], self.store.image_path(project_id, item["item_id"]))
             for item in payload.get("references", [])
         ]
-        recipe["_reference_options"] = [
-            recipe.get("reference_modes", {}).get(item["item_id"], {})
-            for item in payload.get("references", [])
-        ]
+        recipe["_reference_options"] = reference_options(recipe, payload.get("references", []))
         context.update(0, 1, "正在準備生成任務")
         if recipe["backend"] == "comfyui":
             images = self._comfy_images(payload, recipe, prompt, references, context, execution)
@@ -229,7 +246,12 @@ class StudioService:
         execution: dict[str, Any] | None,
     ) -> list[bytes]:
         client = ComfyUIClient(recipe["comfy_url"], timeout=30)
-        prompt_id = execution["provider_task_id"] if execution else ""
+        if execution and execution["state"] == "submitting":
+            msg = "上次 ComfyUI 提交狀態待核對，請先查看 ComfyUI 佇列"
+            raise StudioError(msg)
+        prompt_id = (
+            execution["provider_task_id"] if execution and execution["state"] != "failed" else ""
+        )
         if execution and execution["request"].get("effective_request"):
             recipe["_effective_request"] = execution["request"]["effective_request"]
         if not prompt_id:
@@ -272,9 +294,6 @@ class StudioService:
             self.store.save_execution(
                 context.job_id, payload["project_id"], payload, state="submitting"
             )
-            if execution and execution["state"] == "submitting":
-                msg = "上次 ComfyUI 提交狀態待核對，請先查看 ComfyUI 佇列"
-                raise StudioError(msg)
             try:
                 prompt_id = client.queue_prompt(graph, client_id="soda-prompt-hub-studio")
             except WorkerError as error:
@@ -300,7 +319,14 @@ class StudioService:
             if record:
                 status = record.get("status", {})
                 if status.get("status_str") == "error":
-                    msg = "ComfyUI 執行失敗，請查看對應任務的節點錯誤"
+                    msg = _comfy_failure(status)
+                    self.store.save_execution(
+                        context.job_id,
+                        payload["project_id"],
+                        {**payload, "provider_error": msg},
+                        prompt_id,
+                        "failed",
+                    )
                     raise StudioError(msg)
                 results = [
                     image

@@ -55,21 +55,21 @@ def test_web_shell_exposes_persistent_interface_language_switcher() -> None:
     assert "traditionalProtectedPatterns" in INDEX_HTML
 
 
-def test_tagger_has_a_standalone_navigation_entry_and_route_host() -> None:
+def test_tagger_has_a_main_navigation_entry_and_route_host() -> None:
     assert 'data-view="tagger">打标器</button>' in INDEX_HTML
     assert 'id="workbenchTagger"' in INDEX_HTML
     assert 'id="workbenchTaggerStudioHost"' in INDEX_HTML
     assert '"tagger"' in INDEX_HTML
 
 
-def test_standalone_tagger_can_return_to_main_navigation() -> None:
+def test_tagger_keeps_shared_navigation_and_gallery_action() -> None:
     asset_root = files("prompt_hub").joinpath("web_assets")
     workbench_html = asset_root.joinpath("workbench.html").read_text(encoding="utf-8")
-    workbench_script = asset_root.joinpath("workbench.js").read_text(encoding="utf-8")
-
-    assert workbench_html.count("data-workbench-tagger-home") == 2
-    assert 'window.setPromptHubView("home")' in workbench_script
-    assert 'querySelectorAll("[data-workbench-tagger-home]")' in workbench_script
+    stylesheet = asset_root.joinpath("workbench.css").read_text(encoding="utf-8")
+    assert 'data-view="home"' in INDEX_HTML
+    assert 'id="workbenchTaggerGallery"' in workbench_html
+    assert 'body[data-app-view="tagger"] .app-nav { display:none' not in stylesheet
+    assert 'body[data-app-view="tagger"] #workbenchTaggerGallery { display:none' not in stylesheet
 
 
 def test_interface_language_preserves_user_defined_device_name() -> None:

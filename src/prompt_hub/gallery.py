@@ -360,29 +360,31 @@ class GalleryStore:
                     connection.commit()
 
     def update_asset(self, asset_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
-        current = self.require_asset(asset_id)
-        merged = {**current, **values}
-        kind = _valid_kind(str(merged["kind"]))
-        tags = _clean_strings(merged.get("tags", []))
-        albums = _clean_strings(merged.get("albums", []))
+        text_limits = {
+            "title": 300,
+            "note": 6000,
+            "author": 300,
+            "source_url": 2000,
+            "project_id": 180,
+        }
+        updates: dict[str, Any] = {
+            field: str(values[field])[:limit]
+            for field, limit in text_limits.items()
+            if field in values
+        }
+        if "kind" in values:
+            updates["kind"] = _valid_kind(str(values["kind"]))
+        if "favorite" in values:
+            updates["favorite"] = int(bool(values["favorite"]))
+        for field in ("tags", "albums"):
+            if field in values:
+                updates[f"{field}_json"] = _dump(_clean_strings(values[field]))
+        updates["updated_at"] = _now()
+        assignments = ", ".join(f"{column} = ?" for column in updates)
         with self.connect() as connection:
             connection.execute(
-                "UPDATE gallery_assets SET kind = ?, title = ?, note = ?, author = ?, "
-                "source_url = ?, tags_json = ?, albums_json = ?, favorite = ?, project_id = ?, "
-                "updated_at = ? WHERE asset_id = ?",
-                (
-                    kind,
-                    str(merged.get("title", ""))[:300],
-                    str(merged.get("note", ""))[:6000],
-                    str(merged.get("author", ""))[:300],
-                    str(merged.get("source_url", ""))[:2000],
-                    _dump(tags),
-                    _dump(albums),
-                    int(bool(merged.get("favorite", False))),
-                    str(merged.get("project_id", ""))[:180],
-                    _now(),
-                    asset_id,
-                ),
+                f"UPDATE gallery_assets SET {assignments} WHERE asset_id = ?",
+                (*updates.values(), asset_id),
             )
             connection.commit()
         return self.require_asset(asset_id)

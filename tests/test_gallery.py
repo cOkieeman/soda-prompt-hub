@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image, PngImagePlugin
 
+from prompt_hub import gallery as gallery_module
 from prompt_hub.background_jobs import (
     BackgroundJobRunner,
     BackgroundJobStore,
@@ -282,6 +283,36 @@ def test_upload_metadata_pagination_and_manual_fields(gallery):
     with pytest.raises(GalleryError, match="列表"):
         gallery.update_asset(first["asset_id"], {"tags": "invalid"})
     assert gallery.resolve_asset_path(first["asset_id"], "invalid") is None
+
+
+def test_favorite_write_preserves_note_saved_just_before_it(gallery, monkeypatch):
+    asset_id = gallery.import_bytes(_image(), filename="image.png")["asset_id"]
+    timestamp = "2026-01-01T00:00:00+00:00"
+
+    def save_note_before_write():
+        monkeypatch.setattr(gallery_module, "_now", lambda: timestamp)
+        saved = gallery.update_asset(asset_id, {"note": "from another tab"})
+        assert saved["note"] == "from another tab"
+        return timestamp
+
+    monkeypatch.setattr(gallery_module, "_now", save_note_before_write)
+    updated = gallery.update_asset(asset_id, {"favorite": True})
+    assert updated["favorite"] is True
+    assert updated["note"] == "from another tab"
+
+
+def test_gallery_partial_update_preserves_null_and_accepts_explicit_clears(gallery_client, gallery):
+    client, _, _ = gallery_client
+    asset_id = gallery.import_bytes(_image(), filename="image.png")["asset_id"]
+    gallery.update_asset(asset_id, {"note": "keep", "tags": ["old"], "favorite": True})
+    path = f"/api/gallery/assets/{asset_id}"
+    response = client.put(path, json={"note": None, "tags": [], "favorite": False})
+    assert response.status_code == 200
+    updated = response.json()
+    assert updated["note"] == "keep"
+    assert updated["tags"] == []
+    assert updated["favorite"] is False
+    assert client.put(path, json={"note": ""}).json()["note"] == ""
 
 
 def test_routes_scan_reference_and_explicit_analysis_confirmation(

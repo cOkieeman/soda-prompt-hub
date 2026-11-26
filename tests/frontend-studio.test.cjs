@@ -44,7 +44,7 @@ test("query route wins over a previously saved homepage", () => {
   assert.equal(app.nav.read().step, "caption");
 });
 
-test("standalone tagger route keeps its project across refresh", () => {
+test("tagger route keeps its project across refresh", () => {
   const app = navigation("http://localhost/?view=tagger&project=p1");
   assert.equal(app.nav.read().view, "tagger");
   assert.equal(app.nav.read().project, "p1");
@@ -54,31 +54,39 @@ test("standalone tagger route keeps its project across refresh", () => {
   assert.equal(refreshed.nav.read().project, "p2");
 });
 
-test("tagger exit waits for saving before returning to the Hub", async () => {
+test("tagger global navigation waits for saving before leaving the project", async () => {
   const source = fs.readFileSync(path.join(assets, "workbench.js"), "utf8");
-  const handler = source.slice(source.indexOf("  async function returnToHubHome()"), source.indexOf("  function hideScreens()"));
+  const handler = source.slice(source.indexOf("  async function saveBeforeNavigation("), source.indexOf("  function hideScreens()"));
+  const base = fs.readFileSync(path.join(assets, "base.js"), "utf8");
+  const setView = base.slice(base.indexOf("    async function setView(view"), base.indexOf("      window.SodaWorkbench?.hide();"));
   const calls = [];
-  let finishSave;
+  const pendingSaves = [];
   const context = {
+    document: {body:{dataset:{appView:"tagger"}}},
     window: {
-      SodaStudio: {save: () => new Promise(resolve => { finishSave = resolve; })},
-      setPromptHubView: async view => calls.push(view),
+      SodaStudio: {save: () => new Promise(resolve => { pendingSaves.push(resolve); })},
+      SodaWorkbench: {handles: () => false},
     },
+    calls, navigationRun:0, state:{serial:0},
     message: () => assert.fail("Successful exit must not show an error"),
   };
-  vm.runInNewContext(handler, context);
-  const exiting = context.returnToHubHome();
+  vm.runInNewContext(handler + "window.SodaWorkbench.saveBeforeNavigation = saveBeforeNavigation;\n" + setView + "calls.push(view);}", context);
+  const exiting = context.setView("home");
   assert.deepEqual(calls, []);
-  finishSave();
+  const latest = context.setView("prompts");
+  pendingSaves[1]();
+  await latest;
+  pendingSaves[0]();
   await exiting;
-  assert.deepEqual(calls, ["home"]);
+  assert.deepEqual(calls, ["prompts"]);
 });
 
 test("a failed save keeps the tagger open and reports the error", async () => {
   const source = fs.readFileSync(path.join(assets, "workbench.js"), "utf8");
-  const handler = source.slice(source.indexOf("  async function returnToHubHome()"), source.indexOf("  function hideScreens()"));
+  const handler = source.slice(source.indexOf("  async function saveBeforeNavigation("), source.indexOf("  function hideScreens()"));
   const messages = [];
   const context = {
+    root:{hidden:true}, state:{serial:0},
     window: {
       SodaStudio: {save: async () => { throw new Error("Save failed"); }},
       setPromptHubView: () => assert.fail("Failed save must not navigate"),
@@ -86,7 +94,8 @@ test("a failed save keeps the tagger open and reports the error", async () => {
     message: (text, error) => messages.push({text, error}),
   };
   vm.runInNewContext(handler, context);
-  await context.returnToHubHome();
+  assert.equal(await context.saveBeforeNavigation(), false);
+  assert.equal(context.root.hidden, false);
   assert.deepEqual(messages, [{text: "Save failed", error: true}]);
 });
 
@@ -173,20 +182,21 @@ test("back and forward use URL route and do not create another history entry", (
 function studio(fetch) {
   const nodes = new Map();
   const document = {
+    body:{dataset:{}},
     querySelector: selector => {
-      if (!nodes.has(selector)) nodes.set(selector, {textContent:"",innerHTML:"",dataset:{}});
+      if (!nodes.has(selector)) nodes.set(selector, {textContent:"",innerHTML:"",value:"",dataset:{},querySelectorAll:() => []});
       return nodes.get(selector);
     },
     querySelectorAll: () => [],
     addEventListener: () => {},
   };
-  const window = {};
+  const window = {dispatchEvent:() => {}};
   const localStorage = storage();
   const context = {window, document, localStorage, sessionStorage: storage(), structuredClone,
-    fetch, File:class File {}, setTimeout, clearTimeout, setInterval:() => {}, URLSearchParams};
+    fetch, File:class File {}, Event, setTimeout, clearTimeout, setInterval:() => {}, URLSearchParams};
   let source = fs.readFileSync(path.join(assets, "studio.js"), "utf8");
   source = source.replace('  document.addEventListener("DOMContentLoaded", () => {',
-    '  window.testStudio = {state, markChanged, saveCurrent, persistCaptionDraft, renderCaptionEditor, previewBatch, generationProgress};\n  document.addEventListener("DOMContentLoaded", () => {');
+    '  window.testStudio = {state, markChanged, saveCurrent, persistCaptionDraft, renderCaptionEditor, previewBatch, usePreview, queueBatch, generationProgress};\n  document.addEventListener("DOMContentLoaded", () => {');
   vm.runInNewContext(source, context);
   window.testStudio.state.project = {
     project_id:"project-1", revision:3,
@@ -194,6 +204,41 @@ function studio(fetch) {
   };
   return {...window.testStudio, nodes, document, localStorage};
 }
+
+test("Wildcard V2 queues the preview, retries it by ID, and advances past the last seed after reload", async () => {
+  const draws = [], submissions = [];
+  let start = 42;
+  const app = studio(async (url, options) => {
+    let data;
+    if (options.method === "PUT") {
+      const update = JSON.parse(options.body);
+      start = update.studio.text_seed;
+      data = {revision:update.expected_revision + 1};
+    } else if (url.endsWith("/preview")) {
+      const seeds = [start, start + 1];
+      draws.push(seeds);
+      data = {preview_id:"batch-" + draws.length, rows:seeds.map(text_seed => ({text_seed}))};
+    } else if (url.endsWith("/generate")) {
+      submissions.push(JSON.parse(options.body).preview_id);
+      if (submissions.length === 1) throw Error("lost response");
+      data = {job_ids:["job-1", "job-2"]};
+    } else {
+      data = {images:[],jobs:[]};
+    }
+    return {ok:true,json:async () => data};
+  });
+  Object.assign(app.state.project.studio, {count:2, text_seed:start, text_mode:"wildcard", wildcard_v2:{enabled:true}});
+  await app.previewBatch();
+  await assert.rejects(app.queueBatch(), /lost response/);
+  await app.queueBatch();
+  const saved = JSON.parse(app.localStorage.getItem("soda-studio-preview-project-1"));
+  assert.equal(saved.value.queued, true);
+  app.usePreview(saved.value);
+  await app.queueBatch();
+  await app.queueBatch();
+  assert.deepEqual(draws, [[42,43], [44,45], [46,47]]);
+  assert.deepEqual(submissions, ["batch-1","batch-1","batch-2","batch-3"]);
+});
 
 test("generation progress distinguishes queued, active, complete, and failed jobs", () => {
   const app = studio();
@@ -396,7 +441,6 @@ for (const [locale, title, count, preview] of [
     assert.equal(t("資料集生成"), title);
     assert.equal(t("MOSS · 3 張圖片 · 2 張已採用"), count);
     assert.equal(t("已準備 6 組提示詞。"), preview);
-    assert.equal(t("返回主界面"), {"zh-CN":"返回主界面", "zh-TW":"返回主介面", en:"Back to Hub"}[locale]);
     assert.equal(t(t("資料集生成")), title);
     assert.equal(t("1girl, solo, __pose/standing__"), "1girl, solo, __pose/standing__");
     assert.equal(t("https://example.test/v1"), "https://example.test/v1");
@@ -480,6 +524,78 @@ test("typing into the canvas seed updates the inputs saved in the recipe immedia
   context.updateSeed({type: "change", target: input});
   assert.equal(errors.length, 1);
   assert.equal(Number(saved.seed), 123456);
+});
+
+test("reverse extraction only displays and applies a result in its originating project", async () => {
+  const source = fs.readFileSync(path.join(assets, "creation_canvas.js"), "utf8");
+  const nodes = new Map();
+  const $ = key => {
+    if (!nodes.has(key)) nodes.set(key, {hidden:true, options:["", "test"], value:"test",
+      addEventListener(event, handler) { this[event] = handler; }});
+    return nodes.get(key);
+  };
+  const projectA = {project_id:"a"}, projectB = {project_id:"b"};
+  let project = projectA;
+  const edits = [];
+  let captionResponse = Promise.resolve({images:[{item_id:"test", caption:{long:"caption A"}}]});
+  let signalFetch;
+  const context = vm.createContext({$, state:{}, translate:value => value, current:() => ({project}),
+    setFields:fields => edits.push([project.project_id, fields.body]), selectTab() {},
+    api:async url => {
+      if (url.endsWith("/caption")) return {job_id:"job"};
+      if (url === "/api/jobs/job") return {status:"completed"};
+      signalFetch?.();
+      return captionResponse;
+    },
+  });
+  const start = source.indexOf("  function resetReversePrompt()");
+  const functions = source.slice(start, source.indexOf('  document.querySelectorAll("[data-canvas-tab]")', start));
+  vm.runInContext(functions, context);
+  const events = source.slice(source.indexOf('  $("#creationReverseRun").addEventListener'),
+    source.indexOf('  document.querySelectorAll(".creation-section, #creationParameters").forEach(details => details.addEventListener'));
+  vm.runInContext(events, context);
+  const run = $("#creationReverseRun"), apply = $("#creationReverseApply");
+  await run.click();
+  apply.click();
+  assert.deepEqual(edits, [["a","caption A"]]);
+  project = projectB;
+  apply.click();
+  assert.equal(edits.length, 1);
+  project = projectA;
+  let finish;
+  captionResponse = new Promise(resolve => { finish = resolve; });
+  const fetching = new Promise(resolve => { signalFetch = resolve; });
+  const pending = run.click();
+  await fetching;
+  project = projectB;
+  finish({images:[{item_id:"test", caption:{long:"late caption"}}]});
+  await pending;
+  assert.equal(apply.hidden, true);
+  assert.equal($("#creationReverseResult").value, "");
+});
+
+test("canvas blocks Precise on V4 and reports incompatible active references on V4.5", () => {
+  const source = fs.readFileSync(path.join(assets, "creation_canvas.js"), "utf8");
+  const inputs = ["vibe","precise","img2img","reverse"].map(kind => ({dataset:{canvasReference:kind}}));
+  const notes = {vibe:{}, precise:{}};
+  let model = "nai-diffusion-4-full";
+  const images = ["vibe","precise"].map(mode => ({kind:"reference", mode, review:"pending"}));
+  const context = vm.createContext({referenceInputs:inputs, state:{referenceImporting:false},
+    current:() => ({images}), recipe:() => ({novelai_mode:"mixed"}), referenceKind:image => image.mode,
+    modelName:() => model, translate:value => value, $:selector => notes[selector.split('"')[1]],
+  });
+  vm.runInContext(source.slice(source.indexOf("  function updateReferenceInputs()"), source.indexOf("  async function api(")), context);
+  context.updateReferenceInputs();
+  assert.deepEqual(inputs.map(input => input.disabled), [false,true,false,false]);
+  model = "nai-diffusion-4-5-full";
+  context.updateReferenceInputs();
+  assert.equal(inputs[1].disabled, false);
+  assert.match(notes.vibe.textContent, /Vibe 與 Precise/);
+  assert.equal(notes.precise.hidden, false);
+  images[1].review = "excluded";
+  context.updateReferenceInputs();
+  assert.equal(notes.vibe.hidden, true);
+  assert.equal(notes.precise.hidden, true);
 });
 
 test("gallery detail loading hides the previous image and its actions", () => {

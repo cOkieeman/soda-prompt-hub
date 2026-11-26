@@ -158,6 +158,7 @@
     q('#galleryReferenceProject').innerHTML=options||'<option value="">先在绘图创作建立项目</option>';
     const current=state.active?.project_id||window.getCreativeProjectId?.();
     if(state.projects.some(project=>project.project_id===state.active?.project_id)) q('#galleryAssetProject').value=state.active.project_id;
+    q('#galleryAssetProject').dataset.savedValue=q('#galleryAssetProject').value;
     if(state.projects.some(project=>project.project_id===current)) q('#galleryReferenceProject').value=current;
     q('#galleryAddReference').disabled=!state.projects.length||assetOffline(state.active); q('#galleryOpenProject').disabled=!state.projects.length;
   }
@@ -178,6 +179,46 @@
     q('#galleryAnalysisContent').innerHTML=exists?`<p class="gallery-analysis-state">${pending?'分析预览 · 尚未保存':analysis.stale?'已保存的分析已过期，请连接原目录后重新分析':'已确认的分析'}</p><div class="gallery-analysis-meta">${analysis.purpose?`<span>${esc(purposeLabels[analysis.purpose]||'参考用途')}</span>`:''}${analysis.model?`<span data-i18n-ignore>${esc(analysis.model)}</span>`:''}</div>${analysisMarkup(visible)}${prompts&&Object.keys(prompts).length?`<details><summary>反推的 Prompt（模型建议）</summary><pre>${esc(JSON.stringify(prompts,null,2))}</pre></details>`:''}<details><summary>原始分析记录</summary><pre>${esc(JSON.stringify(analysis,null,2))}</pre></details>`:'<p class="gallery-note">还没有保存分析。先选参考用途，再按需拆解。</p>';
     q('#gallerySaveAnalysis').hidden=!pending;
   }
+  const assetFormControls = {
+    title:'Title', kind:'Kind', favorite:'Favorite', author:'Author', source_url:'Source',
+    tags:'Tags', albums:'Albums', note:'Note', project_id:'Project'
+  };
+  function readAssetForm() {
+    const values = {};
+    for (const [field, suffix] of Object.entries(assetFormControls)) {
+      const control = q('#galleryAsset'+suffix);
+      values[field] = field === 'favorite' ? control.checked : control.value;
+    }
+    return values;
+  }
+  function fillAssetForm(asset, submitted) {
+    const display = {...asset, title:asset.title || asset.filename || '', favorite:Boolean(asset.favorite),
+      source_url:safeLink(asset.source_url), tags:(asset.tags || []).join('，'), albums:(asset.albums || []).join('，')};
+    for (const [field, suffix] of Object.entries(assetFormControls)) {
+      const control = q('#galleryAsset'+suffix);
+      const property = field === 'favorite' ? 'checked' : 'value';
+      const value = display[field] ?? '';
+      if (!submitted || control[property] === submitted[field]) {
+        control[property] = value;
+        control.dataset.savedValue = String(control[property]);
+      } else {
+        control.dataset.savedValue = String(value);
+      }
+    }
+  }
+  function changedAssetFields(values) {
+    const changes = {};
+    for (const [field, suffix] of Object.entries(assetFormControls)) {
+      const value = values[field];
+      if (String(value) === q('#galleryAsset'+suffix).dataset.savedValue) continue;
+      if (field === 'tags' || field === 'albums') changes[field] = commaList(value);
+      else if (field === 'source_url') {
+        changes[field] = safeLink(value);
+        if (value.trim() && !changes[field]) throw new Error('来源链接请填写完整的 http:// 或 https:// 地址');
+      } else changes[field] = typeof value === 'string' ? value.trim() : value;
+    }
+    return changes;
+  }
   async function openAsset(assetId,opener) {
     const run=++state.detailRun; state.opener=opener||document.activeElement;
     let asset;
@@ -190,8 +231,7 @@
     q('#galleryDetailImage').src=(assetOffline(asset)?asset.thumbnail_url:asset.original_url)||asset.thumbnail_url||''; q('#galleryDetailImage').alt=asset.title||asset.filename||'画廊图片';
     q('#galleryDetailAvailability').textContent=assetOffline(asset)?'原目录当前未连接；这里展示已保存的缩略图。重新连接后可查看原图、分析和加入参考。':`${Number(asset.width)||'?'} × ${Number(asset.height)||'?'} · ${asset.filename||''}`;
     q('#galleryOpenOriginal').href=asset.original_url||''; q('#galleryOpenOriginal').hidden=!asset.original_url||assetOffline(asset);
-    q('#galleryAssetTitle').value=asset.title||asset.filename||''; q('#galleryAssetKind').value=asset.kind; q('#galleryAssetFavorite').checked=Boolean(asset.favorite);
-    q('#galleryAssetAuthor').value=asset.author||''; q('#galleryAssetSource').value=safeLink(asset.source_url)||''; q('#galleryAssetTags').value=(asset.tags||[]).join('，'); q('#galleryAssetAlbums').value=(asset.albums||[]).join('，'); q('#galleryAssetNote').value=asset.note||'';
+    fillAssetForm(asset);
     const metadata=asset.metadata||{}; q('#galleryMetadata').textContent=Object.keys(metadata).length?JSON.stringify(metadata,null,2):'无生成元数据。'; renderGeneration(asset);
     renderAnalysis(asset.analysis); message(asset.analysis_stale||asset.analysis?.stale?'旧分析已过期，不会用于 AI 场景与画风建议。请连接原目录，重新分析并确认保存。':'',true); if(!q('#galleryDetailDialog').open) q('#galleryDetailDialog').showModal(); window.dispatchEvent(new CustomEvent('soda-gallery-opened',{detail:asset})); await loadModelsAndProjects();
   }
@@ -302,7 +342,16 @@
   q('#galleryDetailDialog').addEventListener('click',event=>{ if(event.target===q('#galleryDetailDialog')) { const rect=event.target.getBoundingClientRect(); if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom) closeAsset(); } });
   q('#galleryAssetForm').addEventListener('submit',async event=>{
     event.preventDefault(); const button=event.currentTarget.querySelector('button'); button.disabled=true;
-    try { const source=q('#galleryAssetSource').value.trim(),sourceUrl=safeLink(source); if(source&&!sourceUrl) throw new Error('来源链接请填写完整的 http:// 或 https:// 地址'); const asset=await updateActive({title:q('#galleryAssetTitle').value.trim(),kind:q('#galleryAssetKind').value,favorite:q('#galleryAssetFavorite').checked,author:q('#galleryAssetAuthor').value.trim(),source_url:sourceUrl,tags:commaList(q('#galleryAssetTags').value),albums:commaList(q('#galleryAssetAlbums').value),note:q('#galleryAssetNote').value.trim(),project_id:q('#galleryAssetProject').value}); q('#galleryDetailTitle').textContent=asset.title||asset.filename; await loadAlbums(); message('整理已保存。',true); } catch(err) { error(err,true); } finally { button.disabled=false; }
+    const run=state.detailRun;
+    try {
+      const submitted=readAssetForm();
+      const asset=await updateActive(changedAssetFields(submitted));
+      if(run!==state.detailRun) return;
+      fillAssetForm(asset,submitted);
+      q('#galleryDetailTitle').textContent=asset.title||asset.filename;
+      await loadAlbums();
+      if(run===state.detailRun) message('整理已保存。',true);
+    } catch(err) { if(run===state.detailRun) error(err,true); } finally { button.disabled=false; }
   });
   q('#galleryAnalyze').addEventListener('click',()=>analyzeActive().catch(err=>error(err,true)));
   q('#galleryGenerationContent').addEventListener('click',async event=>{ const button=event.target.closest('[data-gallery-copy-prompt]'); if(!button) return; const text=promptRecordText(state.evidence,button.dataset.galleryCopyPrompt); if(text===null) return; try { await navigator.clipboard.writeText(text); message('Prompt 已复制。',true); } catch(err) { error(err,true); } });

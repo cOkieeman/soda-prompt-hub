@@ -7,6 +7,7 @@ import sqlite3
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -627,6 +628,87 @@ def test_accepted_comfy_job_recovers_without_submitting_again(studio, monkeypatc
     assert len(result["item_ids"]) == 1
     assert studio.generation_job(payload, Context()) == result
     assert len(studio.store.images(project["project_id"], "candidate")) == 1
+
+
+def test_confirmed_comfy_error_preserves_node_and_retries_with_new_id(studio, monkeypatch):
+    project = studio.store.create_project("retry", "moss")
+    project_id = project["project_id"]
+    digest = "a" * 64
+    graph_path = studio.store.root / "graphs" / f"{digest}.json"
+    graph_path.parent.mkdir(exist_ok=True)
+    graph_path.write_text('{"42":{"class_type":"SaveImage","inputs":{}}}')
+    payload = {
+        "project_id": project_id,
+        "graph_digest": digest,
+        "recipe": project["studio"],
+        "prompt": {"prefix": "", "body": "", "suffix": ""},
+    }
+    jobs = BackgroundJobStore(studio.store.settings.database_path)
+    job_id = jobs.enqueue("studio_generate", payload)["job_id"]
+    studio.store.save_execution(job_id, project_id, payload, "old", "accepted")
+    calls = []
+
+    def history(prompt_id):
+        calls.append(prompt_id)
+        if prompt_id == "old":
+            detail = {
+                "node_id": "22",
+                "node_type": "KSampler",
+                "exception_type": "RuntimeError",
+                "exception_message": "CUDA out of memory",
+                "current_inputs": "omit these",
+            }
+            return {"status": {"status_str": "error", "messages": [["execution_error", detail]]}}
+        return {"status": {"completed": True}, "outputs": {"42": {"images": [{"type": "output"}]}}}
+
+    def queue(_graph, *, client_id):
+        assert client_id == "soda-prompt-hub-studio"
+        calls.append("queue")
+        return "new"
+
+    client = SimpleNamespace(
+        history=history, queue_prompt=queue, download_output=lambda _: picture()
+    )
+    monkeypatch.setattr("prompt_hub.studio_service.ComfyUIClient", lambda *_, **__: client)
+    runner = BackgroundJobRunner(jobs, {"studio_generate": studio.generation_job})
+    runner._execute(jobs.claim_next({"studio_generate"}))  # noqa: SLF001 - run one claimed job
+    error = jobs.get(job_id)["error"]
+    assert "22 KSampler" in error
+    assert "RuntimeError" in error
+    assert "CUDA out of memory" in error
+    assert "omit these" not in error
+    execution = studio.store.execution(job_id)
+    assert execution["state"] == "failed"
+    assert execution["request"]["provider_error"] == error
+    jobs.retry(job_id)
+    runner._execute(jobs.claim_next({"studio_generate"}))  # noqa: SLF001 - run one claimed job
+    assert jobs.get(job_id)["status"] == "completed"
+    assert calls == ["old", "queue", "new"]
+
+
+def test_legacy_comfy_error_can_retry_and_uncertain_execution_is_preserved(studio):
+    jobs = BackgroundJobStore(studio.store.settings.database_path)
+    for error, expected in [
+        ("ComfyUI 執行失敗，請查看對應任務的節點錯誤", "failed"),
+        ("history connection failed", "accepted"),
+    ]:
+        job_id = jobs.enqueue("studio_generate", {})["job_id"]
+        jobs.claim_next({"studio_generate"})
+        jobs.fail(job_id, error)
+        studio.store.save_execution(job_id, "p", {}, "old", "accepted")
+        studio.store.initialize()
+        assert studio.store.execution(job_id)["state"] == expected
+
+
+def test_unknown_comfy_submission_does_not_queue_another_generation(studio, monkeypatch):
+    project = studio.store.create_project("unknown", "moss")
+    payload = {"project_id": project["project_id"], "recipe": project["studio"], "prompt": {}}
+    studio.store.save_execution("unknown", project["project_id"], payload, state="submitting")
+    monkeypatch.setattr("prompt_hub.studio_service.ComfyUIClient", lambda *_, **__: object())
+    context = SimpleNamespace(job_id="unknown", update=lambda *_args: None)
+    with pytest.raises(StudioError, match="提交狀態待核對"):
+        studio.generation_job(payload, context)
+    assert studio.store.execution("unknown")["state"] == "submitting"
 
 
 def test_saved_cloud_response_recovers_without_another_api_call(studio, monkeypatch):

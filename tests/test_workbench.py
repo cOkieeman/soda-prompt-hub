@@ -11,7 +11,7 @@ from PIL import Image
 
 from prompt_hub.agent_workbench import AgentWorkbench
 from prompt_hub.api import create_app
-from prompt_hub.background_jobs import BackgroundJobStore
+from prompt_hub.background_jobs import BackgroundJobRunner, BackgroundJobStore
 from prompt_hub.creative import CreativeStore
 from prompt_hub.dataset_workspace import DatasetWorkspaceStore
 from prompt_hub.gallery import GalleryStore
@@ -434,7 +434,7 @@ def test_saved_character_library_is_searchable_and_repeat_save_updates_one_entry
         assert found[0]["metadata"]["gender"] == "female"
 
 
-def test_precise_references_override_vibe_and_invert_fidelity(tmp_path, capture_novelai):
+def test_mixed_references_require_one_kind_and_preserve_fidelity(tmp_path, capture_novelai):
     first, second = tmp_path / "first.png", tmp_path / "second.png"
     first.write_bytes(picture())
     second.write_bytes(picture("red"))
@@ -443,17 +443,18 @@ def test_precise_references_override_vibe_and_invert_fidelity(tmp_path, capture_
         {"mode": "vibe", "strength": 0.1},
         {"mode": "precise", "strength": 0.8, "fidelity": 0.7},
     ]
-    novelai_images(
-        {
-            "kind": "novelai",
-            "model": "nai-diffusion-4-5-full",
-            "base_url": "https://example.test",
-            "api_key": "test",
-        },
-        recipe,
-        {"positive": "test", "negative": "", "seed": 12},
-        [("style", first), ("identity", second)],
-    )
+    provider = {
+        "kind": "novelai",
+        "model": "nai-diffusion-4-5-full",
+        "base_url": "https://example.test",
+        "api_key": "test",
+    }
+    prompt = {"positive": "test", "negative": "", "seed": 12}
+    with pytest.raises(StudioError, match="Vibe 與 Precise"):
+        novelai_images(provider, recipe, prompt, [("style", first), ("identity", second)])
+    assert capture_novelai == []
+    recipe["_reference_options"] = [recipe["_reference_options"][1]]
+    novelai_images(provider, recipe, prompt, [("identity", second)])
     params = capture_novelai[0]["parameters"]
     assert "reference_image_multiple" not in params
     assert len(params["director_reference_images"]) == 1
@@ -461,6 +462,55 @@ def test_precise_references_override_vibe_and_invert_fidelity(tmp_path, capture_
     assert params["director_reference_secondary_strength_values"] == pytest.approx([0.3])
     assert "director_reference_images" not in recipe["_effective_request"]["parameters"]
     assert "test" not in json.dumps(recipe["_effective_request"].get("Authorization", {}))
+
+
+@pytest.mark.parametrize(
+    ("model", "include_vibe", "error"),
+    [("nai-diffusion-4-5-full", True, "Vibe 與 Precise"), ("nai-diffusion-4-full", False, "V4.5")],
+)
+def test_novelai_rejects_incompatible_active_references_before_queue(
+    store, monkeypatch, model, include_vibe, error
+):
+    monkeypatch.setattr(BackgroundJobRunner, "start", lambda _self: None)
+    provider = ImageProviderStore(store.settings.library_root).save(
+        {"provider": {"kind": "novelai", "model": model, "base_url": "https://example.test"}}
+    )
+    project_id = store.create_project("references", "anima")["project_id"]
+    precise = store.add_image(project_id, picture(), "p.png", kind="reference", role="identity")
+    vibe = store.add_image(project_id, picture("red"), "v.png", kind="reference", role="style")
+    if not include_vibe:
+        store.update_image(project_id, vibe["item_id"], {"review": "excluded"})
+    store.save_project(
+        project_id,
+        {
+            "studio": {
+                "body": "test",
+                "backend": "novelai",
+                "provider_id": provider["saved_provider_id"],
+                "novelai_mode": "mixed",
+                "reference_modes": {precise["item_id"]: {"mode": "precise"}},
+            }
+        },
+    )
+    base = f"/api/studio/projects/{project_id}"
+    with TestClient(create_app(store.settings)) as client:
+
+        def generate():
+            preview = client.post(f"{base}/preview", json={})
+            assert preview.status_code == 200, preview.text
+            return client.post(
+                f"{base}/generate", json={"preview_id": preview.json()["preview_id"]}
+            )
+
+        result = generate()
+        assert result.status_code == 422
+        assert error in result.json()["detail"]
+        project = client.get(base).json()
+        assert project["jobs"] == []
+        assert len(project["images"]) == 2
+        store.update_image(project_id, precise["item_id"], {"review": "excluded"})
+        store.update_image(project_id, vibe["item_id"], {"review": "pending"})
+        assert generate().status_code == 202
 
 
 def test_novelai_outpaint_sends_infill_and_expanded_size(tmp_path, capture_novelai):

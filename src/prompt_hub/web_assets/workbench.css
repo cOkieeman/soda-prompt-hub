@@ -77,7 +77,6 @@
 @media(max-width:760px){.workbench-dataset-more{display:block;}.workbench-dataset-more summary{display:block;padding:8px 12px;border:1px solid var(--line);min-height:40px;cursor:pointer;}.workbench-dataset-more[open]>.workbench-actions{padding-top:8px;}#workbenchDatasetTools>.workbench-switches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}#workbenchDatasetTools>.workbench-switches button{white-space:normal;}#workbenchDatasetTools{margin-bottom:0;gap:10px;}}
 @media(max-width:560px){#workbenchTagger .studio-section-heading .studio-control-row{width:100%;}#workbenchTagger .studio-section-heading .studio-control-row>label{flex-basis:100%;}}
 
-body[data-app-view="tagger"] #workbenchTagger { max-width:none; padding:12px 16px; }
 body[data-app-view="tagger"] .studio-caption-layout { grid-template-columns:220px minmax(0,1fr); gap:0; margin-top:16px; border:1px solid var(--line); }
 body[data-app-view="tagger"] .tagger-image-column { min-width:0; padding:10px; border-right:1px solid var(--line); }
 body[data-app-view="tagger"] #taggerImageFilters { display:grid; gap:8px; }
@@ -119,24 +118,10 @@ body[data-app-view="tagger"] .studio-caption-list button > span > span:last-chil
 .tagger-box-fields input { width:100%; }
 @media(max-width:1000px) { .tagger-graph-form { grid-template-columns:minmax(0,1fr); } .tagger-inspector { max-height:none; border-left:0; border-top:1px solid var(--line); } .tagger-canvas-scroll { height:65vh; } }
 @media(max-width:650px) { body[data-app-view="tagger"] .studio-caption-layout { grid-template-columns:minmax(0,1fr); } body[data-app-view="tagger"] .tagger-image-column { border-right:0; border-bottom:1px solid var(--line); } body[data-app-view="tagger"] .studio-caption-list { grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); max-height:220px; } .tagger-canvas-scroll { height:55vh; } }
-body[data-app-view="tagger"] { overflow-x:clip; }
-body[data-app-view="tagger"] .app-nav { display:none; }
-body[data-app-view="tagger"] .shell { width:100%; max-width:none; min-height:100dvh; margin:0; padding:0; }
-body[data-app-view="tagger"] .workbench-page { margin:0; }
-body[data-app-view="tagger"] #workbenchTagger { width:100%; max-width:none; min-height:100dvh; margin:0; padding:0 10px 10px; }
 body[data-app-view="tagger"] #workbenchTaggerFlow,
 body[data-app-view="tagger"] .tagger-caption-heading > div:first-child { display:none; }
-#workbenchTaggerProjects > .workbench-heading,
-#workbenchTaggerEditor > .workbench-heading {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--studio-paper);
-}
 body[data-app-view="tagger"] #workbenchTaggerEditor > .workbench-heading { min-height:34px; margin:0; padding:0; gap:4px; }
-body[data-app-view="tagger"] #workbenchTaggerGallery { display:none; }
 body[data-app-view="tagger"] #workbenchTaggerBack { min-height:30px; padding:3px 9px; font-size:.85rem; }
-body[data-app-view="tagger"] [data-workbench-tagger-home] { min-height:34px; padding:5px 10px; }
 body[data-app-view="tagger"] #studioPage { padding:0; }
 body[data-app-view="tagger"] #studioPage .studio-steps { display:none; }
 body[data-app-view="tagger"] #studioPage .studio-project-heading { min-height:42px; margin:0; padding:3px 0; border-bottom:1px solid var(--line); }
@@ -157,7 +142,7 @@ body[data-app-view="tagger"] .tagger-import-tools p { margin:6px 0; font-size:.8
 body[data-app-view="tagger"] #studioTaggerSelection { min-height:32px; margin:0; gap:6px; }
 body[data-app-view="tagger"] #studioTaggerSelection > span { display:none; }
 body[data-app-view="tagger"] #studioTaggerSelection button { min-height:28px; padding:3px 8px; font-size:.82rem; }
-body[data-app-view="tagger"] .studio-caption-layout { height:calc(100dvh - 108px); min-height:420px; margin:0; }
+body[data-app-view="tagger"] .studio-caption-layout { margin:0; }
 body[data-app-view="tagger"] .tagger-graph-form { height:100%; min-height:0; }
 body[data-app-view="tagger"] .tagger-canvas-column { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; }
 body[data-app-view="tagger"] .tagger-image-column { display:flex; flex-direction:column; height:100%; overflow:visible; }
@@ -211,11 +196,17 @@ body[data-app-view="tagger"] .tagger-caption-select { min-height:0; }
 .tagger-object-list button { min-height:38px; }
 body[data-app-view="tagger"] .studio-notice:empty { display:none; }
 @media(min-width:1001px) {
-  body[data-app-view="tagger"] #workbenchTaggerEditor { display:flex; flex-direction:column; height:calc(100dvh - 10px); }
+  body[data-app-view="tagger"] .shell:has(#workbenchTaggerEditor:not([hidden])) { display:flex; flex-direction:column; height:100dvh; }
+  body[data-app-view="tagger"] .app-nav { flex:none; }
+  body[data-app-view="tagger"] #workbenchPage:has(#workbenchTaggerEditor:not([hidden])),
+  body[data-app-view="tagger"] #workbenchTagger:has(#workbenchTaggerEditor:not([hidden])),
+  body[data-app-view="tagger"] #workbenchTaggerEditor:not([hidden]) { display:flex; flex:1; flex-direction:column; min-height:420px; min-width:0; }
+  body[data-app-view="tagger"] #workbenchTagger { width:100%; }
   body[data-app-view="tagger"] #workbenchTaggerStudioHost { flex:1; min-height:0; }
   body[data-app-view="tagger"] #studioPage { display:flex; flex-direction:column; height:100%; min-height:0; }
   body[data-app-view="tagger"] [data-studio-panel="caption"] { display:flex; flex:1; flex-direction:column; min-height:0; }
-  body[data-app-view="tagger"] .studio-caption-layout { flex:1; height:auto; min-height:0; }
+  body[data-app-view="tagger"] .studio-caption-layout { flex:1; grid-template-rows:minmax(0,1fr); height:auto; min-height:0; }
+  body[data-app-view="tagger"] .tagger-image-column { min-height:0; }
   body[data-app-view="tagger"] .studio-caption-editor { min-height:0; overflow:hidden; }
   body[data-app-view="tagger"] .tagger-graph-form { grid-template-rows:minmax(0,1fr); }
   body[data-app-view="tagger"] .tagger-inspector { height:100%; min-height:0; }
@@ -229,7 +220,6 @@ body[data-app-view="tagger"] .studio-notice:empty { display:none; }
   body[data-app-view="tagger"] .tagger-inspector { max-height:none; }
 }
 @media(max-width:650px) {
-  body[data-app-view="tagger"] #workbenchTagger { padding:0 8px 8px; }
   body[data-app-view="tagger"] #studioPage .studio-project-heading { align-items:center; flex-wrap:wrap; gap:4px 8px; }
   body[data-app-view="tagger"] #studioProjectTaggerActions { width:100%; margin-left:0; }
   body[data-app-view="tagger"] #studioProjectTaggerActions #studioCaptionBatch { white-space:normal; }

@@ -24,7 +24,7 @@
   const v2PairedPoolLists = {layout:"studioWildcardV2LayoutPools", scene_light:"studioWildcardV2SceneLightPools"};
   const v2TestLightActive = settings => settings.layout === "independent" && ["random", "fixed"].includes(settings.test_lighting_mode);
   const v2TagGroups = [["style", "畫風"], ["line", "線條"], ["clothing", "服裝"]];
-  const state = {bootstrap:null, project:null, images:[], jobs:[], generationJobIds:[], preview:null, lastDraw:null, lastQueuedV2Preview:"", selectedImage:"", captionSelection:new Set(),
+  const state = {bootstrap:null, project:null, images:[], jobs:[], generationJobIds:[], preview:null, lastDraw:null, selectedImage:"", captionSelection:new Set(),
     v2Editor:"", v2CharacterEditing:false, v2PoolsRequest:null, v2PoolData:null,
     step:"generate", saving:null, dirty:false, saveTimer:null, uploadBusy:false,
     providerFormRun:0, providerDiscoveryRun:0, providerDiscoveryController:null, deletingProviderId:"", graphSelection:"", graphZoom:100,
@@ -782,8 +782,7 @@
       try {
         const preview = JSON.parse(localStorage.getItem(previewKey(route.project)) || "null");
         if (preview && preview.recipe === JSON.stringify(state.project.studio)) {
-          state.preview = preview.value;
-          state.lastDraw = preview.value.rows[0];
+          usePreview(preview.value);
         }
       } catch { }
       state.selectedImage = sessionStorage.getItem("studio-selected-" + route.project) || "";
@@ -834,28 +833,61 @@
     $("#studioPromptPreview").innerHTML = rows.length ? rows.slice(0, 12).map((row, index) => `<article class="studio-prompt-preview"><strong>第 ${index + 1} 張</strong><p>${escape(row.positive)}</p><small>抽詞種子 ${row.text_seed}${state.project.studio.backend === "openai" ? "" : `　出圖種子 ${row.seed}`}</small>${row.debug ? `<details><summary>Raffle 抽取紀錄</summary><p>${escape(row.debug)}</p></details>` : ""}</article>`).join("") + (rows.length > 12 ? `<p>本批共 ${rows.length} 張，顯示前 12 組。</p>` : "") : '<p class="studio-empty">填好提示詞後，預覽抽取結果。</p>';
   }
 
+  function usePreview(preview) {
+    state.preview = preview;
+    state.lastDraw = wildcardV2Active(state.project.studio) ? preview.rows.at(-1) : preview.rows[0];
+  }
+
   async function previewBatch(count) {
-    const v2 = wildcardV2Active(state.project.studio);
-    if (count === 1 && state.lastDraw && (v2 || state.project.studio.text_seed_mode === "increment")) {
-      state.project.studio.text_seed = (state.lastDraw.text_seed + 1) % (2 ** 53);
+    const project = state.project;
+    const v2 = wildcardV2Active(project.studio);
+    if (state.lastDraw && (v2 || (count === 1 && project.studio.text_seed_mode === "increment"))) {
+      project.studio.text_seed = (state.lastDraw.text_seed + 1) % (2 ** 53);
       const input = document.querySelector('[data-recipe="text_seed"]');
-      input.value = state.project.studio.text_seed;
+      input.value = project.studio.text_seed;
       markChanged();
     }
-    await saveCurrent();
-    const project = state.project;
     const snapshot = JSON.stringify(project.studio);
+    await saveCurrent();
     const result = await api(`/projects/${project.project_id}/preview`, {
       method:"POST", body:count === 1 ? {count:1} : {},
     });
-    if (v2 && (project !== state.project || snapshot !== JSON.stringify(project.studio))) {
+    if (project !== state.project || snapshot !== JSON.stringify(project.studio)) {
       throw new Error(translated("抽詞設定已變更，請重新抽詞。"));
     }
-    state.preview = result;
-    state.lastDraw = result.rows[0];
+    usePreview(result);
     try { localStorage.setItem(previewKey(state.project.project_id), JSON.stringify({recipe:JSON.stringify(state.project.studio),value:result})); } catch { }
     renderPreview();
     notice(`已準備 ${result.rows.length} 組提示詞。`);
+  }
+
+  async function queueBatch() {
+    const project = state.project;
+    await saveCurrent();
+    if (state.project !== project) return;
+    const v2 = wildcardV2Active(project.studio);
+    if (!state.preview || state.preview.rows.length !== project.studio.count || (v2 && state.preview.queued)) {
+      await previewBatch();
+    }
+    const preview = state.preview;
+    const projectId = project.project_id;
+    const result = await api(`/projects/${projectId}/generate`, {method:"POST",body:{preview_id:preview.preview_id}});
+    if (v2) {
+      if (state.preview?.preview_id === preview.preview_id) state.preview.queued = true;
+      try {
+        const key = previewKey(projectId);
+        const saved = JSON.parse(localStorage.getItem(key));
+        if (saved?.value?.preview_id === preview.preview_id) {
+          saved.value.queued = true;
+          localStorage.setItem(key, JSON.stringify(saved));
+        }
+      } catch { }
+    }
+    sessionStorage.setItem("studio-generation-jobs-" + projectId, JSON.stringify(result.job_ids));
+    if (state.project !== project) return;
+    state.generationJobIds = result.job_ids;
+    notice(`已加入 ${result.job_ids.length} 個任務。`);
+    await refreshImages();
   }
 
   async function importFiles(files, kind) {
@@ -1614,26 +1646,7 @@
       if (button.dataset.jobCancel) action(button, async () => { await api(`/jobs/${button.dataset.jobCancel}/cancel`, {method:"POST"}); await refreshImages(); });
       if (button.dataset.jobRetry) action(button, async () => { await api(`/jobs/${button.dataset.jobRetry}/retry`, {method:"POST"}); await refreshImages(); });
       if (button.id === "studioPreviewBatch" || button.id === "studioDrawOnce") action(button, () => previewBatch(button.id === "studioDrawOnce" ? 1 : undefined));
-      if (button.id === "studioQueueBatch") action(button, async () => {
-        await saveCurrent();
-        const v2 = wildcardV2Active(state.project.studio);
-        if (!state.preview || state.preview.rows.length !== state.project.studio.count ||
-            (v2 && state.preview.preview_id === state.lastQueuedV2Preview)) await previewBatch();
-        const previewId = state.preview.preview_id;
-        const projectId = state.project.project_id;
-        const result = await api(`/projects/${projectId}/generate`, {method:"POST",body:{preview_id:previewId}});
-        if (v2) {
-          state.lastQueuedV2Preview = previewId;
-          const cacheKey = previewKey(projectId);
-          try {
-            if (JSON.parse(localStorage.getItem(cacheKey))?.value?.preview_id === previewId) localStorage.removeItem(cacheKey);
-          } catch { }
-        }
-        state.generationJobIds = result.job_ids;
-        sessionStorage.setItem("studio-generation-jobs-" + projectId, JSON.stringify(result.job_ids));
-        notice(`已加入 ${result.job_ids.length} 個任務。`);
-        await refreshImages();
-      });
+      if (button.id === "studioQueueBatch") action(button, queueBatch);
       if (button.id === "studioLockDraw") {
         if (!state.preview?.rows?.length) return notice("先點抽一次，再鎖定抽取結果。", true);
         recipeFieldsFromPreview(state.preview.rows[0]);
